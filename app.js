@@ -200,16 +200,24 @@
     return [photos[heroIndex], ...photos.filter((_, i) => i !== heroIndex)];
   };
 
+  const FOCUS_ORDER = ['center', 'top', 'bottom'];
+  const FOCUS_ICON = { center: '⊙', top: '⬆', bottom: '⬇' };
   const renderPhotoGrid = () => {
     const grid = $('photoGrid');
     grid.innerHTML = '';
     photos.forEach((p, i) => {
       const cell = document.createElement('div');
       cell.className = 'photo-card' + (i === heroIndex ? ' hero' : '');
+      const focus = p.focus || 'center';
       cell.innerHTML = `<img src="${p.url}" alt="">` +
         (i === heroIndex ? '<span class="hero-tag">★ hero</span>' : '') +
-        `<button type="button" class="photo-x" title="Remove">×</button>`;
+        `<button type="button" class="photo-x" title="Remove">×</button>` +
+        `<button type="button" class="photo-focus${focus !== 'center' ? ' on' : ''}" title="Crop focus: ${focus} (click to change)">${FOCUS_ICON[focus]}</button>`;
       cell.querySelector('img').addEventListener('click', () => { heroIndex = i; renderPhotoGrid(); rerenderVisuals(); });
+      cell.querySelector('.photo-focus').addEventListener('click', () => {
+        p.focus = FOCUS_ORDER[(FOCUS_ORDER.indexOf(focus) + 1) % FOCUS_ORDER.length];
+        renderPhotoGrid(); rerenderVisuals();
+      });
       cell.querySelector('.photo-x').addEventListener('click', () => {
         if (p.url.startsWith('blob:')) URL.revokeObjectURL(p.url);
         photos.splice(i, 1);
@@ -278,17 +286,54 @@
       sqft: Generator.num(d.sqft), areaUnit: d.areaUnit,
       brand,
       hero: photos[heroIndex] ? photos[heroIndex].img : null,
+      heroFocus: photos[heroIndex] ? photos[heroIndex].focus : 'center',
       photos: orderedPhotos(),
       raw: d,
     };
   };
 
   // ---------------- graphics tab ----------------
+  let carouselCanvases = [];
   const renderGraphics = () => {
     const d = vizData();
     Visuals.render(brand.templateId, 'square', $('cvSquare'), d);
     Visuals.render(brand.templateId, 'story', $('cvStory'), d);
     Visuals.render(brand.templateId, 'wide', $('cvWide'), d);
+    renderCarousel(d);
+  };
+
+  // carousel: cover → photo slides with feature captions → CTA card
+  const renderCarousel = (d) => {
+    const section = $('carouselSection'), row = $('carouselRow');
+    carouselCanvases = [];
+    if (!d.photos.length) { section.hidden = true; return; }
+    section.hidden = false;
+    row.innerHTML = '';
+
+    const feats = Generator.flyerFeatures(d.raw, 6);
+    const slides = d.photos.slice(0, 6);
+    const total = slides.length + 2;
+
+    const addSlide = (label, renderFn) => {
+      const cell = document.createElement('div');
+      cell.className = 'car-slide';
+      const cv = document.createElement('canvas');
+      renderFn(cv);
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'copy-btn dl-mini';
+      btn.textContent = label;
+      const n = carouselCanvases.length + 1;
+      btn.addEventListener('click', () => Visuals.download(cv, `${slug()}-carousel-${String(n).padStart(2, '0')}.png`));
+      cell.appendChild(cv); cell.appendChild(btn);
+      row.appendChild(cell);
+      carouselCanvases.push(cv);
+    };
+
+    addSlide('1 · Cover', (cv) => Visuals.render(brand.templateId, 'square', cv, d));
+    slides.forEach((p, i) =>
+      addSlide(`${i + 2} · Photo`, (cv) => Visuals.featureSlide(cv, { photo: p, caption: feats[i] || '', brand, idx: i + 1, total })));
+    addSlide(`${total} · CTA`, (cv) => Visuals.ctaSlide(cv, { brand, address: d.address, badgeText: d.badgeText }));
   };
 
   const slug = () => ($('address').value.trim() || 'listing').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -299,6 +344,10 @@
     $('dlAll').addEventListener('click', () => {
       Object.entries(DL_NAME).forEach(([id, name], i) =>
         setTimeout(() => Visuals.download($(id), `${slug()}-${name}.png`), i * 350));
+    });
+    $('dlCarousel').addEventListener('click', () => {
+      carouselCanvases.forEach((cv, i) =>
+        setTimeout(() => Visuals.download(cv, `${slug()}-carousel-${String(i + 1).padStart(2, '0')}.png`), i * 350));
     });
   };
 
@@ -322,9 +371,12 @@
 
   const scaleFlyer = () => {
     const wrap = $('flyerWrap'), frame = $('flyerFrame');
-    const scale = Math.min(1, (wrap.clientWidth - 24) / 816);
+    const { w, h } = Flyer.pagePx(brand);
+    frame.style.width = w + 'px';
+    frame.style.height = h + 'px';
+    const scale = Math.min(1, (wrap.clientWidth - 24) / w);
     frame.style.transform = `scale(${scale})`;
-    wrap.style.height = Math.ceil(1056 * scale + 24) + 'px';
+    wrap.style.height = Math.ceil(h * scale + 24) + 'px';
   };
 
   // re-render whatever visual surface is active (cheap; canvases only)
@@ -349,12 +401,38 @@
     $('content').hidden = false;
     const text = outputs[tab] || '';
     $('copytext').textContent = text;
-    const chars = text.length;
-    let note = `${chars.toLocaleString()} characters`;
-    if (tab === 'mls') note += chars > 1000 ? ' · long for some portals — many truncate around 1,000' : ' · within typical portal limits';
-    if (tab === 'instagram') note += ' · Instagram caption limit is 2,200';
-    $('charcount').textContent = note;
+    updateCharcount();
     resetCopyBtn();
+  };
+
+  const updateCharcount = () => {
+    const chars = (outputs && outputs[activeTab] || '').length;
+    let note = `${chars.toLocaleString()} characters`;
+    if (activeTab === 'mls') note += chars > 1000 ? ' · long for some portals — many truncate around 1,000' : ' · within typical portal limits';
+    if (activeTab === 'instagram') note += ' · Instagram caption limit is 2,200';
+    $('charcount').textContent = note + ' · ✏️ click text to edit';
+  };
+
+  // edits in the output pane are kept (Copy copies them) and re-scanned
+  let rescanTimer = null;
+  const wireEditableOutput = () => {
+    const el = $('copytext');
+    try { el.contentEditable = 'plaintext-only'; } catch (e) { el.contentEditable = 'true'; }
+    el.spellcheck = false;
+    el.addEventListener('input', () => {
+      if (!outputs || activeTab === 'compliance') return;
+      outputs[activeTab] = el.innerText;
+      updateCharcount();
+      clearTimeout(rescanTimer);
+      rescanTimer = setTimeout(() => {
+        const data = readForm();
+        report = FairHousing.scan({
+          ...outputs,
+          'your input': [data.features.join(', '), data.neighborhood, data.address].filter(Boolean).join('. '),
+        });
+        updateComplianceDot();
+      }, 500);
+    });
   };
 
   // ---------------- compliance ----------------
@@ -497,6 +575,48 @@
     setTimeout(generate, 120);
   };
 
+  // ---------------- draft autosave (listing fields survive a refresh) ----------------
+  const DRAFT_KEY = 'lk_draft_v1';
+  const LISTING_FIELDS = ['address', 'city', 'price', 'currency', 'badge', 'badgeCustom', 'openhouse', 'type', 'tone', 'beds', 'baths', 'cars', 'sqft', 'areaUnit', 'year', 'lot', 'features', 'neighborhood'];
+  let draftTimer = null;
+  const saveDraft = () => {
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(() => {
+      const draft = {};
+      LISTING_FIELDS.forEach((id) => (draft[id] = $(id).value));
+      try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch (e) {}
+    }, 400);
+  };
+  const restoreDraft = () => {
+    try {
+      const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
+      if (!draft) return;
+      LISTING_FIELDS.forEach((id) => { if (draft[id] != null && draft[id] !== '') $(id).value = draft[id]; });
+      $('openhouseWrap').hidden = $('badge').value !== 'openhouse';
+      $('badgeCustomWrap').hidden = $('badge').value !== 'custom';
+    } catch (e) {}
+  };
+  const clearListing = () => {
+    LISTING_FIELDS.forEach((id) => {
+      const el = $(id);
+      if (el.tagName === 'SELECT') el.selectedIndex = 0;
+      else el.value = '';
+    });
+    applyRegionDefaults();
+    $('openhouseWrap').hidden = true;
+    $('badgeCustomWrap').hidden = true;
+    photos.forEach((p) => { if (p.url.startsWith('blob:')) URL.revokeObjectURL(p.url); });
+    photos = []; heroIndex = 0;
+    renderPhotoGrid();
+    document.querySelectorAll('#featureChips .chip').forEach((c) => c.classList.remove('added'));
+    outputs = null; report = null;
+    ['graphicsContent', 'flyerContent', 'content', 'complianceContent'].forEach((id) => ($(id).hidden = true));
+    $('emptyState').hidden = false;
+    $('complianceDot').className = 'dot';
+    $('parseNote').textContent = '';
+    try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
+  };
+
   // ---------------- misc wiring ----------------
   const wireChips = () => {
     document.querySelectorAll('#featureChips .chip').forEach((chip) => {
@@ -519,8 +639,11 @@
 
   // ---------------- events ----------------
   form.addEventListener('submit', (e) => { e.preventDefault(); generate(); });
+  form.addEventListener('input', saveDraft);
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => renderTab(t.dataset.tab)));
   $('copyBtn').addEventListener('click', doCopy);
+  $('rewordBtn').addEventListener('click', () => { if (outputs) generate(); });
+  $('clearBtn').addEventListener('click', clearListing);
   $('exampleBtn').addEventListener('click', loadExample);
   $('parseBtn').addEventListener('click', parsePaste);
   $('flyerOpen').addEventListener('click', () => { if (outputs) Flyer.openPrint(flyerOpts()); });
@@ -558,10 +681,12 @@
   wireChips();
   wireDropZone();
   wireDownloads();
+  wireEditableOutput();
   renderPalettes();
   window.addEventListener('resize', () => { if (activeTab === 'flyer' && outputs) scaleFlyer(); });
 
   loadBrand();
+  restoreDraft();
 
   // integration/test hook
   window.ListingKit = { addPhotoDataURL, generate, loadExample };

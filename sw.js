@@ -1,6 +1,6 @@
 /* Listing Kit — service worker. Cache-first so the app works offline and
  * installs to a phone/tablet home screen for in-the-field or interview demos. */
-const CACHE = 'listing-kit-v3';
+const CACHE = 'listing-kit-v4';
 const ASSETS = [
   './', './index.html', './styles.css',
   './app.js', './generator.js', './fairhousing.js',

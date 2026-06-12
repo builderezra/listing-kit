@@ -51,14 +51,17 @@ const Visuals = (() => {
   };
 
   // cover-fit an image into a rect (optionally rounded); placeholder if no img.
-  const cover = (ctx, img, x, y, w, h, r, brand) => {
+  // focus biases the vertical crop: 'top' keeps rooflines, 'bottom' keeps yards.
+  const FOCUS_Y = { top: 0, center: 0.5, bottom: 1 };
+  const cover = (ctx, img, x, y, w, h, r, brand, focus) => {
     ctx.save();
     if (r) { rr(ctx, x, y, w, h, r); ctx.clip(); }
     else { ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); }
     if (img && img.width) {
       const s = Math.max(w / img.width, h / img.height);
       const dw = img.width * s, dh = img.height * s;
-      ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) / 2, dw, dh);
+      const fy = FOCUS_Y[focus] != null ? FOCUS_Y[focus] : 0.5;
+      ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) * fy, dw, dh);
     } else {
       const g = ctx.createLinearGradient(x, y, x + w, y + h);
       g.addColorStop(0, shade(brand.primary, 26));
@@ -172,7 +175,7 @@ const Visuals = (() => {
   // =====================  MODERN — full-bleed photo + gradient  ================
   const modern = (ctx, W, H, d, kind) => {
     const b = d.brand;
-    cover(ctx, d.hero, 0, 0, W, H, 0, b);
+    cover(ctx, d.hero, 0, 0, W, H, 0, b, d.heroFocus);
 
     // legibility gradients
     let g = ctx.createLinearGradient(0, H * 0.4, 0, H);
@@ -233,7 +236,7 @@ const Visuals = (() => {
 
     if (kind === 'wide') {
       // photo left, content right
-      cover(ctx, d.hero, 44, 44, 596, H - 88, 0, b);
+      cover(ctx, d.hero, 44, 44, 596, H - 88, 0, b, d.heroFocus);
       badge(ctx, 64, 64, d.badgeText, b.accent, onColor(b.accent), 19, 4);
       ctx.textAlign = 'center';
       let y = d.ohLine ? 150 : 175;
@@ -255,13 +258,13 @@ const Visuals = (() => {
     const photoW = W - m * 2;
     const thumbs = (d.photos || []).length >= 3;
     const mainH = kind === 'story' ? (thumbs ? 880 : 1010) : (thumbs ? 500 : 590);
-    cover(ctx, d.hero, m, m, photoW, mainH, 0, b);
+    cover(ctx, d.hero, m, m, photoW, mainH, 0, b, d.heroFocus);
     badge(ctx, m + 22, m + 22, d.badgeText, b.accent, onColor(b.accent), kind === 'story' ? 26 : 22, 4);
     let y = m + mainH;
     if (thumbs) {
       const tw = (photoW - 14) / 2, th = kind === 'story' ? 240 : 168;
-      cover(ctx, d.photos[1] && d.photos[1].img, m, y + 14, tw, th, 0, b);
-      cover(ctx, d.photos[2] && d.photos[2].img, m + tw + 14, y + 14, tw, th, 0, b);
+      cover(ctx, d.photos[1] && d.photos[1].img, m, y + 14, tw, th, 0, b, d.photos[1] && d.photos[1].focus);
+      cover(ctx, d.photos[2] && d.photos[2].img, m + tw + 14, y + 14, tw, th, 0, b, d.photos[2] && d.photos[2].focus);
       y += 14 + th;
     }
 
@@ -300,7 +303,7 @@ const Visuals = (() => {
     let y;
 
     if (kind === 'wide') {
-      cover(ctx, d.hero, W - 560 - m, m, 560, H - m * 2, 26, b);
+      cover(ctx, d.hero, W - 560 - m, m, 560, H - m * 2, 26, b, d.heroFocus);
       contentX = m + 12; contentW = W - 560 - m * 2 - 40;
       badge(ctx, contentX, 72, d.badgeText, b.accent, onColor(b.accent), 21);
       if (d.ohLine) { ctx.font = font(600, 20); ctx.fillStyle = alpha('#ffffff', 0.9); ctx.fillText(d.ohLine, contentX + 4, 148); }
@@ -320,7 +323,7 @@ const Visuals = (() => {
 
     // square / story
     const photoH = kind === 'story' ? 1100 : 540;
-    cover(ctx, d.hero, m, m, W - m * 2, photoH, 30, b);
+    cover(ctx, d.hero, m, m, W - m * 2, photoH, 30, b, d.heroFocus);
     // angled badge overlapping the photo's bottom edge
     ctx.save();
     ctx.translate(m + 16, m + photoH - 26);
@@ -349,6 +352,121 @@ const Visuals = (() => {
     else logoImg(ctx, b.logoImg, W - m - 16, rowY + (kind === 'story' ? 72 : 64), kind === 'story' ? 80 : 68);
   };
 
+  // =====================  CAROUSEL SLIDES (1080×1080)  =========================
+  // wrap text to maxWidth, at most `maxLines` lines (ellipsis on overflow)
+  const wrapText = (ctx, text, maxWidth, maxLines) => {
+    const words = String(text).split(/\s+/).filter(Boolean);
+    const lines = [];
+    let line = '';
+    for (const w of words) {
+      const tryLine = line ? line + ' ' + w : w;
+      if (ctx.measureText(tryLine).width <= maxWidth || !line) line = tryLine;
+      else {
+        lines.push(line);
+        line = w;
+        if (lines.length === maxLines) break;
+      }
+    }
+    if (lines.length < maxLines && line) lines.push(line);
+    else if (line && lines.length === maxLines) lines[maxLines - 1] = lines[maxLines - 1].replace(/\s+\S*$/, '') + '…';
+    return lines;
+  };
+
+  // photo slide with a feature caption + position dots
+  const featureSlide = (canvas, { photo, caption, brand, idx, total }) => {
+    const W = 1080, H = 1080;
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    cover(ctx, photo && photo.img, 0, 0, W, H, 0, brand, photo && photo.focus);
+
+    const g = ctx.createLinearGradient(0, H * 0.55, 0, H);
+    g.addColorStop(0, 'rgba(8,14,18,0)');
+    g.addColorStop(1, 'rgba(8,14,18,0.85)');
+    ctx.fillStyle = g; ctx.fillRect(0, H * 0.55, W, H * 0.45);
+
+    // position dots, top-right
+    for (let i = 0; i < total; i++) {
+      ctx.beginPath();
+      ctx.arc(W - 52 - (total - 1 - i) * 26, 52, 6.5, 0, Math.PI * 2);
+      ctx.fillStyle = i === idx ? '#ffffff' : 'rgba(255,255,255,0.45)';
+      ctx.fill();
+    }
+
+    let y = H - 96;
+    if (caption) {
+      ctx.font = font(700, 46, priceFam(brand, SANS));
+      const lines = wrapText(ctx, caption, W - 128, 2);
+      y = H - 96 - (lines.length - 1) * 58;
+      ctx.fillStyle = '#ffffff';
+      lines.forEach((l, i) => ctx.fillText(l, 64, y + i * 58));
+      // accent tick above the caption
+      ctx.fillStyle = brand.accent;
+      ctx.fillRect(64, y - 58, 56, 5);
+      y -= 0;
+    }
+    // counter + name, bottom corners
+    ctx.font = font(600, 24);
+    ctx.fillStyle = 'rgba(255,255,255,0.75)';
+    ctx.fillText(brand.agentName || '', 64, H - 36);
+    ctx.textAlign = 'right';
+    ctx.fillText(`${idx + 1}/${total}`, W - 52, H - 36);
+    ctx.textAlign = 'left';
+  };
+
+  // closing call-to-action slide
+  const ctaSlide = (canvas, { brand, address, badgeText }) => {
+    const W = 1080, H = 1080;
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const fg = onColor(brand.primary);
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, shade(brand.primary, 16));
+    g.addColorStop(1, shade(brand.primary, -32));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    // decorative ring
+    ctx.beginPath(); ctx.arc(W - 120, 140, 190, 0, Math.PI * 2);
+    ctx.strokeStyle = alpha(brand.accent, 0.35); ctx.lineWidth = 3; ctx.stroke();
+
+    let y = 330;
+    if (brand.headImg && brand.headImg.width) circleImg(ctx, brand.headImg, W / 2, y - 60, 230, brand.accent);
+    else if (brand.logoImg && brand.logoImg.width) logoImg(ctx, brand.logoImg, W / 2 + 140, y - 60, 150);
+
+    ctx.textAlign = 'center';
+    ctx.font = font(700, 66, priceFam(brand, SANS));
+    ctx.fillStyle = fg;
+    ctx.fillText('Like what you see?', W / 2, y + 130);
+
+    // pill CTA
+    const ctaText = 'BOOK YOUR PRIVATE VIEWING';
+    ctx.font = font(800, 30);
+    spacing(ctx, 4);
+    const tw = ctx.measureText(ctaText).width;
+    const pw = tw + 76, ph = 78, px = (W - pw) / 2, py = y + 190;
+    ctx.fillStyle = brand.accent;
+    rr(ctx, px, py, pw, ph, ph / 2); ctx.fill();
+    ctx.fillStyle = onColor(brand.accent);
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ctaText, W / 2, py + ph / 2 + 2);
+    ctx.textBaseline = 'alphabetic';
+    spacing(ctx, 0);
+
+    y = py + ph + 110;
+    ctx.font = font(700, 40); ctx.fillStyle = fg;
+    ctx.fillText(brand.agentName || 'Your Name Here', W / 2, y);
+    ctx.font = font(400, 28); ctx.globalAlpha = 0.85;
+    if (brand.brokerage) { y += 48; ctx.fillText(brand.brokerage, W / 2, y); }
+    const contact = [brand.phone, brand.email].filter(Boolean).join('   ·   ');
+    if (contact) { y += 44; ctx.fillText(contact, W / 2, y); }
+    ctx.globalAlpha = 1;
+    if (address) {
+      ctx.font = font(600, 24); ctx.fillStyle = alpha(brand.accent, 0.95);
+      spacing(ctx, 2);
+      ctx.fillText(address.toUpperCase(), W / 2, H - 72);
+      spacing(ctx, 0);
+    }
+    ctx.textAlign = 'left';
+  };
+
   // ---- public API ------------------------------------------------------------
   const SIZES = { square: [1080, 1080], story: [1080, 1920], wide: [1200, 630] };
   const TEMPLATES = { modern, classic, bold };
@@ -371,5 +489,5 @@ const Visuals = (() => {
     }, 'image/png');
   };
 
-  return { render, download, SIZES, onColor, shade };
+  return { render, download, SIZES, onColor, shade, featureSlide, ctaSlide };
 })();

@@ -289,7 +289,14 @@ const Generator = (() => {
       p2.push(`${lead} — you’re ${cleanLocation(d.neighborhood)}.`);
     }
 
-    p2.push(pick(CLOSERS[tone] || CLOSERS.classic));
+    if (d.badge === 'openhouse' && d.openhouse) {
+      p2.push(pick([
+        `${ohLabel(d)} ${d.openhouse} — come and walk it yourself.`,
+        `See it in person: ${ohLabel(d).toLowerCase()} ${d.openhouse}.`,
+      ]));
+    } else {
+      p2.push(pick(CLOSERS[tone] || CLOSERS.classic));
+    }
 
     return p1.join(' ') + '\n\n' + p2.join(' ');
   };

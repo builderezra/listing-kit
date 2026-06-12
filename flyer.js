@@ -11,7 +11,14 @@ const Flyer = (() => {
 
   const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+  // page geometry: A4 everywhere except the US (Letter). px @ 96dpi for preview scaling.
+  const pagePx = (brand) => (brand.region === 'us' ? { w: 816, h: 1056 } : { w: 794, h: 1123 });
+
   const buildHTML = ({ d, brand, photos, mls, features, print }) => {
+    const isA4 = brand.region !== 'us';
+    const pageSize = isA4 ? 'A4' : 'letter';
+    const pageW = isA4 ? '210mm' : '8.5in';
+    const pageH = isA4 ? '297mm' : '11in';
     const primary = brand.primary || '#0f2e3d';
     const accent = brand.accent || '#c08a3e';
     const onPrim = Visuals.onColor(primary);
@@ -35,11 +42,11 @@ const Flyer = (() => {
     return `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>Flyer — ${esc(d.address || 'Listing')}</title>
 <style>
-  @page { size: letter; margin: 0; }
+  @page { size: ${pageSize}; margin: 0; }
   * { box-sizing: border-box; margin: 0; }
   html, body { background: #777; }
   body { font-family: -apple-system, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif; color: #22313a; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .page { width: 8.5in; height: 11in; margin: 0 auto; background: #fff; display: flex; flex-direction: column; overflow: hidden; position: relative; }
+  .page { width: ${pageW}; height: ${pageH}; margin: 0 auto; background: #fff; display: flex; flex-direction: column; overflow: hidden; position: relative; }
   @media print { html, body { background: #fff; } .printbar { display: none !important; } }
 
   .topbar { background: ${primary}; color: ${onPrim}; display: flex; align-items: center; justify-content: space-between; padding: 0.16in 0.45in; }
@@ -127,5 +134,5 @@ ${print ? '<div class="printbar"><button onclick="window.print()">🖨️ Print 
     w.document.close();
   };
 
-  return { buildHTML, openPrint };
+  return { buildHTML, openPrint, pagePx };
 })();

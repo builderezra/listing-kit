@@ -4,7 +4,7 @@
  * advertising that signals a preference, limitation, or discrimination based on
  * a protected class: race, color, religion, national origin, sex, disability,
  * and familial status. Agents get tripped up by phrases that sound harmless —
- * "perfect for families," "safe neighborhood," "walking distance," "master
+ * "perfect for families," "safe neighbourhood," "walking distance," "master
  * bedroom." This module scans any text and flags those phrases with the why and
  * a safer rewrite.
  *
@@ -31,9 +31,9 @@ const FairHousing = (() => {
     { re: /\bholy\b/i, cls: 'Religion', sev: 'low', why: 'May read as a religious reference depending on context.', fix: 'Rephrase if it refers to a religious site.' },
 
     // ---- Race / color / national origin -------------------------------------
-    { re: /\b(exclusive|restricted) (neighborhood|community|area|enclave)\b/i, cls: 'Race / national origin', sev: 'high', why: '“Exclusive/restricted” can imply who is welcome.', fix: 'Try “sought-after” or “established” and describe the homes.' },
-    { re: /\b(integrated|traditional|established ethnic)\b/i, cls: 'Race / national origin', sev: 'medium', why: 'Comments on the makeup of a neighborhood.', fix: 'Describe amenities and architecture, not demographics.' },
-    { re: /\b(hispanic|latino|asian|black|white|caucasian|african)\b/i, cls: 'Race / national origin', sev: 'high', why: 'References race or ethnicity of an area or buyer.', fix: 'Remove. Never describe a neighborhood by its demographics.' },
+    { re: /\b(exclusive|restricted) (neighbou?rhood|community|area|enclave)\b/i, cls: 'Race / national origin', sev: 'high', why: '“Exclusive/restricted” can imply who is welcome.', fix: 'Try “sought-after” or “established” and describe the homes.' },
+    { re: /\b(integrated|traditional|established ethnic)\b/i, cls: 'Race / national origin', sev: 'medium', why: 'Comments on the makeup of a neighbourhood.', fix: 'Describe amenities and architecture, not demographics.' },
+    { re: /\b(hispanic|latino|asian|black|white|caucasian|african)\b/i, cls: 'Race / national origin', sev: 'high', why: 'References race or ethnicity of an area or buyer.', fix: 'Remove. Never describe a neighbourhood by its demographics.' },
 
     // ---- Disability ---------------------------------------------------------
     { re: /\bwalking distance\b/i, cls: 'Disability', sev: 'medium', why: '“Walking distance” can be read as excluding those with mobility needs.', fix: 'Use “close to,” “minutes from,” or give the distance.' },
@@ -54,8 +54,8 @@ const FairHousing = (() => {
     { re: /\b(safe|safer)\b(?!\s*(room|deposit|harbor))/i, cls: 'Steering (safety)', sev: 'high', why: '“Safe” is a classic steering word — it can imply who lives there and creates liability if ever inaccurate.', fix: 'Remove safety claims entirely; describe the property instead.' },
     { re: /\b(crime[- ]free|low[- ]crime|no crime)\b/i, cls: 'Steering (safety)', sev: 'high', why: 'Crime claims are steering and a liability risk.', fix: 'Remove. Let buyers research public crime data themselves.' },
     { re: /\b(good|great|top|best|excellent) schools?\b/i, cls: 'Steering (schools)', sev: 'medium', why: 'School-quality claims can function as steering and proxy for class/race.', fix: 'State the district name factually, or let buyers research it.' },
-    { re: /\b(desirable|prestigious|prime|sought[- ]after) (neighborhood|area|community)\b/i, cls: 'Steering', sev: 'low', why: 'Vague desirability language can edge into steering.', fix: 'Be specific: name the park, the trail, the coffee shop.' },
-    { re: /\bquiet (neighborhood|area|street|community)\b/i, cls: 'Steering', sev: 'low', why: 'Subjective claims about an area can be read as coded.', fix: 'Describe the street factually (“tree-lined,” “low-traffic cul-de-sac”).' },
+    { re: /\b(desirable|prestigious|prime|sought[- ]after) (neighbou?rhood|area|community)\b/i, cls: 'Steering', sev: 'low', why: 'Vague desirability language can edge into steering.', fix: 'Be specific: name the park, the trail, the coffee shop.' },
+    { re: /\bquiet (neighbou?rhood|area|street|community)\b/i, cls: 'Steering', sev: 'low', why: 'Subjective claims about an area can be read as coded.', fix: 'Describe the street factually (“tree-lined,” “low-traffic cul-de-sac”).' },
     { re: /\bgated community\b/i, cls: 'Steering', sev: 'low', why: 'Usually fine as a factual feature; just avoid “exclusive” framing.', fix: 'Keep factual: “gated community with controlled access.”' },
   ];
 

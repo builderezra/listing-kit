@@ -277,7 +277,10 @@
 
         <div class="actions">
           <button type="submit" class="generate-btn" id="generateBtn">Generate marketing kit ✨</button>
-          <button type="button" class="link-btn" id="exampleBtn">Load example listing</button>
+          <div class="actions-links">
+            <button type="button" class="link-btn" id="exampleBtn">Load example listing</button>
+            <button type="button" class="link-btn" id="clearBtn">Start a new listing</button>
+          </div>
         </div>
       </form>
     </section>
@@ -326,6 +329,12 @@
             </div>
           </div>
           <button type="button" class="copy-btn dl-all" id="dlAll">⬇️ Download all graphics</button>
+
+          <div id="carouselSection" hidden>
+            <h3 class="gfx-sub">📚 Instagram carousel <span class="hint">— cover, photo highlights, then your CTA card. Post in order.</span></h3>
+            <div class="carousel-row" id="carouselRow"></div>
+            <button type="button" class="copy-btn dl-all" id="dlCarousel">⬇️ Download carousel slides</button>
+          </div>
         </article>
 
         <article class="panel-content" id="flyerContent" hidden>
@@ -341,7 +350,10 @@
         <article class="panel-content" id="content" hidden>
           <div class="content-head">
             <span class="charcount" id="charcount"></span>
-            <button type="button" class="copy-btn" id="copyBtn">Copy</button>
+            <div class="content-btns">
+              <button type="button" class="copy-btn" id="rewordBtn" title="Generate a fresh wording of all the copy">↻ Reword</button>
+              <button type="button" class="copy-btn" id="copyBtn">Copy</button>
+            </div>
           </div>
           <pre class="copytext" id="copytext"></pre>
         </article>
