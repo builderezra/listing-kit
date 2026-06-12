@@ -21,10 +21,14 @@ const Flyer = (() => {
     const stats = [
       d.beds && [d.beds, d.beds == 1 ? 'Bedroom' : 'Bedrooms'],
       d.baths && [d.baths, d.baths == 1 ? 'Bath' : 'Baths'],
-      d.sqft && [d.sqft, 'Sq Ft'],
+      d.cars && [d.cars, d.cars == 1 ? 'Car' : 'Cars'],
+      d.sqft && [d.sqft, d.areaUnit === 'sqm' ? 'm²' : 'Sq Ft'],
       d.lot && [d.lot, 'Lot'],
       d.year && [d.year, 'Built'],
     ].filter(Boolean);
+    const headlineFont = brand.font === 'sans'
+      ? `-apple-system, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif`
+      : `Georgia, 'Times New Roman', serif`;
 
     const mlsParas = String(mls || '').split('\n\n').map((p) => `<p>${esc(p)}</p>`).join('');
 
@@ -49,7 +53,7 @@ const Flyer = (() => {
   .pricetag { position: absolute; right: 0; bottom: 0.32in; background: ${accent}; color: ${Visuals.onColor(accent)}; font-size: 19pt; font-weight: 800; padding: 0.1in 0.42in 0.1in 0.3in; }
 
   .addr { padding: 0.22in 0.45in 0.05in; display: flex; align-items: baseline; justify-content: space-between; }
-  .addr h1 { font-family: Georgia, 'Times New Roman', serif; font-size: 19pt; color: ${primary}; font-weight: 700; }
+  .addr h1 { font-family: ${headlineFont}; font-size: 19pt; color: ${primary}; font-weight: 700; }
   .addr .city { font-size: 11pt; color: #5d6e75; }
 
   .stats { display: flex; gap: 0.32in; padding: 0.1in 0.45in 0.14in; border-bottom: 2px solid ${accent}; margin: 0 0.45in 0.16in; padding-left: 0; padding-right: 0; }
@@ -111,7 +115,7 @@ ${print ? '<div class="printbar"><button onclick="window.print()">🖨️ Print 
     <div class="contact">${[brand.phone, brand.email].filter(Boolean).map(esc).join('<br>')}</div>
     ${brand.logo ? `<img class="logo" src="${brand.logo}" alt="">` : ''}
   </div>
-  <div class="eho">⌂ Equal Housing Opportunity</div>
+  ${brand.region === 'us' ? '<div class="eho">⌂ Equal Housing Opportunity</div>' : ''}
 </div>
 </body></html>`;
   };

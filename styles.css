@@ -115,6 +115,22 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 }
 .filebtn:hover { border-color: var(--teal); color: var(--teal); }
 
+/* quick palettes */
+.pal-row { display: flex; gap: 7px; flex-wrap: wrap; }
+.pal {
+  width: 32px; height: 32px; border-radius: 9px; padding: 0;
+  border: 1.5px solid var(--line); cursor: pointer; transition: transform .1s, border-color .12s;
+}
+.pal:hover { transform: scale(1.12); border-color: var(--teal); }
+
+/* design import/export */
+.design-io { display: flex; gap: 18px; margin-top: 2px; }
+
+/* price + size unit selects */
+.pricewrap, .sizewrap { display: flex; gap: 6px; }
+.pricewrap select { width: 74px; flex: 0 0 auto; }
+.sizewrap select { width: 84px; flex: 0 0 auto; }
+
 /* template picker */
 .tpl-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
 .tpl {

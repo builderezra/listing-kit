@@ -19,10 +19,25 @@
     primary: '#0f2e3d', accent: '#c08a3e',
     logo: '', headshot: '',      // dataURLs (persisted)
     templateId: 'modern',
+    font: 'auto',                // headline font: auto | serif | sans
+    region: 'au',                // au | us | uk | other — drives defaults + compliance framing
   };
   brand.logoImg = null; brand.headImg = null; // live Image objects
 
-  const CHANNEL_LABEL = { mls: 'MLS description', instagram: 'Instagram caption', facebook: 'Facebook post', email: 'Email blast' };
+  const CHANNEL_LABEL = { mls: 'Listing description', instagram: 'Instagram caption', facebook: 'Facebook post', email: 'Email blast' };
+
+  // sensible per-market defaults for the per-listing selects
+  const REGION_DEFAULTS = {
+    au: { currency: '$', areaUnit: 'sqm' },
+    us: { currency: '$', areaUnit: 'sqft' },
+    uk: { currency: '£', areaUnit: 'sqft' },
+    other: { currency: '$', areaUnit: 'sqm' },
+  };
+  const applyRegionDefaults = () => {
+    const r = REGION_DEFAULTS[brand.region] || REGION_DEFAULTS.other;
+    $('currency').value = r.currency;
+    $('areaUnit').value = r.areaUnit;
+  };
 
   // ---------------- brand kit (persisted) ----------------
   const loadBrand = () => {
@@ -33,6 +48,9 @@
     $('agentName').value = brand.agentName; $('brokerage').value = brand.brokerage;
     $('phone').value = brand.phone; $('email').value = brand.email;
     $('brandPrimary').value = brand.primary; $('brandAccent').value = brand.accent;
+    $('brandFont').value = brand.font || 'auto';
+    $('region').value = brand.region || 'au';
+    applyRegionDefaults();
     setImgPreview('logo', brand.logo); setImgPreview('head', brand.headshot);
     loadBrandImages();
     markTemplate();
@@ -92,6 +110,68 @@
 
   const markTemplate = () => {
     document.querySelectorAll('.tpl').forEach((t) => t.classList.toggle('active', t.dataset.tpl === brand.templateId));
+  };
+
+  // ---------------- quick palettes ----------------
+  const PALETTES = [
+    ['#0f2e3d', '#c08a3e'], // navy & gold
+    ['#1b3a2d', '#b06f43'], // forest & copper
+    ['#20242b', '#c9a227'], // charcoal & brass
+    ['#2c2330', '#c77d92'], // plum & rose
+    ['#16424f', '#e0704f'], // teal & coral
+    ['#101010', '#d4af37'], // black & gold
+    ['#33415c', '#8fb8de'], // slate & sky
+    ['#4a2c2a', '#d9c5a0'], // espresso & cream
+  ];
+  const renderPalettes = () => {
+    const row = $('palRow');
+    row.innerHTML = '';
+    PALETTES.forEach(([p, a]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'pal';
+      b.title = `${p} / ${a}`;
+      b.style.background = `linear-gradient(135deg, ${p} 50%, ${a} 50%)`;
+      b.addEventListener('click', () => {
+        brand.primary = p; brand.accent = a;
+        $('brandPrimary').value = p; $('brandAccent').value = a;
+        saveBrand(); rerenderVisuals();
+      });
+      row.appendChild(b);
+    });
+  };
+
+  // ---------------- design import / export ----------------
+  const exportDesign = () => {
+    const { logoImg, headImg, ...persist } = brand;
+    const blob = new Blob([JSON.stringify({ app: 'listing-kit', v: 1, design: persist }, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'my-design.listingkit.json';
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  };
+  const importDesign = (file) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      try {
+        const parsed = JSON.parse(reader.result);
+        const design = parsed && parsed.app === 'listing-kit' ? parsed.design : parsed;
+        if (!design || typeof design !== 'object' || !('primary' in design || 'templateId' in design)) {
+          $('parseNote').textContent = '';
+          alert('That file doesn’t look like a Listing Kit design.');
+          return;
+        }
+        const { logoImg, headImg, ...safe } = design;
+        Object.assign(brand, safe);
+        saveBrand();
+        loadBrand();
+        rerenderVisuals();
+      } catch (e) {
+        alert('Couldn’t read that design file.');
+      }
+    };
+    reader.readAsText(file);
   };
 
   // ---------------- photos ----------------
@@ -154,18 +234,23 @@
     address: $('address').value.trim(),
     city: $('city').value.trim(),
     price: $('price').value.trim(),
+    currency: $('currency').value,
     badge: $('badge').value,
+    badgeCustom: $('badgeCustom').value.trim(),
     openhouse: $('openhouse').value.trim(),
     type: $('type').value,
     tone: $('tone').value,
     beds: $('beds').value.trim(),
     baths: $('baths').value.trim(),
+    cars: $('cars').value.trim(),
     sqft: $('sqft').value.trim(),
+    areaUnit: $('areaUnit').value,
     year: $('year').value.trim(),
     lot: $('lot').value.trim(),
     features: $('features').value.split(/[,\n]/).map((s) => s.trim()).filter(Boolean),
     neighborhood: $('neighborhood').value.trim(),
     agentName: brand.agentName, brokerage: brand.brokerage, phone: brand.phone, email: brand.email,
+    region: brand.region,
     photoCount: photos.length,
   });
 
@@ -185,11 +270,12 @@
   const vizData = () => {
     const d = readForm();
     return {
-      badgeText: Generator.BADGE_HOOK[d.badge] || 'JUST LISTED',
+      badgeText: Generator.badgeText(d),
       ohLine: d.badge === 'openhouse' && d.openhouse ? d.openhouse : '',
-      price: Generator.money(d.price),
+      price: Generator.money(d.price, d.currency),
       address: [d.address, d.city].filter(Boolean).join(', '),
-      beds: d.beds, baths: d.baths, sqft: Generator.num(d.sqft),
+      beds: d.beds, baths: d.baths, cars: d.cars,
+      sqft: Generator.num(d.sqft), areaUnit: d.areaUnit,
       brand,
       hero: photos[heroIndex] ? photos[heroIndex].img : null,
       photos: orderedPhotos(),
@@ -220,7 +306,7 @@
   const flyerOpts = () => {
     const d = vizData();
     return {
-      d: { ...d.raw, badgeText: d.badgeText, ohLine: d.ohLine, price: d.price, sqft: Generator.num(d.raw.sqft) },
+      d: { ...d.raw, badgeText: d.badgeText, ohLine: d.ohLine, price: d.price, sqft: Generator.num(d.raw.sqft), cars: d.cars, areaUnit: d.areaUnit },
       brand,
       photos: orderedPhotos(),
       mls: outputs ? outputs.mls : '',
@@ -265,7 +351,7 @@
     $('copytext').textContent = text;
     const chars = text.length;
     let note = `${chars.toLocaleString()} characters`;
-    if (tab === 'mls') note += chars > 1000 ? ' · over the 1,000-char limit on some MLS boards' : ' · within typical MLS limits';
+    if (tab === 'mls') note += chars > 1000 ? ' · long for some portals — many truncate around 1,000' : ' · within typical portal limits';
     if (tab === 'instagram') note += ' · Instagram caption limit is 2,200';
     $('charcount').textContent = note;
     resetCopyBtn();
@@ -310,7 +396,11 @@
       const note = document.createElement('p');
       note.className = 'muted';
       note.style.marginTop = '14px';
-      note.textContent = 'Flags are guidance, not legal advice. When in doubt, check with your broker’s compliance team.';
+      note.textContent = brand.region === 'au'
+        ? 'Flags are guidance, not legal advice. In Australia, ads that indicate an intention to discriminate are unlawful under federal anti-discrimination law and the WA Equal Opportunity Act 1984 — when in doubt, check with your agency or REIWA guidance.'
+        : brand.region === 'uk'
+          ? 'Flags are guidance, not legal advice. In the UK, discriminatory property ads breach the Equality Act 2010 — when in doubt, check with your agency’s compliance guidance.'
+          : 'Flags are guidance, not legal advice. When in doubt, check with your broker’s compliance team.';
       body.appendChild(note);
     }
   };
@@ -341,28 +431,27 @@
     setTimeout(resetCopyBtn, 1600);
   };
 
-  // ---------------- paste-to-parse ----------------
+  // ---------------- paste-to-parse (site-agnostic, via parser.js) ----------------
   const parsePaste = () => {
     const t = $('pasteBox').value;
     if (!t.trim()) return;
-    const found = [];
-    const grab = (re, id, label, clean) => {
-      const m = t.match(re);
-      if (m && !$(id).value.trim()) {
-        $(id).value = clean ? clean(m[1]) : m[1];
-        found.push(label);
-      }
-    };
-    grab(/\$\s?([\d,]{5,})/, 'price', 'price');
-    grab(/([\d.]+)\s*(?:bd|beds?|bedrooms?)\b/i, 'beds', 'beds');
-    grab(/([\d.]+)\s*(?:ba|baths?|bathrooms?)\b/i, 'baths', 'baths');
-    grab(/([\d,]{3,6})\s*(?:sq\.?\s?ft|sqft|square\s+feet)/i, 'sqft', 'sqft');
-    grab(/built\D{0,12}((?:19|20)\d{2})/i, 'year', 'year built');
-    grab(/((?:19|20)\d{2})\s+built/i, 'year', 'year built');
-    grab(/([\d.]+)\s*acres?\b/i, 'lot', 'lot size', (v) => v + '-acre');
-    const addr = t.split('\n').map((l) => l.trim()).find((l) => /^\d{2,6}\s+[A-Za-z]/.test(l));
-    if (addr && !$('address').value.trim()) { $('address').value = addr.split(',')[0]; found.push('address'); }
-    $('parseNote').textContent = found.length ? `✓ Filled: ${found.join(', ')}` : 'Nothing recognized — fill the fields manually.';
+    const r = Parser.parse(t);
+    const fillText = (id, v, fmt) => { if (v != null && v !== '' && !$(id).value.trim()) $(id).value = fmt ? fmt(v) : v; };
+    fillText('price', r.price, (v) => v.toLocaleString('en-US'));
+    fillText('beds', r.beds);
+    fillText('baths', r.baths);
+    fillText('cars', r.cars);
+    fillText('sqft', r.sqft, (v) => v.toLocaleString('en-US'));
+    fillText('year', r.year);
+    fillText('lot', r.lot);
+    fillText('address', r.address);
+    fillText('city', r.city);
+    if (r.currency) $('currency').value = r.currency;
+    if (r.areaUnit) $('areaUnit').value = r.areaUnit;
+    if (r.type) $('type').value = r.type;
+    $('parseNote').textContent = r.found.length
+      ? `✓ Found: ${[...new Set(r.found)].join(', ')}`
+      : 'Nothing recognized — fill the fields manually.';
   };
 
   // ---------------- example listing (with synthesized photos) ----------------
@@ -383,16 +472,17 @@
   };
 
   const EXAMPLE = {
-    address: '142 Maple Grove Ln', city: 'Asheville', price: '525,000', type: 'single', tone: 'warm',
-    beds: '3', baths: '2', sqft: '1,850', year: '1998', lot: '0.3-acre',
-    features: 'Updated kitchen, hardwood floors, primary suite, fenced backyard, finished basement, stainless appliances',
-    neighborhood: 'minutes from downtown, the greenway, and local coffee shops',
+    address: '24 Seaview Terrace', city: 'Scarborough', price: '985,000', type: 'single', tone: 'warm',
+    beds: '4', baths: '2', cars: '2', sqft: '220', year: '2004', lot: '450 m²',
+    features: 'Renovated kitchen, stone benchtops, open-plan living, alfresco entertaining area, double garage, solar panels, reverse-cycle aircon, walk-in robe',
+    neighborhood: 'minutes from Scarborough Beach, the coastal path, and local cafés',
   };
   const loadExample = () => {
     Object.entries(EXAMPLE).forEach(([k, v]) => { if ($(k)) $(k).value = v; });
+    $('currency').value = '$'; $('areaUnit').value = 'sqm';
     if (!brand.agentName) {
-      brand.agentName = 'Ezra Smith'; brand.brokerage = 'Blue Ridge Realty';
-      brand.phone = '(828) 555-0142'; brand.email = 'ezra@blueridge.com';
+      brand.agentName = 'Ezra Smith'; brand.brokerage = 'Sunset Coast Realty';
+      brand.phone = '0400 555 142'; brand.email = 'ezra@sunsetcoast.com.au';
       $('agentName').value = brand.agentName; $('brokerage').value = brand.brokerage;
       $('phone').value = brand.phone; $('email').value = brand.email;
       saveBrand();
@@ -436,8 +526,11 @@
   $('flyerOpen').addEventListener('click', () => { if (outputs) Flyer.openPrint(flyerOpts()); });
   $('badge').addEventListener('change', () => {
     $('openhouseWrap').hidden = $('badge').value !== 'openhouse';
+    $('badgeCustomWrap').hidden = $('badge').value !== 'custom';
     rerenderVisuals();
   });
+  ['badgeCustom', 'openhouse', 'cars', 'currency', 'areaUnit'].forEach((id) =>
+    $(id).addEventListener('input', rerenderVisuals));
   document.querySelectorAll('.tpl').forEach((t) => t.addEventListener('click', () => {
     brand.templateId = t.dataset.tpl;
     saveBrand(); markTemplate(); rerenderVisuals();
@@ -448,11 +541,24 @@
   bindBrandField('email', 'email');
   bindBrandField('brandPrimary', 'primary');
   bindBrandField('brandAccent', 'accent');
+  bindBrandField('brandFont', 'font');
+  $('region').addEventListener('change', () => {
+    brand.region = $('region').value;
+    applyRegionDefaults();
+    saveBrand(); rerenderVisuals();
+    if (activeTab === 'compliance' && report) renderCompliance();
+  });
+  $('designExport').addEventListener('click', exportDesign);
+  $('designImport').addEventListener('change', (e) => {
+    if (e.target.files[0]) importDesign(e.target.files[0]);
+    e.target.value = '';
+  });
   wireImagePick('logo', 'logo');
   wireImagePick('head', 'headshot');
   wireChips();
   wireDropZone();
   wireDownloads();
+  renderPalettes();
   window.addEventListener('resize', () => { if (activeTab === 'flyer' && outputs) scaleFlyer(); });
 
   loadBrand();

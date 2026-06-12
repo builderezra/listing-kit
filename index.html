@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Listing Kit — Photos in, marketing kit out</title>
-  <meta name="description" content="Upload listing photos and details once — get branded Instagram posts, stories, Facebook graphics, a print-ready flyer, and all the copy, with a built-in fair-housing language check." />
+  <meta name="description" content="Upload listing photos and details once — get branded Instagram posts, stories, Facebook graphics, a print-ready flyer, and all the copy, with a built-in compliance language check." />
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
@@ -19,7 +19,7 @@
         <p class="tag">Photos + details in → branded graphics, flyer &amp; copy out.</p>
       </div>
     </div>
-    <span class="badge" title="Every output is scanned for fair-housing language risks.">⚖️ Fair-Housing Aware</span>
+    <span class="badge" title="Every output is scanned for discrimination-risk language.">⚖️ Compliance-Aware</span>
   </header>
 
   <main class="layout">
@@ -36,18 +36,37 @@
                 <input type="text" id="agentName" placeholder="Ezra Smith" />
               </div>
               <div class="field">
-                <label for="brokerage">Brokerage</label>
-                <input type="text" id="brokerage" placeholder="Blue Ridge Realty" />
+                <label for="brokerage">Agency</label>
+                <input type="text" id="brokerage" placeholder="Sunset Coast Realty" />
               </div>
             </div>
             <div class="row">
               <div class="field">
                 <label for="phone">Phone</label>
-                <input type="text" id="phone" placeholder="(828) 555-0142" />
+                <input type="text" id="phone" placeholder="0400 555 142" />
               </div>
               <div class="field">
                 <label for="email">Email</label>
-                <input type="text" id="email" placeholder="ezra@blueridge.com" />
+                <input type="text" id="email" placeholder="ezra@sunsetcoast.com.au" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label for="region">Market region</label>
+                <select id="region">
+                  <option value="au">Australia</option>
+                  <option value="us">United States</option>
+                  <option value="uk">United Kingdom</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+              <div class="field">
+                <label for="brandFont">Headline font</label>
+                <select id="brandFont">
+                  <option value="auto">Auto (match template)</option>
+                  <option value="serif">Serif (editorial)</option>
+                  <option value="sans">Sans (modern)</option>
+                </select>
               </div>
             </div>
             <div class="row">
@@ -59,6 +78,10 @@
                 <label for="brandAccent">Accent color</label>
                 <input type="color" id="brandAccent" value="#c08a3e" />
               </div>
+            </div>
+            <div class="field">
+              <label>Quick palettes</label>
+              <div class="pal-row" id="palRow"></div>
             </div>
             <div class="row">
               <div class="field">
@@ -88,6 +111,11 @@
                 <button type="button" class="tpl" data-tpl="bold"><span class="tpl-art tpl-bold"></span>Bold</button>
               </div>
             </div>
+            <div class="design-io">
+              <button type="button" class="link-btn" id="designExport">⬇️ Export design file</button>
+              <label class="link-btn" for="designImport">⬆️ Import design file</label>
+              <input type="file" id="designImport" accept=".json,application/json" hidden />
+            </div>
           </div>
         </details>
 
@@ -95,24 +123,38 @@
           <summary><span class="step">2</span> The listing</summary>
           <div class="section-body">
             <details class="paste-block">
-              <summary>📋 Paste from Zillow / MLS to auto-fill</summary>
-              <textarea id="pasteBox" rows="3" placeholder="Paste any listing text — I'll pull out the price, beds, baths, sqft, and year."></textarea>
+              <summary>📋 Paste from any listing site to auto-fill</summary>
+              <textarea id="pasteBox" rows="3" placeholder="Paste listing text from realestate.com.au, Domain, REIWA, Zillow, Rightmove — anywhere. I'll pull out the price, beds, baths, cars, size, and more."></textarea>
               <button type="button" class="mini-btn" id="parseBtn">Auto-fill from paste</button>
               <span class="parse-note" id="parseNote"></span>
             </details>
 
             <div class="field">
               <label for="address">Address</label>
-              <input type="text" id="address" placeholder="142 Maple Grove Ln" />
+              <input type="text" id="address" placeholder="24 Seaview Terrace" />
             </div>
             <div class="row">
               <div class="field">
-                <label for="city">City / area</label>
-                <input type="text" id="city" placeholder="Asheville" />
+                <label for="city">Suburb / area</label>
+                <input type="text" id="city" placeholder="Scarborough" />
               </div>
               <div class="field">
                 <label for="price">Price</label>
-                <input type="text" id="price" inputmode="numeric" placeholder="525,000" />
+                <div class="pricewrap">
+                  <select id="currency" aria-label="Currency">
+                    <option value="$">$</option>
+                    <option value="£">£</option>
+                    <option value="€">€</option>
+                    <option value="C$">C$</option>
+                    <option value="NZ$">NZ$</option>
+                    <option value="CHF">CHF</option>
+                    <option value="kr">kr</option>
+                    <option value="R">R</option>
+                    <option value="₹">₹</option>
+                    <option value="¥">¥</option>
+                  </select>
+                  <input type="text" id="price" inputmode="numeric" placeholder="985,000" />
+                </div>
               </div>
             </div>
             <div class="row">
@@ -120,25 +162,32 @@
                 <label for="badge">Status</label>
                 <select id="badge">
                   <option value="justlisted">Just Listed</option>
-                  <option value="openhouse">Open House</option>
+                  <option value="openhouse">Home Open / Open House</option>
                   <option value="forsale">For Sale</option>
                   <option value="newprice">New Price</option>
                   <option value="sold">Just Sold</option>
+                  <option value="custom">Custom…</option>
                 </select>
               </div>
               <div class="field" id="openhouseWrap" hidden>
-                <label for="openhouse">Open house date/time</label>
-                <input type="text" id="openhouse" placeholder="Sat June 14 · 1–3 PM" />
+                <label for="openhouse">Home open date/time</label>
+                <input type="text" id="openhouse" placeholder="Sat 14 June · 1–1:45pm" />
+              </div>
+              <div class="field" id="badgeCustomWrap" hidden>
+                <label for="badgeCustom">Custom badge text</label>
+                <input type="text" id="badgeCustom" placeholder="COMING SOON" />
               </div>
             </div>
             <div class="row">
               <div class="field">
                 <label for="type">Property type</label>
                 <select id="type">
-                  <option value="single">Single-family</option>
-                  <option value="condo">Condo</option>
+                  <option value="single">House</option>
+                  <option value="apartment">Apartment / Unit</option>
+                  <option value="villa">Villa</option>
                   <option value="townhouse">Townhouse</option>
-                  <option value="multi">Multi-family</option>
+                  <option value="condo">Condo</option>
+                  <option value="multi">Multi-family / Duplex</option>
                   <option value="luxury">Luxury / Estate</option>
                   <option value="land">Land / Lot</option>
                 </select>
@@ -157,46 +206,59 @@
             <div class="row three">
               <div class="field">
                 <label for="beds">Beds</label>
-                <input type="number" id="beds" min="0" step="1" placeholder="3" />
+                <input type="number" id="beds" min="0" step="1" placeholder="4" />
               </div>
               <div class="field">
                 <label for="baths">Baths</label>
                 <input type="number" id="baths" min="0" step="0.5" placeholder="2" />
               </div>
               <div class="field">
-                <label for="sqft">Sq ft</label>
-                <input type="text" id="sqft" inputmode="numeric" placeholder="1,850" />
+                <label for="cars">Cars</label>
+                <input type="number" id="cars" min="0" step="1" placeholder="2" />
+              </div>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label for="sqft">Internal size</label>
+                <div class="sizewrap">
+                  <input type="text" id="sqft" inputmode="numeric" placeholder="220" />
+                  <select id="areaUnit" aria-label="Area unit">
+                    <option value="sqm">m²</option>
+                    <option value="sqft">sq ft</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label for="lot">Block / lot size</label>
+                <input type="text" id="lot" placeholder="450 m²" />
               </div>
             </div>
             <div class="row">
               <div class="field">
                 <label for="year">Year built</label>
-                <input type="text" id="year" inputmode="numeric" placeholder="1998" />
-              </div>
-              <div class="field">
-                <label for="lot">Lot size</label>
-                <input type="text" id="lot" placeholder="0.3-acre" />
+                <input type="text" id="year" inputmode="numeric" placeholder="2004" />
               </div>
             </div>
             <div class="field">
               <label for="features">Key features</label>
-              <textarea id="features" rows="3" placeholder="Updated kitchen, hardwood floors, primary suite, fenced backyard, finished basement…"></textarea>
+              <textarea id="features" rows="3" placeholder="Renovated kitchen, stone benchtops, alfresco area, double garage, solar panels…"></textarea>
               <div class="chips" id="featureChips" aria-label="Quick-add features">
-                <button type="button" class="chip">Updated kitchen</button>
-                <button type="button" class="chip">Hardwood floors</button>
-                <button type="button" class="chip">Open floor plan</button>
+                <button type="button" class="chip">Renovated kitchen</button>
+                <button type="button" class="chip">Stone benchtops</button>
+                <button type="button" class="chip">Open-plan living</button>
+                <button type="button" class="chip">Alfresco area</button>
+                <button type="button" class="chip">Double garage</button>
+                <button type="button" class="chip">Solar panels</button>
+                <button type="button" class="chip">Reverse-cycle aircon</button>
                 <button type="button" class="chip">Primary suite</button>
+                <button type="button" class="chip">Walk-in robe</button>
                 <button type="button" class="chip">Fenced backyard</button>
-                <button type="button" class="chip">Finished basement</button>
-                <button type="button" class="chip">Stainless appliances</button>
-                <button type="button" class="chip">2-car garage</button>
                 <button type="button" class="chip">Natural light</button>
-                <button type="button" class="chip">New roof</button>
               </div>
             </div>
             <div class="field">
               <label for="neighborhood">Location highlights</label>
-              <input type="text" id="neighborhood" placeholder="minutes from downtown, parks, and the greenway" />
+              <input type="text" id="neighborhood" placeholder="minutes from the beach, cafés, and the train station" />
             </div>
           </div>
         </details>
@@ -225,7 +287,7 @@
       <nav class="tabs" id="tabs" role="tablist">
         <button class="tab active" data-tab="graphics" role="tab">🎨 Graphics</button>
         <button class="tab" data-tab="flyer" role="tab">📄 Flyer</button>
-        <button class="tab" data-tab="mls" role="tab">MLS</button>
+        <button class="tab" data-tab="mls" role="tab">Listing</button>
         <button class="tab" data-tab="instagram" role="tab">Instagram</button>
         <button class="tab" data-tab="facebook" role="tab">Facebook</button>
         <button class="tab" data-tab="email" role="tab">Email</button>
@@ -268,7 +330,7 @@
 
         <article class="panel-content" id="flyerContent" hidden>
           <div class="flyer-bar">
-            <span class="muted">Print-ready 8.5×11 — uses your saved brand kit.</span>
+            <span class="muted">Print-ready A4/Letter — uses your saved brand kit.</span>
             <button type="button" class="copy-btn" id="flyerOpen">🖨️ Open &amp; print / save PDF</button>
           </div>
           <div class="flyer-wrap" id="flyerWrap">
@@ -292,11 +354,12 @@
   </main>
 
   <footer class="foot">
-    <p>Runs entirely in your browser — photos and details are never uploaded. The compliance check is decision support, not legal advice; always defer to your broker’s compliance team.</p>
+    <p>Runs entirely in your browser — photos and details are never uploaded. The compliance check is decision support, not legal advice; always defer to your agency’s compliance guidance.</p>
   </footer>
 
   <script src="generator.js"></script>
   <script src="fairhousing.js"></script>
+  <script src="parser.js"></script>
   <script src="visuals.js"></script>
   <script src="flyer.js"></script>
   <script src="app.js"></script>

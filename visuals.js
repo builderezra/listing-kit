@@ -161,9 +161,13 @@ const Visuals = (() => {
     const p = [];
     if (d.beds) p.push(`${d.beds} BD`);
     if (d.baths) p.push(`${d.baths} BA`);
-    if (d.sqft) p.push(`${d.sqft} SQ FT`);
+    if (d.cars) p.push(`${d.cars} CAR`);
+    if (d.sqft) p.push(`${d.sqft} ${d.areaUnit === 'sqm' ? 'M²' : 'SQ FT'}`);
     return p.join('   ·   ');
   };
+
+  // brand font preference: 'serif' | 'sans' | 'auto' (template default)
+  const priceFam = (b, def) => (b.font === 'serif' ? SERIF : b.font === 'sans' ? SANS : def);
 
   // =====================  MODERN — full-bleed photo + gradient  ================
   const modern = (ctx, W, H, d, kind) => {
@@ -209,7 +213,7 @@ const Visuals = (() => {
       y -= addrSize * 1.45;
     }
     if (d.price) {
-      ctx.font = font(800, priceSize);
+      ctx.font = font(800, priceSize, priceFam(b, SANS));
       ctx.fillStyle = '#ffffff';
       ctx.fillText(d.price, m, y);
     }
@@ -234,7 +238,7 @@ const Visuals = (() => {
       ctx.textAlign = 'center';
       let y = d.ohLine ? 150 : 175;
       if (d.ohLine) { ctx.font = font(600, 22); ctx.fillStyle = mut; ctx.fillText(d.ohLine, centerX, 120); }
-      if (d.price) { ctx.font = font(700, 58, SERIF); ctx.fillStyle = b.primary; ctx.fillText(d.price, centerX, y + 40); y += 95; }
+      if (d.price) { ctx.font = font(700, 58, priceFam(b, SERIF)); ctx.fillStyle = b.primary; ctx.fillText(d.price, centerX, y + 40); y += 95; }
       if (d.address) { ctx.font = font(400, 26); ctx.fillStyle = ink; ctx.fillText(d.address, centerX, y + 10); y += 52; }
       ctx.fillStyle = b.accent; ctx.fillRect(centerX - 45, y, 90, 3); y += 45;
       const stats = statText(d);
@@ -265,7 +269,7 @@ const Visuals = (() => {
     const compact = kind === 'square' && thumbs;
     y += compact ? 64 : 84;
     if (d.ohLine) { ctx.font = font(600, compact ? 22 : 26); ctx.fillStyle = mut; ctx.fillText(d.ohLine, W / 2, y - (compact ? 36 : 46)); }
-    if (d.price) { ctx.font = font(700, compact ? 60 : kind === 'story' ? 88 : 72, SERIF); ctx.fillStyle = b.primary; ctx.fillText(d.price, W / 2, y); y += compact ? 46 : 58; }
+    if (d.price) { ctx.font = font(700, compact ? 60 : kind === 'story' ? 88 : 72, priceFam(b, SERIF)); ctx.fillStyle = b.primary; ctx.fillText(d.price, W / 2, y); y += compact ? 46 : 58; }
     if (d.address) { ctx.font = font(400, compact ? 27 : kind === 'story' ? 36 : 31); ctx.fillStyle = ink; ctx.fillText(d.address, W / 2, y); y += compact ? 40 : 52; }
     if (!compact) { ctx.fillStyle = b.accent; ctx.fillRect(W / 2 - 45, y - 14, 90, 3); y += 38; }
     const stats = statText(d);
@@ -301,10 +305,10 @@ const Visuals = (() => {
       badge(ctx, contentX, 72, d.badgeText, b.accent, onColor(b.accent), 21);
       if (d.ohLine) { ctx.font = font(600, 20); ctx.fillStyle = alpha('#ffffff', 0.9); ctx.fillText(d.ohLine, contentX + 4, 148); }
       y = 250;
-      if (d.price) { ctx.font = font(800, 64); ctx.fillStyle = fg; ctx.fillText(d.price, contentX, y); y += 52; }
+      if (d.price) { ctx.font = font(800, 64, priceFam(b, SANS)); ctx.fillStyle = fg; ctx.fillText(d.price, contentX, y); y += 52; }
       if (d.address) { ctx.font = font(400, 26); ctx.fillStyle = alpha(fg === '#ffffff' ? '#ffffff' : '#1c2b30', 0.85); ctx.fillText(d.address, contentX, y); y += 64; }
       let cx = contentX;
-      [d.beds && `${d.beds} BD`, d.baths && `${d.baths} BA`, d.sqft && `${d.sqft} SF`].filter(Boolean).forEach((t) => {
+      [d.beds && `${d.beds} BD`, d.baths && `${d.baths} BA`, d.cars && `${d.cars} CAR`, d.sqft && `${d.sqft} ${d.areaUnit === 'sqm' ? 'M²' : 'SF'}`].filter(Boolean).forEach((t) => {
         cx += chip(ctx, cx, y, t, b.accent, fg, 20).w + 12;
       });
       ctx.font = font(700, 24); ctx.fillStyle = fg;
@@ -315,7 +319,7 @@ const Visuals = (() => {
     }
 
     // square / story
-    const photoH = kind === 'story' ? 900 : 540;
+    const photoH = kind === 'story' ? 1100 : 540;
     cover(ctx, d.hero, m, m, W - m * 2, photoH, 30, b);
     // angled badge overlapping the photo's bottom edge
     ctx.save();
@@ -324,12 +328,12 @@ const Visuals = (() => {
     badge(ctx, 0, 0, d.badgeText, b.accent, onColor(b.accent), kind === 'story' ? 30 : 26, 10);
     ctx.restore();
 
-    y = m + photoH + (kind === 'story' ? 130 : 110);
-    if (d.ohLine) { ctx.font = font(600, kind === 'story' ? 28 : 24); ctx.fillStyle = alpha('#ffffff', 0.92); ctx.fillText(d.ohLine, m + 16, y - (kind === 'story' ? 78 : 64)); }
-    if (d.price) { ctx.font = font(800, kind === 'story' ? 104 : 88); ctx.fillStyle = fg; ctx.fillText(d.price, m + 16, y); y += kind === 'story' ? 66 : 56; }
-    if (d.address) { ctx.font = font(400, kind === 'story' ? 38 : 33); ctx.fillStyle = alpha(fg === '#ffffff' ? '#ffffff' : '#1c2b30', 0.85); ctx.fillText(d.address, m + 16, y); y += kind === 'story' ? 80 : 66; }
+    y = m + photoH + (kind === 'story' ? 150 : 110);
+    if (d.ohLine) { ctx.font = font(600, kind === 'story' ? 28 : 24); ctx.fillStyle = alpha('#ffffff', 0.92); ctx.fillText(d.ohLine, m + 16, y - (kind === 'story' ? 88 : 64)); }
+    if (d.price) { ctx.font = font(800, kind === 'story' ? 104 : 88, priceFam(b, SANS)); ctx.fillStyle = fg; ctx.fillText(d.price, m + 16, y); y += kind === 'story' ? 66 : 56; }
+    if (d.address) { ctx.font = font(400, kind === 'story' ? 38 : 33); ctx.fillStyle = alpha(fg === '#ffffff' ? '#ffffff' : '#1c2b30', 0.85); ctx.fillText(d.address, m + 16, y); y += kind === 'story' ? 84 : 66; }
     let cx = m + 16;
-    [d.beds && `${d.beds} BD`, d.baths && `${d.baths} BA`, d.sqft && `${d.sqft} SQ FT`].filter(Boolean).forEach((t) => {
+    [d.beds && `${d.beds} BD`, d.baths && `${d.baths} BA`, d.cars && `${d.cars} CAR`, d.sqft && `${d.sqft} ${d.areaUnit === 'sqm' ? 'M²' : 'SQ FT'}`].filter(Boolean).forEach((t) => {
       cx += chip(ctx, cx, y, t, b.accent, fg, kind === 'story' ? 26 : 23).w + 14;
     });
 

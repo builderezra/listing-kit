@@ -34,12 +34,17 @@ const Generator = (() => {
     const v = Number(String(n).replace(/[^0-9.]/g, ''));
     return isFinite(v) && v > 0 ? v.toLocaleString('en-US') : '';
   };
-  const money = (n) => {
+  const money = (n, cur = '$') => {
     if (n == null || n === '') return '';
     const v = Number(String(n).replace(/[^0-9.]/g, ''));
     if (!isFinite(v) || v === 0) return '';
-    return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    const s = v.toLocaleString('en-US', { maximumFractionDigits: 0 });
+    return cur === 'kr' ? s + ' kr' : cur + s;   // kr is a suffix currency
   };
+
+  // area helpers — the app supports sq ft and m² listings
+  const areaLong = (u) => (u === 'sqm' ? 'square metres' : 'square feet');
+  const areaShort = (u) => (u === 'sqm' ? 'm²' : 'sq ft');
 
   const priceTier = (price) => {
     const v = Number(String(price || '').replace(/[^0-9.]/g, ''));
@@ -51,7 +56,9 @@ const Generator = (() => {
   };
 
   const TYPE_NOUN = {
-    single: ['home', 'residence', 'single-family home'],
+    single: ['home', 'residence', 'family home'],
+    apartment: ['apartment', 'residence', 'home'],
+    villa: ['villa', 'home', 'residence'],
     condo: ['condo', 'residence', 'condominium'],
     townhouse: ['townhome', 'residence', 'townhouse'],
     multi: ['property', 'multi-family property', 'investment property'],
@@ -66,7 +73,9 @@ const Generator = (() => {
     { k: ['updated kitchen', 'renovated kitchen', 'new kitchen', 'chef'], cat: 'kitchen', p: ['a renovated chef’s kitchen', 'a beautifully updated kitchen', 'a sleek, modern kitchen'] },
     { k: ['kitchen'], cat: 'kitchen', p: ['a bright, functional kitchen', 'a well-appointed kitchen'] },
     { k: ['stainless'], cat: 'kitchen', p: ['stainless steel appliances'] },
+    { k: ['stone bench', 'benchtop'], cat: 'kitchen', p: ['stone benchtops'] },
     { k: ['quartz', 'granite', 'countertop'], cat: 'kitchen', p: ['stone countertops', 'upgraded countertops'] },
+    { k: ['scullery'], cat: 'kitchen', p: ['a separate scullery'] },
     { k: ['island'], cat: 'kitchen', p: ['a generous center island'] },
     { k: ['pantry'], cat: 'kitchen', p: ['a walk-in pantry'] },
     { k: ['hardwood', 'wood floor'], cat: 'interior', p: ['gleaming hardwood floors', 'rich hardwood flooring'] },
@@ -76,7 +85,10 @@ const Generator = (() => {
     { k: ['high ceiling', 'vaulted', 'cathedral'], cat: 'interior', p: ['soaring ceilings', 'dramatic vaulted ceilings'] },
     { k: ['fireplace'], cat: 'interior', p: ['a cozy fireplace', 'a statement fireplace'] },
     { k: ['primary suite', 'master suite', 'owner’s suite', 'owners suite', 'primary bedroom', 'master bedroom'], cat: 'interior', p: ['a spacious primary suite', 'a serene primary retreat'] },
+    { k: ['robe'], cat: 'interior', p: ['generous built-in robes'] },
     { k: ['walk-in closet', 'walk in closet'], cat: 'interior', p: ['generous walk-in closets'] },
+    { k: ['theatre', 'theater room'], cat: 'interior', p: ['a dedicated home theatre'] },
+    { k: ['powder room'], cat: 'interior', p: ['a convenient powder room'] },
     { k: ['spa', 'soaking tub', 'en-suite', 'ensuite'], cat: 'interior', p: ['a spa-inspired bath', 'a luxurious en-suite bath'] },
     { k: ['basement', 'lower level'], cat: 'interior', p: ['a finished lower level', 'a versatile finished basement'] },
     { k: ['bonus room', 'flex room', 'office', 'den', 'study'], cat: 'interior', p: ['a flexible bonus room', 'a dedicated home office'] },
@@ -88,10 +100,15 @@ const Generator = (() => {
     { k: ['deck', 'patio', 'pergola'], cat: 'outdoor', p: ['an entertainer’s deck', 'an inviting outdoor patio'] },
     { k: ['balcony', 'terrace'], cat: 'outdoor', p: ['a private balcony', 'a sun-soaked terrace'] },
     { k: ['view', 'overlook'], cat: 'outdoor', p: ['captivating views', 'stunning views'] },
+    { k: ['alfresco'], cat: 'outdoor', p: ['an alfresco entertaining area', 'a covered alfresco for year-round entertaining'] },
+    { k: ['bbq', 'barbecue', 'outdoor kitchen'], cat: 'outdoor', p: ['a built-in outdoor barbecue area'] },
+    { k: ['reticulat'], cat: 'outdoor', p: ['reticulated, easy-care gardens'] },
     { k: ['garden', 'landscap'], cat: 'outdoor', p: ['mature, easy-care landscaping'] },
     { k: ['corner lot', 'cul-de-sac', 'cul de sac', 'large lot', 'acre', 'private lot'], cat: 'outdoor', p: ['a desirable lot', 'a premium lot position'] },
     { k: ['garage'], cat: 'practical', p: ['a spacious garage', 'attached garage parking'] },
     { k: ['smart home', 'smart-home', 'nest', 'smart thermostat'], cat: 'practical', p: ['smart-home technology'] },
+    { k: ['reverse cycle', 'reverse-cycle', 'ducted', 'aircon', 'air con'], cat: 'practical', p: ['ducted reverse-cycle air conditioning'] },
+    { k: ['granny flat', 'ancillary dwelling'], cat: 'practical', p: ['a self-contained granny flat'] },
     { k: ['solar'], cat: 'practical', p: ['energy-saving solar panels'] },
     { k: ['new roof', 'new hvac', 'new windows', 'new furnace', 'new water heater', 'updated systems', 'new ac'], cat: 'practical', p: ['major recent system upgrades', 'big-ticket updates already done'] },
     { k: ['remodel', 'renovat', 'updated', 'upgraded', 'move-in', 'move in', 'turnkey', 'turn-key'], cat: 'practical', p: ['a tasteful, move-in-ready renovation', 'thoughtful updates throughout'] },
@@ -205,7 +222,7 @@ const Generator = (() => {
     const sq = num(d.sqft);
     if (statBits.length || sq) {
       let s = statBits.length ? cap(oxford(statBits)) : 'The floor plan';
-      s += sq ? ` span${statBits.length === 1 ? 's' : ''} ${sq} square feet` : ' fill the home';
+      s += sq ? ` span${statBits.length === 1 ? 's' : ''} ${sq} ${areaLong(d.areaUnit)}` : ' fill the home';
       s += `, ${pick(STAT_TAILS[tone] || STAT_TAILS.classic)}.`;
       p1.push(s);
     }
@@ -263,7 +280,7 @@ const Generator = (() => {
     // provenance
     const prov = [];
     if (d.year) prov.push(`built in ${d.year}`);
-    if (d.lot) prov.push(`set on a ${d.lot} lot`);
+    if (d.lot) prov.push(`set on a ${d.lot} ${d.region === 'au' ? 'block' : 'lot'}`);
     if (prov.length) p2.push(`${cap(oxford(prov))}, it’s been cared for where it counts.`);
 
     // location
@@ -286,10 +303,17 @@ const Generator = (() => {
     newprice: 'NEW PRICE',
     sold: 'JUST SOLD',
   };
+  const badgeText = (d) => {
+    if (d.badge === 'custom' && d.badgeCustom) return d.badgeCustom.toUpperCase();
+    if (d.badge === 'openhouse' && d.region === 'au') return 'HOME OPEN';   // WA-speak
+    return BADGE_HOOK[d.badge] || 'JUST LISTED';
+  };
+  const ohLabel = (d) => (d.region === 'au' ? 'Home open' : 'Open house');
+
   const buildInstagram = (d) => {
     const lines = [];
     const noun = typeNoun(d.type);
-    lines.push(`${pick(HOOK_EMOJI)} ${BADGE_HOOK[d.badge] || 'JUST LISTED'} ${pick(HOOK_EMOJI)}`);
+    lines.push(`${pick(HOOK_EMOJI)} ${badgeText(d)} ${pick(HOOK_EMOJI)}`);
     if (d.badge === 'openhouse' && d.openhouse) lines.push(`🗓️ ${d.openhouse}`);
     lines.push(pick([
       `Say hello to your next ${noun}.`,
@@ -302,8 +326,9 @@ const Generator = (() => {
     const stat = [];
     if (d.beds) stat.push(`🛏️ ${d.beds} bd`);
     if (d.baths) stat.push(`🛁 ${d.baths} ba`);
-    if (num(d.sqft)) stat.push(`📐 ${num(d.sqft)} sqft`);
-    if (money(d.price)) stat.push(`💰 ${money(d.price)}`);
+    if (d.cars) stat.push(`🚗 ${d.cars} car`);
+    if (num(d.sqft)) stat.push(`📐 ${num(d.sqft)} ${d.areaUnit === 'sqm' ? 'm²' : 'sqft'}`);
+    if (money(d.price)) stat.push(`💰 ${money(d.price, d.currency)}`);
     if (stat.length) lines.push(stat.join('  •  '));
 
     const feats = polishFeatures(d.features);
@@ -323,7 +348,7 @@ const Generator = (() => {
 
   const hashtags = (d) => {
     const tags = ['#justlisted', '#realestate', '#forsale', '#newlisting', '#homeforsale', '#dreamhome', '#realtor', '#housetour', '#hometour'];
-    const typeTag = { single: '#singlefamilyhome', condo: '#condoliving', townhouse: '#townhome', multi: '#investmentproperty', land: '#landforsale', luxury: '#luxuryrealestate' }[d.type];
+    const typeTag = { single: '#familyhome', apartment: '#apartmentliving', villa: '#villaliving', condo: '#condoliving', townhouse: '#townhome', multi: '#investmentproperty', land: '#landforsale', luxury: '#luxuryrealestate' }[d.type];
     if (typeTag) tags.push(typeTag);
     if (priceTier(d.price) === 'luxury') tags.push('#luxuryhomes', '#luxurylisting');
     if (d.badge === 'openhouse') tags.push('#openhouse');
@@ -337,7 +362,7 @@ const Generator = (() => {
     if (d.beds) p.push(`${d.beds} bed`);
     if (d.baths) p.push(`${d.baths} bath`);
     let s = p.length ? ' with ' + oxford(p) : '';
-    if (num(d.sqft)) s += `${p.length ? ',' : ' with'} ${num(d.sqft)} sq ft`;
+    if (num(d.sqft)) s += `${p.length ? ',' : ' with'} ${num(d.sqft)} ${areaShort(d.areaUnit)}`;
     return s;
   };
 
@@ -349,7 +374,7 @@ const Generator = (() => {
       `Excited to share my newest listing! 🎉`,
       `Just listed and I can’t wait to show it off 👇`,
     ]));
-    if (d.badge === 'openhouse' && d.openhouse) parts.push(`🗓️ Open house: ${d.openhouse}`);
+    if (d.badge === 'openhouse' && d.openhouse) parts.push(`🗓️ ${ohLabel(d)}: ${d.openhouse}`);
     parts.push('');
 
     const sentence = [];
@@ -360,7 +385,7 @@ const Generator = (() => {
     if (d.neighborhood) sentence.push(`It’s ${cleanLocation(d.neighborhood)}.`);
     parts.push(sentence.join(' '));
 
-    if (money(d.price)) { parts.push(''); parts.push(`Offered at ${money(d.price)}.`); }
+    if (money(d.price)) { parts.push(''); parts.push(`Offered at ${money(d.price, d.currency)}.`); }
 
     parts.push('');
     parts.push(pick(['Want a private tour? Send me a message or comment below 👇', 'Message me to schedule a showing — this one won’t last!', 'Tag someone who needs to see this, and DM me to tour.']));
@@ -375,7 +400,7 @@ const Generator = (() => {
   const buildEmail = (d) => {
     const subjOpts = [
       `Just Listed${d.city ? ' in ' + d.city : ''}: ${[d.beds && d.beds + ' Bed', d.baths && d.baths + ' Bath'].filter(Boolean).join(', ')}`.replace(/:\s*$/, ''),
-      `New Listing${money(d.price) ? ' — ' + money(d.price) : ''}${d.address ? ' — ' + d.address : ''}`,
+      `New Listing${money(d.price) ? ' — ' + money(d.price, d.currency) : ''}${d.address ? ' — ' + d.address : ''}`,
       `Be the first to see this one${d.city ? ' in ' + d.city : ''}`,
     ].filter((s) => s && s.trim());
     const subject = pick(subjOpts);
@@ -398,10 +423,10 @@ const Generator = (() => {
     body.push('');
 
     const bullets = [];
-    if (money(d.price)) bullets.push(`Price: ${money(d.price)}`);
-    const bb = [d.beds && d.beds + ' bed', d.baths && d.baths + ' bath', num(d.sqft) && num(d.sqft) + ' sq ft'].filter(Boolean);
+    if (money(d.price)) bullets.push(`Price: ${money(d.price, d.currency)}`);
+    const bb = [d.beds && d.beds + ' bed', d.baths && d.baths + ' bath', num(d.sqft) && num(d.sqft) + ' ' + areaShort(d.areaUnit)].filter(Boolean);
     if (bb.length) bullets.push(bb.join(' / '));
-    if (d.badge === 'openhouse' && d.openhouse) bullets.push(`Open house: ${d.openhouse}`);
+    if (d.badge === 'openhouse' && d.openhouse) bullets.push(`${ohLabel(d)}: ${d.openhouse}`);
     pickN(feats, Math.min(feats.length, 4)).forEach((f) => bullets.push(cap(f.text.replace(/^a |^an /, ''))));
     if (bullets.length) { bullets.forEach((b) => body.push(`• ${b}`)); body.push(''); }
 
@@ -428,5 +453,5 @@ const Generator = (() => {
     email: buildEmail(data),
   });
 
-  return { generate, priceTier, money, num, flyerFeatures, BADGE_HOOK };
+  return { generate, priceTier, money, num, flyerFeatures, BADGE_HOOK, badgeText };
 })();
