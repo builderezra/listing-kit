@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Listing Kit — Marketing copy for every listing, in one click</title>
+  <meta name="description" content="Paste a listing once and generate the full marketing kit — MLS description, Instagram, Facebook, email blast, and flyer copy — with a built-in fair-housing language check." />
+  <link rel="icon" href="icon.svg" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <meta name="theme-color" content="#0f2e3d" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div class="brand">
+      <span class="logo" aria-hidden="true">🏡</span>
+      <div>
+        <h1>Listing Kit</h1>
+        <p class="tag">One listing in → the whole marketing kit out.</p>
+      </div>
+    </div>
+    <span class="badge" title="Every output is scanned for fair-housing language risks.">⚖️ Fair-Housing Aware</span>
+  </header>
+
+  <main class="layout">
+    <!-- ============ INPUT ============ -->
+    <section class="panel form-panel" aria-label="Listing details">
+      <div class="panel-head">
+        <h2>Listing details</h2>
+        <button type="button" class="link-btn" id="exampleBtn">Load example</button>
+      </div>
+
+      <form id="listingForm" autocomplete="off">
+        <div class="field">
+          <label for="address">Address</label>
+          <input type="text" id="address" placeholder="142 Maple Grove Ln" />
+        </div>
+        <div class="row">
+          <div class="field">
+            <label for="city">City / area</label>
+            <input type="text" id="city" placeholder="Asheville" />
+          </div>
+          <div class="field">
+            <label for="price">Price</label>
+            <input type="text" id="price" inputmode="numeric" placeholder="525,000" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="type">Property type</label>
+            <select id="type">
+              <option value="single">Single-family</option>
+              <option value="condo">Condo</option>
+              <option value="townhouse">Townhouse</option>
+              <option value="multi">Multi-family</option>
+              <option value="luxury">Luxury / Estate</option>
+              <option value="land">Land / Lot</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="tone">Tone</label>
+            <select id="tone">
+              <option value="classic">Classic &amp; Professional</option>
+              <option value="warm">Warm &amp; Welcoming</option>
+              <option value="luxury">Luxury &amp; Refined</option>
+              <option value="modern">Modern &amp; Sleek</option>
+              <option value="investor">Investor / Value</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="row three">
+          <div class="field">
+            <label for="beds">Beds</label>
+            <input type="number" id="beds" min="0" step="1" placeholder="3" />
+          </div>
+          <div class="field">
+            <label for="baths">Baths</label>
+            <input type="number" id="baths" min="0" step="0.5" placeholder="2" />
+          </div>
+          <div class="field">
+            <label for="sqft">Sq ft</label>
+            <input type="text" id="sqft" inputmode="numeric" placeholder="1,850" />
+          </div>
+        </div>
+
+        <div class="row">
+          <div class="field">
+            <label for="year">Year built</label>
+            <input type="text" id="year" inputmode="numeric" placeholder="1998" />
+          </div>
+          <div class="field">
+            <label for="lot">Lot size</label>
+            <input type="text" id="lot" placeholder="0.3-acre" />
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="features">Key features</label>
+          <textarea id="features" rows="3" placeholder="Updated kitchen, hardwood floors, primary suite, fenced backyard, finished basement…"></textarea>
+          <div class="chips" id="featureChips" aria-label="Quick-add features">
+            <button type="button" class="chip">Updated kitchen</button>
+            <button type="button" class="chip">Hardwood floors</button>
+            <button type="button" class="chip">Open floor plan</button>
+            <button type="button" class="chip">Primary suite</button>
+            <button type="button" class="chip">Fenced backyard</button>
+            <button type="button" class="chip">Finished basement</button>
+            <button type="button" class="chip">Stainless appliances</button>
+            <button type="button" class="chip">2-car garage</button>
+            <button type="button" class="chip">Natural light</button>
+            <button type="button" class="chip">New roof</button>
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="neighborhood">Location highlights</label>
+          <input type="text" id="neighborhood" placeholder="minutes from downtown, parks, and the greenway" />
+        </div>
+
+        <details class="agent-block">
+          <summary>Your contact info (optional)</summary>
+          <div class="row">
+            <div class="field">
+              <label for="agentName">Name</label>
+              <input type="text" id="agentName" placeholder="Ezra Smith" />
+            </div>
+            <div class="field">
+              <label for="brokerage">Brokerage</label>
+              <input type="text" id="brokerage" placeholder="Blue Ridge Realty" />
+            </div>
+          </div>
+          <div class="row">
+            <div class="field">
+              <label for="phone">Phone</label>
+              <input type="text" id="phone" placeholder="(828) 555-0142" />
+            </div>
+            <div class="field">
+              <label for="email">Email</label>
+              <input type="text" id="email" placeholder="ezra@blueridge.com" />
+            </div>
+          </div>
+        </details>
+
+        <button type="submit" class="generate-btn" id="generateBtn">Generate marketing kit ✨</button>
+      </form>
+    </section>
+
+    <!-- ============ OUTPUT ============ -->
+    <section class="panel out-panel" aria-label="Generated marketing kit">
+      <nav class="tabs" id="tabs" role="tablist">
+        <button class="tab active" data-tab="mls" role="tab">MLS</button>
+        <button class="tab" data-tab="instagram" role="tab">Instagram</button>
+        <button class="tab" data-tab="facebook" role="tab">Facebook</button>
+        <button class="tab" data-tab="email" role="tab">Email</button>
+        <button class="tab" data-tab="flyer" role="tab">Flyer</button>
+        <button class="tab compliance-tab" data-tab="compliance" role="tab">⚖️ Compliance <span class="dot" id="complianceDot"></span></button>
+      </nav>
+
+      <div class="output" id="output">
+        <div class="empty" id="emptyState">
+          <div class="empty-art">📝</div>
+          <p>Fill in the listing on the left and hit <strong>Generate</strong>.</p>
+          <p class="muted">No listing handy? Click <em>Load example</em> up top.</p>
+        </div>
+
+        <article class="panel-content" id="content" hidden>
+          <div class="content-head">
+            <span class="charcount" id="charcount"></span>
+            <button type="button" class="copy-btn" id="copyBtn">Copy</button>
+          </div>
+          <pre class="copytext" id="copytext"></pre>
+        </article>
+
+        <article class="panel-content" id="complianceContent" hidden>
+          <div id="complianceBody"></div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <p>Runs entirely in your browser — nothing is uploaded. The compliance check is decision support, not legal advice; always defer to your broker’s compliance team.</p>
+  </footer>
+
+  <script src="generator.js"></script>
+  <script src="fairhousing.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "Listing Kit",
+  "short_name": "Listing Kit",
+  "description": "Generate the full marketing kit for any listing — MLS, social, email, flyer — with a fair-housing language check.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f5f3ee",
+  "theme_color": "#0f2e3d",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
