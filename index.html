@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=10" />
+  <link rel="stylesheet" href="styles.css?v=11" />
 </head>
 <body>
   <header class="topbar">
@@ -112,9 +112,27 @@
               </div>
             </div>
             <div class="field">
-              <label for="prefs">House style preferences <span class="hint">— applied to all generated copy</span></label>
-              <textarea id="prefs" rows="2"></textarea>
-              <p class="hint">Understands: <em>no emojis · no hashtags · no exclamation marks · shorter copy · sign off with … · don’t say …</em> (e.g. “no emojis, sign off with Cheers, don’t say cozy”)</p>
+              <label>House style <span class="hint">— applied to all generated copy, saved with your brand</span></label>
+              <div class="prefs-grid">
+                <label class="pref-check"><input type="checkbox" id="prefNoEmojis" /> No emojis</label>
+                <label class="pref-check"><input type="checkbox" id="prefNoHashtags" /> No hashtags</label>
+                <label class="pref-check"><input type="checkbox" id="prefNoExclaim" /> No exclamation marks</label>
+                <label class="pref-check"><input type="checkbox" id="prefShort" /> Shorter copy</label>
+              </div>
+              <div class="row">
+                <div class="field">
+                  <label for="prefGreeting">Emails start with</label>
+                  <input type="text" id="prefGreeting" placeholder="default: Hi there," />
+                </div>
+                <div class="field">
+                  <label for="prefSignoff">Emails sign off with</label>
+                  <input type="text" id="prefSignoff" placeholder="default: Best," />
+                </div>
+              </div>
+              <div class="field">
+                <label for="prefBanned">Words to avoid <span class="hint">— comma-separated; flagged in the ⚖️ check if they appear</span></label>
+                <input type="text" id="prefBanned" />
+              </div>
             </div>
             <div class="design-io">
               <button type="button" class="link-btn" id="designExport">⬇️ Export design file</button>
@@ -404,12 +422,12 @@
     <p>Runs in your browser — photos and details are never uploaded (link import fetches via public read proxies). The compliance check is decision support, not legal advice; always defer to your agency’s compliance guidance. <span id="verTag"></span></p>
   </footer>
 
-  <script src="generator.js?v=10"></script>
-  <script src="fairhousing.js?v=10"></script>
-  <script src="parser.js?v=10"></script>
-  <script src="importer.js?v=10"></script>
-  <script src="visuals.js?v=10"></script>
-  <script src="flyer.js?v=10"></script>
-  <script src="app.js?v=10"></script>
+  <script src="generator.js?v=11"></script>
+  <script src="fairhousing.js?v=11"></script>
+  <script src="parser.js?v=11"></script>
+  <script src="importer.js?v=11"></script>
+  <script src="visuals.js?v=11"></script>
+  <script src="flyer.js?v=11"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>

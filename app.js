@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v10';
+  const APP_VERSION = 'v11';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -21,7 +21,7 @@
     logo: '', headshot: '',      // dataURLs (persisted)
     templateId: 'modern',
     font: 'auto',                // headline font: auto | serif | sans
-    prefs: '',                   // house style directives ("no emojis, sign off with Cheers")
+    prefs: { noEmojis: false, noHashtags: false, noExclaim: false, short: false, greeting: '', signoff: '', banned: '' },
     region: 'au',                // au | us | uk | other — drives defaults + compliance framing
   };
   brand.logoImg = null; brand.headImg = null; // live Image objects
@@ -51,7 +51,19 @@
     $('phone').value = brand.phone; $('email').value = brand.email;
     $('brandPrimary').value = brand.primary; $('brandAccent').value = brand.accent;
     $('brandFont').value = brand.font || 'auto';
-    $('prefs').value = brand.prefs || '';
+    // v10 stored prefs as free text — migrate to the structured object
+    if (typeof brand.prefs === 'string') {
+      const p = Generator.parsePrefs(brand.prefs);
+      brand.prefs = { noEmojis: p.noEmojis, noHashtags: p.noHashtags, noExclaim: p.noExclaim, short: p.short, greeting: '', signoff: p.signoff || '', banned: (p.banned || []).join(', ') };
+    }
+    brand.prefs = { noEmojis: false, noHashtags: false, noExclaim: false, short: false, greeting: '', signoff: '', banned: '', ...(brand.prefs || {}) };
+    $('prefNoEmojis').checked = brand.prefs.noEmojis;
+    $('prefNoHashtags').checked = brand.prefs.noHashtags;
+    $('prefNoExclaim').checked = brand.prefs.noExclaim;
+    $('prefShort').checked = brand.prefs.short;
+    $('prefGreeting').value = brand.prefs.greeting;
+    $('prefSignoff').value = brand.prefs.signoff;
+    $('prefBanned').value = brand.prefs.banned;
     $('region').value = brand.region || 'au';
     applyRegionDefaults();
     setImgPreview('logo', brand.logo); setImgPreview('head', brand.headshot);
@@ -313,14 +325,14 @@
   // ---------------- generate ----------------
   const generate = () => {
     const data = readForm();
-    const prefs = Generator.parsePrefs(brand.prefs);
+    const prefs = brand.prefs || {};
     outputs = Generator.applyPrefs(Generator.generate(data), prefs);
     report = FairHousing.scan({
       ...outputs,
       'your input': [data.features.join(', '), data.neighborhood, data.address].filter(Boolean).join('. '),
     });
     // the agent's own banned words join the compliance report
-    (prefs.banned || []).forEach((w) => {
+    String(prefs.banned || '').split(',').map((w) => w.trim().toLowerCase()).filter(Boolean).forEach((w) => {
       const re = new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
       const channels = Object.keys(outputs).filter((k) => re.test(outputs[k]));
       if (channels.length) {
@@ -889,8 +901,19 @@
   bindBrandField('brokerage', 'brokerage');
   bindBrandField('phone', 'phone');
   bindBrandField('email', 'email');
-  bindBrandField('prefs', 'prefs');
-  $('prefs').addEventListener('change', () => { if (outputs) generate(); });
+  // house style controls -> brand.prefs object
+  const PREF_CHECKS = { prefNoEmojis: 'noEmojis', prefNoHashtags: 'noHashtags', prefNoExclaim: 'noExclaim', prefShort: 'short' };
+  Object.entries(PREF_CHECKS).forEach(([id, key]) => {
+    $(id).addEventListener('change', () => {
+      brand.prefs[key] = $(id).checked;
+      saveBrand();
+      if (outputs) generate();
+    });
+  });
+  [['prefGreeting', 'greeting'], ['prefSignoff', 'signoff'], ['prefBanned', 'banned']].forEach(([id, key]) => {
+    $(id).addEventListener('input', () => { brand.prefs[key] = $(id).value; saveBrand(); });
+    $(id).addEventListener('change', () => { if (outputs) generate(); });
+  });
   bindBrandField('brandPrimary', 'primary');
   bindBrandField('brandAccent', 'accent');
   bindBrandField('brandFont', 'font');

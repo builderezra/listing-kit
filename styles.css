@@ -164,6 +164,14 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 .tpl-bold { background: linear-gradient(180deg, #1c4658 0%, #0d2530 100%); position: relative; }
 .tpl-bold::after { content: ''; position: absolute; inset: 5px 5px 50% 5px; background: #88a0a8; border-radius: 5px; }
 
+/* house style preference checks */
+.prefs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin-bottom: 10px; }
+.pref-check {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 500; color: var(--ink); cursor: pointer; margin: 0;
+}
+.pref-check input { width: auto; accent-color: var(--teal); cursor: pointer; }
+
 /* inline custom inputs beside the currency / unit selects */
 .pricewrap #currencyCustom { width: 74px; flex: 0 0 auto; }
 .sizewrap #areaUnitCustom { width: 96px; flex: 0 0 auto; }

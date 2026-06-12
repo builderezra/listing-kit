@@ -606,8 +606,12 @@ const Generator = (() => {
     if (p.noHashtags) {
       out.instagram = out.instagram.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n').trimEnd();
     }
+    if (p.greeting) {
+      const hi = cap(p.greeting.trim()).replace(/[,!.]*$/, ',');
+      out.email = out.email.replace(/^Hi there,$/m, hi);
+    }
     if (p.signoff) {
-      const sig = cap(p.signoff).replace(/,?$/, ',');
+      const sig = cap(p.signoff.trim()).replace(/[,!.]*$/, ',');
       out.email = out.email.replace(/^Best,$/m, sig);
     }
     if (p.noExclaim) {
