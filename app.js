@@ -7,6 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
+  const APP_VERSION = 'v5';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -195,6 +196,16 @@
     renderPhotoGrid();
   };
 
+  // add a photo from fetched bytes (link import) — local blob, canvas-safe
+  const addPhotoBlob = (blob, name = 'imported') =>
+    new Promise((resolve) => {
+      const url = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => { photos.push({ url, img, name }); renderPhotoGrid(); resolve(true); };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(false); };
+      img.src = url;
+    });
+
   const orderedPhotos = () => {
     if (!photos.length) return [];
     return [photos[heroIndex], ...photos.filter((_, i) => i !== heroIndex)];
@@ -234,7 +245,15 @@
     $('photoFile').addEventListener('change', (e) => { addPhotoFiles(e.target.files); e.target.value = ''; });
     ['dragover', 'dragenter'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.add('drag'); }));
     ['dragleave', 'drop'].forEach((ev) => dz.addEventListener(ev, (e) => { e.preventDefault(); dz.classList.remove('drag'); }));
-    dz.addEventListener('drop', (e) => addPhotoFiles(e.dataTransfer.files));
+    dz.addEventListener('drop', async (e) => {
+      if (e.dataTransfer.files && e.dataTransfer.files.length) return addPhotoFiles(e.dataTransfer.files);
+      // dragging an image from another tab drops its URL — fetch it via proxy
+      const uri = e.dataTransfer.getData('text/uri-list') || e.dataTransfer.getData('text/plain');
+      if (uri && /^https?:\/\//i.test(uri.trim())) {
+        const blob = await Importer.fetchImageBlob(uri.trim().split('\n')[0]);
+        if (blob) { await addPhotoBlob(blob, 'dragged'); rerenderVisuals(); }
+      }
+    });
   };
 
   // ---------------- form ----------------
@@ -509,17 +528,17 @@
     setTimeout(resetCopyBtn, 1600);
   };
 
-  // ---------------- paste-to-parse (site-agnostic, via parser.js) ----------------
-  const parsePaste = () => {
-    const t = $('pasteBox').value;
-    if (!t.trim()) return;
-    const r = Parser.parse(t);
-    const fillText = (id, v, fmt) => { if (v != null && v !== '' && !$(id).value.trim()) $(id).value = fmt ? fmt(v) : v; };
-    fillText('price', r.price, (v) => v.toLocaleString('en-US'));
+  // ---------------- field filling (paste + link import share this) ----------------
+  const applyParsedFields = (r, overwrite = false) => {
+    const fillText = (id, v, fmt) => {
+      if (v == null || v === '') return;
+      if (overwrite || !$(id).value.trim()) $(id).value = fmt ? fmt(v) : v;
+    };
+    fillText('price', r.price, (v) => Number(v).toLocaleString('en-US'));
     fillText('beds', r.beds);
     fillText('baths', r.baths);
     fillText('cars', r.cars);
-    fillText('sqft', r.sqft, (v) => v.toLocaleString('en-US'));
+    fillText('sqft', r.sqft, (v) => Number(v).toLocaleString('en-US'));
     fillText('year', r.year);
     fillText('lot', r.lot);
     fillText('address', r.address);
@@ -527,9 +546,101 @@
     if (r.currency) $('currency').value = r.currency;
     if (r.areaUnit) $('areaUnit').value = r.areaUnit;
     if (r.type) $('type').value = r.type;
+    saveDraft();
+  };
+
+  // ---------------- paste-to-parse (site-agnostic, via parser.js) ----------------
+  const parsePaste = () => {
+    const t = $('pasteBox').value;
+    if (!t.trim()) return;
+    const r = Parser.parse(t);
+    applyParsedFields(r, false);
     $('parseNote').textContent = r.found.length
       ? `✓ Found: ${[...new Set(r.found)].join(', ')}`
       : 'Nothing recognized — fill the fields manually.';
+  };
+
+  // ---------------- link import ----------------
+  const setImportStatus = (msg, kind) => {
+    const el = $('importStatus');
+    el.hidden = !msg;
+    el.textContent = msg || '';
+    el.className = 'import-status' + (kind ? ' ' + kind : '');
+  };
+
+  const importFromLink = async () => {
+    const url = $('importUrl').value.trim();
+    if (!url) { setImportStatus('Paste a listing link first.', 'err'); return; }
+    if (!/^https?:\/\//i.test(url)) { setImportStatus('That doesn’t look like a link — it should start with https://', 'err'); return; }
+    const btn = $('importBtn');
+    btn.disabled = true; btn.textContent = '…';
+    try {
+      // direct image link → just add the photo
+      if (Importer.isImageURL(url) && !/reiwa\.com\.au\/[a-z]/i.test(url)) {
+        setImportStatus('Fetching photo…');
+        const blob = await Importer.fetchImageBlob(url);
+        if (blob) { await addPhotoBlob(blob, 'imported'); setImportStatus('✓ Photo added.', 'ok'); rerenderVisuals(); }
+        else setImportStatus('Couldn’t fetch that image (the site may block proxies). Try right-click → Copy Image, then paste it in the box below.', 'err');
+        return;
+      }
+
+      setImportStatus('Fetching the listing page…');
+      const page = await Importer.fetchPage(url);
+      if (!page) {
+        setImportStatus(
+          Importer.isBlockedPortal(url)
+            ? 'That site blocks automated imports. Tip: almost every WA listing is also on reiwa.com.au — find the same address there and import that link. Or copy the page text into the box below and drag the photos in.'
+            : 'Couldn’t fetch that page. Copy the listing text into the box below instead — and drag photos straight into the photo area.',
+          'err');
+        return;
+      }
+
+      // details
+      setImportStatus('Reading the details…');
+      const text = Importer.cleanText(page.kind, page.text);
+      const parsed = Parser.parse(text);
+      if (page.kind === 'html') Object.assign(parsed, ((ld) => { Object.keys(ld).forEach((k) => ld[k] == null && delete ld[k]); return ld; })(Importer.jsonLD(page.text)));
+
+      // photos — REIWA: recover the full numbered gallery; others: page images
+      let imgURLs = Importer.extractImages(page.kind, page.text);
+
+      // thin result (pre-render shell)? get a second opinion from the HTML route
+      if (page.kind === 'md' && (!imgURLs.length || !parsed.beds)) {
+        setImportStatus('Page came back thin — trying a second route…');
+        const alt = await Importer.fetchPageHTML(url);
+        if (alt) {
+          const altParsed = Parser.parse(Importer.cleanText('html', alt.text));
+          Object.assign(altParsed, ((ld) => { Object.keys(ld).forEach((k) => ld[k] == null && delete ld[k]); return ld; })(Importer.jsonLD(alt.text)));
+          Object.keys(altParsed).forEach((k) => {
+            if (k === 'found') { (altParsed.found || []).forEach((f) => parsed.found.push(f)); return; }
+            if (parsed[k] == null || parsed[k] === '') parsed[k] = altParsed[k];
+          });
+          if (!imgURLs.length) imgURLs = Importer.extractImages('html', alt.text);
+        }
+      }
+      applyParsedFields(parsed, true);
+      const ref = imgURLs.map(Importer.reiwaRef).find(Boolean) || Importer.reiwaRefFromURL(url);
+      if (ref) imgURLs = Importer.reiwaGalleryURLs(ref, 12);
+      let added = 0;
+      if (imgURLs.length) {
+        setImportStatus(`Importing photos 0/${imgURLs.length}…`);
+        const blobs = await Importer.fetchImages(imgURLs, (done, total) => setImportStatus(`Importing photos ${done}/${total}…`));
+        for (const b of blobs) if (b && photos.length < 14) added += (await addPhotoBlob(b, 'imported')) ? 1 : 0;
+      }
+
+      const got = [...new Set(parsed.found || [])];
+      const bits = [];
+      if (got.length) bits.push(got.join(', '));
+      bits.push(added ? `${added} photo${added === 1 ? '' : 's'}` : 'no photos (drag them in from the page)');
+      setImportStatus(`✓ Imported: ${bits.join(' · ')}${parsed.price ? '' : ' — no advertised price found (offers campaign?), add one if you have it'}`, 'ok');
+
+      // one-action flow: if we got the essentials, build the kit right away
+      if ((parsed.address || parsed.beds) && added) generate();
+    } catch (e) {
+      setImportStatus('Import failed unexpectedly — paste the listing text below instead.', 'err');
+    } finally {
+      btn.disabled = false; btn.textContent = 'Import';
+    }
   };
 
   // ---------------- example listing (with synthesized photos) ----------------
@@ -645,7 +756,37 @@
   $('rewordBtn').addEventListener('click', () => { if (outputs) generate(); });
   $('clearBtn').addEventListener('click', clearListing);
   $('exampleBtn').addEventListener('click', loadExample);
-  $('parseBtn').addEventListener('click', parsePaste);
+
+  // import + paste UX
+  $('importBtn').addEventListener('click', importFromLink);
+  $('importUrl').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); importFromLink(); } });
+  $('clipBtn').addEventListener('click', async () => {
+    try {
+      const t = await navigator.clipboard.readText();
+      if (t) { $('pasteBox').value = t; parsePaste(); }
+      else $('parseNote').textContent = 'Clipboard is empty — copy the listing text first.';
+    } catch (e) {
+      $('parseNote').textContent = 'Clipboard blocked — click in the box and press Ctrl/Cmd+V instead.';
+    }
+  });
+  $('pasteBox').addEventListener('paste', (e) => {
+    const files = e.clipboardData && e.clipboardData.files;
+    if (files && files.length) {
+      e.preventDefault();
+      addPhotoFiles(files);
+      $('parseNote').textContent = `📸 ${files.length} photo${files.length === 1 ? '' : 's'} added below.`;
+      rerenderVisuals();
+      return;
+    }
+    setTimeout(parsePaste, 60);   // let the text land, then auto-fill
+  });
+  // pasting a copied photo anywhere (outside inputs) adds it too
+  window.addEventListener('paste', (e) => {
+    const t = e.target;
+    if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.isContentEditable)) return;
+    const files = e.clipboardData && e.clipboardData.files;
+    if (files && files.length) { addPhotoFiles(files); rerenderVisuals(); }
+  });
   $('flyerOpen').addEventListener('click', () => { if (outputs) Flyer.openPrint(flyerOpts()); });
   $('badge').addEventListener('change', () => {
     $('openhouseWrap').hidden = $('badge').value !== 'openhouse';
@@ -687,9 +828,10 @@
 
   loadBrand();
   restoreDraft();
+  $('verTag').textContent = 'Listing Kit ' + APP_VERSION;
 
   // integration/test hook
-  window.ListingKit = { addPhotoDataURL, generate, loadExample };
+  window.ListingKit = { addPhotoDataURL, generate, loadExample, importFromLink };
 
   // register service worker for offline / installable use
   if ('serviceWorker' in navigator) {

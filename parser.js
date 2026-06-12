@@ -65,23 +65,39 @@ const Parser = (() => {
     const found = [];
 
     // ---- price + currency ---------------------------------------------------
+    // Real pages are full of OTHER dollar figures (strata fees, rates, suburb
+    // medians, "similar listings"). Real prices sit near the top, so: scan all
+    // matches, stay inside the header window, skip fee/stat contexts, and
+    // ignore implausibly small amounts.
+    const PRICE_WINDOW = 2800;
+    const NOT_PRICE_CTX = /strata|lev(?:y|ies)|fees?|rates?|water|council|deposit|bond|per\s*week|p\/?w\b|per\s*month|pcm|p\.?a\.?|annum|median|sold|rent|leased|interested|outgoings|insurance/i;
+    const okPriceAt = (idx) => idx < PRICE_WINDOW && !NOT_PRICE_CTX.test(text.slice(Math.max(0, idx - 32), idx));
+    outer:
     for (const { re, c } of CURRENCIES) {
-      const m = text.match(re);
-      if (m) {
+      const g = new RegExp(re.source, re.flags.includes('g') ? re.flags : re.flags + 'g');
+      let m;
+      while ((m = g.exec(text)) !== null) {
+        if (m.index >= PRICE_WINDOW) break;
         const multWord = (m[2] || '').toLowerCase();
         const mult = multWord.startsWith('m') ? 1e6 : multWord === 'k' ? 1e3 : 0;
         const v = numVal(m[1], mult);
-        if (v && v >= 1000) {
+        if (v && v >= 15000 && okPriceAt(m.index)) {
           out.price = v;
           out.currency = c;
           found.push(`price (${c})`);
-          break;
+          break outer;
         }
+        if (m.index === g.lastIndex) g.lastIndex++;
       }
     }
     if (!out.price) {
-      const m = text.match(/(?:price|asking|guide(?:\s+price)?|offers(?:\s+(?:over|around|in\s+excess\s+of))?|listed\s+(?:at|for))\D{0,10}([\d][\d\s.,]{3,})/i);
-      if (m) { const v = numVal(m[1]); if (v && v >= 1000) { out.price = v; found.push('price'); } }
+      const g = /(?:price|asking|guide(?:\s+price)?|offers(?:\s+(?:over|around|from|in\s+excess\s+of))?|listed\s+(?:at|for)|from)\s*:?\s*\$?\s?([\d][\d\s.,]{4,})/gi;
+      let m;
+      while ((m = g.exec(text)) !== null) {
+        if (m.index >= PRICE_WINDOW) break;
+        const v = numVal(m[1]);
+        if (v && v >= 15000 && okPriceAt(m.index)) { out.price = v; found.push('price'); break; }
+      }
     }
 
     // ---- beds / baths / cars --------------------------------------------------
@@ -91,13 +107,19 @@ const Parser = (() => {
       out.beds = m[1]; out.baths = m[2]; found.push('beds', 'baths');
       if (m[3]) { out.cars = m[3]; found.push('cars'); }
     }
+    // flowery copy spells numbers out: "three spacious bedrooms"
+    const WORDNUM = { one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7' };
+    const WN = '(one|two|three|four|five|six|seven)';
+    const FLUFF = '(?:\\s+(?:spacious|generous|large|double|queen[- ]sized?|king[- ]sized?|good[- ]sized?|well[- ]sized|grand|minor|guest))*';
     if (!out.beds) {
       m = text.match(/(\d+(?:\.\d)?)\s*(?:bed(?:room)?s?|bd|br)\b/i) || text.match(/bed(?:room)?s?\s*[:\-–]?\s*(\d+)/i);
       if (m) { out.beds = m[1]; found.push('beds'); }
+      else if ((m = text.match(new RegExp(WN + FLUFF + '\\s+bed(?:room)?s?\\b', 'i')))) { out.beds = WORDNUM[m[1].toLowerCase()]; found.push('beds'); }
     }
     if (!out.baths) {
       m = text.match(/(\d+(?:\.\d)?)\s*(?:bath(?:room)?s?|ba)\b/i) || text.match(/bath(?:room)?s?\s*[:\-–]?\s*(\d+)/i);
       if (m) { out.baths = m[1]; found.push('baths'); }
+      else if ((m = text.match(new RegExp(WN + FLUFF + '\\s+bath(?:room)?s?\\b', 'i')))) { out.baths = WORDNUM[m[1].toLowerCase()]; found.push('baths'); }
     }
     if (!out.cars) {
       m = text.match(/(\d+)\s*(?:car(?:\s*(?:bays?|spaces?|ports?))?|garage|parking)\b/i);
@@ -117,9 +139,11 @@ const Parser = (() => {
       .map((x) => ({ v: numVal(x[2]), isBlock: !!(x[1] || x[3]) }))
       .filter((x) => x.v && x.v > 10);
     const blocks = sqms.filter((x) => x.isBlock);
-    let interiors = sqms.filter((x) => !x.isBlock).map((x) => x.v);
+    // dedupe — listings repeat the same figure ("57sqm layout… 57sqm strata")
+    let interiors = [...new Set(sqms.filter((x) => !x.isBlock).map((x) => x.v))];
     if (blocks.length) { out.lot = blocks[0].v.toLocaleString('en-US') + ' m²'; found.push('block size'); }
-    else if (interiors.length >= 2) {
+    else if (interiors.length >= 2 && Math.max(...interiors) >= Math.min(...interiors) * 1.6) {
+      // distinct values: the big one is the block (block > house in AU listings)
       const max = Math.max(...interiors);
       out.lot = max.toLocaleString('en-US') + ' m²';
       interiors = interiors.filter((v) => v !== max);
@@ -144,10 +168,18 @@ const Parser = (() => {
     if (m) { out.year = m[1]; found.push('year built'); }
 
     // ---- property type ----------------------------------------------------------
+    // Headers/breadcrumbs state the real type early; body text is full of
+    // red herrings ("air conditioning unit", similar-listing strips).
     const low = ' ' + text.toLowerCase() + ' ';
-    for (const { k, t } of TYPE_MAP) {
-      if (k.some((kw) => low.includes(kw))) { out.type = t; found.push('type'); break; }
-    }
+    const lowHead = low.slice(0, 1200);
+    const detect = (hay, skipUnit) => {
+      for (const { k, t } of TYPE_MAP) {
+        if (k.some((kw) => !(skipUnit && kw === 'unit ') && hay.includes(kw))) return t;
+      }
+      return null;
+    };
+    const ty = detect(lowHead, false) || detect(low, true);
+    if (ty) { out.type = ty; found.push('type'); }
 
     // ---- address (best guess) -----------------------------------------------------
     const NOT_ADDR = /\b(bed|bath|garage|car|sale|let|sold|auction|offers|guide|price|built|sqm|sq ft)\b/i;

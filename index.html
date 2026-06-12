@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css" />
+  <link rel="stylesheet" href="styles.css?v=5" />
 </head>
 <body>
   <header class="topbar">
@@ -122,12 +122,29 @@
         <details class="section" id="listingSection" open>
           <summary><span class="step">2</span> The listing</summary>
           <div class="section-body">
-            <details class="paste-block">
-              <summary>📋 Paste from any listing site to auto-fill</summary>
-              <textarea id="pasteBox" rows="3" placeholder="Paste listing text from realestate.com.au, Domain, REIWA, Zillow, Rightmove — anywhere. I'll pull out the price, beds, baths, cars, size, and more."></textarea>
-              <button type="button" class="mini-btn" id="parseBtn">Auto-fill from paste</button>
-              <span class="parse-note" id="parseNote"></span>
-            </details>
+            <div class="import-box">
+              <label class="import-title">⚡ Quick import — skip the typing</label>
+              <div class="importrow">
+                <input type="text" id="importUrl" placeholder="Paste a reiwa.com.au or agency listing link…" />
+                <button type="button" class="mini-btn" id="importBtn">Import</button>
+              </div>
+              <div class="import-status" id="importStatus" hidden></div>
+              <div class="or-divider">or paste the listing text</div>
+              <textarea id="pasteBox" rows="3" placeholder="On the listing page press Ctrl/Cmd+A (select all), Ctrl/Cmd+C (copy), then click here and Ctrl/Cmd+V. Price, beds, baths, cars and size fill in automatically. Pasting a copied photo adds it to your photos too."></textarea>
+              <div class="importrow2">
+                <button type="button" class="mini-btn ghost" id="clipBtn">📋 Paste from clipboard</button>
+                <span class="parse-note" id="parseNote"></span>
+              </div>
+              <details class="howto">
+                <summary>How do I get a listing in here?</summary>
+                <ol>
+                  <li><strong>Easiest — link:</strong> open the listing on <em>reiwa.com.au</em> (or your agency's website), copy the address-bar link, paste it above, hit <strong>Import</strong>. Details <em>and</em> photos load automatically.</li>
+                  <li><strong>Text:</strong> on any listing page: <kbd>Ctrl/Cmd+A</kbd> → <kbd>Ctrl/Cmd+C</kbd> → paste in the box above.</li>
+                  <li><strong>Photos:</strong> drag photos from any webpage straight into the photo box below, or right-click a photo → <em>Copy Image</em> → paste here.</li>
+                </ol>
+                <p class="hint">realestate.com.au &amp; Domain block automated imports — but nearly every WA listing is also on reiwa.com.au, so import it from there. Link import uses public fetch services (the URL is shared with them; photos still stay in your browser).</p>
+              </details>
+            </div>
 
             <div class="field">
               <label for="address">Address</label>
@@ -366,14 +383,15 @@
   </main>
 
   <footer class="foot">
-    <p>Runs entirely in your browser — photos and details are never uploaded. The compliance check is decision support, not legal advice; always defer to your agency’s compliance guidance.</p>
+    <p>Runs in your browser — photos and details are never uploaded (link import fetches via public read proxies). The compliance check is decision support, not legal advice; always defer to your agency’s compliance guidance. <span id="verTag"></span></p>
   </footer>
 
-  <script src="generator.js"></script>
-  <script src="fairhousing.js"></script>
-  <script src="parser.js"></script>
-  <script src="visuals.js"></script>
-  <script src="flyer.js"></script>
-  <script src="app.js"></script>
+  <script src="generator.js?v=5"></script>
+  <script src="fairhousing.js?v=5"></script>
+  <script src="parser.js?v=5"></script>
+  <script src="importer.js?v=5"></script>
+  <script src="visuals.js?v=5"></script>
+  <script src="flyer.js?v=5"></script>
+  <script src="app.js?v=5"></script>
 </body>
 </html>

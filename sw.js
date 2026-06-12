@@ -1,10 +1,11 @@
-/* Listing Kit — service worker. Cache-first so the app works offline and
- * installs to a phone/tablet home screen for in-the-field or interview demos. */
-const CACHE = 'listing-kit-v4';
+/* Listing Kit — service worker. Network-first with cache fallback: you always
+ * get the newest version when online, and the app still works offline / as an
+ * installed home-screen app for in-the-field or interview demos. */
+const CACHE = 'listing-kit-v5';
 const ASSETS = [
   './', './index.html', './styles.css',
   './app.js', './generator.js', './fairhousing.js',
-  './parser.js', './visuals.js', './flyer.js',
+  './parser.js', './importer.js', './visuals.js', './flyer.js',
   './icon.svg', './manifest.webmanifest',
 ];
 
@@ -20,11 +21,17 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   if (e.request.method !== 'GET') return;
+  const url = new URL(e.request.url);
+  // never intercept cross-origin (import proxies, remote images)
+  if (url.origin !== self.location.origin) return;
   e.respondWith(
-    caches.match(e.request).then((hit) => hit || fetch(e.request).then((res) => {
-      const copy = res.clone();
-      caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
-      return res;
-    }).catch(() => caches.match('./index.html')))
+    // no-cache: revalidate with the server so deploys show up immediately
+    fetch(e.request, { cache: 'no-cache' })
+      .then((res) => {
+        const copy = res.clone();
+        caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+        return res;
+      })
+      .catch(() => caches.match(e.request, { ignoreSearch: true }).then((hit) => hit || caches.match('./index.html')))
   );
 });

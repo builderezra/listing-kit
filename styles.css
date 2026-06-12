@@ -148,15 +148,30 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 .tpl-bold { background: linear-gradient(180deg, #1c4658 0%, #0d2530 100%); position: relative; }
 .tpl-bold::after { content: ''; position: absolute; inset: 5px 5px 50% 5px; background: #88a0a8; border-radius: 5px; }
 
-/* paste-to-parse */
-.paste-block { background: var(--hi); border: 1px dashed var(--line); border-radius: 9px; padding: 9px 11px; margin-bottom: 13px; }
-.paste-block summary { font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer; }
-.paste-block textarea { margin-top: 9px; font-size: 13px; }
+/* quick import */
+.import-box { background: var(--hi); border: 1px solid var(--line); border-radius: 11px; padding: 12px; margin-bottom: 14px; }
+.import-title { font-size: 13px; font-weight: 700; color: var(--navy); display: block; margin-bottom: 8px; }
+.importrow { display: flex; gap: 8px; }
+.importrow input { flex: 1; font-size: 13.5px; }
+.importrow2 { display: flex; align-items: center; gap: 8px; margin-top: 7px; flex-wrap: wrap; }
+.import-status { font-size: 12.5px; margin-top: 8px; padding: 7px 10px; border-radius: 7px; background: #eef3f5; color: var(--ink); }
+.import-status.ok { background: #eaf6ef; color: var(--green); }
+.import-status.err { background: #fbeae8; color: var(--red); }
+.or-divider { font-size: 11.5px; color: var(--muted); text-transform: uppercase; letter-spacing: 1px; margin: 10px 0 6px; display: flex; align-items: center; gap: 8px; }
+.or-divider::before, .or-divider::after { content: ''; height: 1px; background: var(--line); flex: 1; }
+.import-box textarea { font-size: 13px; }
 .mini-btn {
   font-family: var(--sans); font-size: 12.5px; font-weight: 600; color: #fff;
-  background: var(--teal); border: none; border-radius: 7px; padding: 7px 13px; cursor: pointer; margin-top: 7px;
+  background: var(--teal); border: none; border-radius: 7px; padding: 8px 14px; cursor: pointer;
 }
-.parse-note { font-size: 12px; color: var(--green); margin-left: 8px; }
+.mini-btn:disabled { opacity: .6; cursor: wait; }
+.mini-btn.ghost { background: #fff; color: var(--teal); border: 1px solid var(--teal); }
+.parse-note { font-size: 12px; color: var(--green); }
+.howto { margin-top: 9px; }
+.howto summary { font-size: 12.5px; font-weight: 600; color: var(--muted); cursor: pointer; }
+.howto ol { margin: 8px 0 4px; padding-left: 20px; font-size: 12.5px; }
+.howto li { margin-bottom: 5px; }
+.howto kbd { background: #fff; border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-size: 11px; }
 
 /* photos */
 .dropzone {
