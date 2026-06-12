@@ -1,11 +1,11 @@
-/* Listing Kit — marketing copy generator.
+/* Listing Kit — marketing copy generator (v2).
  *
- * Runs entirely in the browser. No API, no network, no key. Given a listing,
- * it assembles polished, property-aware, tone-driven copy for every channel an
- * agent needs: MLS description, Instagram, Facebook, an email blast, and flyer
- * copy. The vocabulary is written to steer clear of fair-housing landmines by
- * construction; fairhousing.js then audits the result (and the agent's own
- * typed-in text) as a backstop.
+ * Runs entirely in the browser. Given a listing, assembles property-aware,
+ * tone-driven copy for MLS, Instagram, Facebook, and email. Features are
+ * categorized (kitchen / interior / outdoor / practical) so the description
+ * reads like prose that walks you through the home, not a comma-spliced list.
+ * The vocabulary avoids fair-housing landmines by construction; fairhousing.js
+ * audits everything (including the agent's own input) as a backstop.
  */
 const Generator = (() => {
   'use strict';
@@ -32,7 +32,7 @@ const Generator = (() => {
   const num = (n) => {
     if (n == null || n === '') return '';
     const v = Number(String(n).replace(/[^0-9.]/g, ''));
-    return isFinite(v) ? v.toLocaleString('en-US') : '';
+    return isFinite(v) && v > 0 ? v.toLocaleString('en-US') : '';
   };
   const money = (n) => {
     if (n == null || n === '') return '';
@@ -41,7 +41,6 @@ const Generator = (() => {
     return '$' + v.toLocaleString('en-US', { maximumFractionDigits: 0 });
   };
 
-  // ---- price tiers drive how "aspirational" the language gets ---------------
   const priceTier = (price) => {
     const v = Number(String(price || '').replace(/[^0-9.]/g, ''));
     if (!v) return 'mid';
@@ -51,7 +50,6 @@ const Generator = (() => {
     return 'mid';
   };
 
-  // ---- property-type nouns --------------------------------------------------
   const TYPE_NOUN = {
     single: ['home', 'residence', 'single-family home'],
     condo: ['condo', 'residence', 'condominium'],
@@ -62,78 +60,78 @@ const Generator = (() => {
   };
   const typeNoun = (type) => pick(TYPE_NOUN[type] || TYPE_NOUN.single);
 
-  // ---- feature dictionary: raw input -> polished phrasing --------------------
-  // Each entry: trigger keywords + a few interchangeable phrasings. Phrases are
-  // written so they read naturally mid-sentence ("...featuring <phrase>").
+  // ---- feature dictionary: raw input -> polished phrasing + category ---------
+  // cat: kitchen | interior | outdoor | practical — drives sentence grouping.
   const FEATURE_LIB = [
-    { k: ['updated kitchen', 'renovated kitchen', 'new kitchen', 'chef'], p: ['a renovated chef’s kitchen', 'a beautifully updated kitchen', 'a sleek, modern kitchen'] },
-    { k: ['kitchen'], p: ['a bright, functional kitchen', 'a well-appointed kitchen'] },
-    { k: ['stainless'], p: ['stainless steel appliances'] },
-    { k: ['quartz', 'granite', 'countertop'], p: ['stone countertops', 'upgraded countertops'] },
-    { k: ['island'], p: ['a generous center island'] },
-    { k: ['hardwood', 'wood floor'], p: ['gleaming hardwood floors', 'rich hardwood flooring'] },
-    { k: ['tile floor', 'tile'], p: ['designer tile work'] },
-    { k: ['open floor', 'open concept', 'open-concept', 'open plan'], p: ['an open-concept layout', 'a flowing open floor plan'] },
-    { k: ['natural light', 'bright', 'sunlit', 'sunny'], p: ['abundant natural light', 'sun-filled living spaces'] },
-    { k: ['high ceiling', 'vaulted', 'cathedral'], p: ['soaring ceilings', 'dramatic vaulted ceilings'] },
-    { k: ['fireplace'], p: ['a cozy fireplace', 'a statement fireplace'] },
-    { k: ['primary suite', 'master suite', 'owner’s suite', 'owners suite', 'primary bedroom', 'master bedroom'], p: ['a spacious primary suite', 'a serene primary retreat'] },
-    { k: ['walk-in closet', 'walk in closet'], p: ['generous walk-in closets'] },
-    { k: ['spa', 'soaking tub', 'en-suite', 'ensuite'], p: ['a spa-inspired bath', 'a luxurious en-suite bath'] },
-    { k: ['pool'], p: ['a sparkling pool', 'a resort-style pool'] },
-    { k: ['hot tub', 'jacuzzi', 'spa tub'], p: ['a relaxing hot tub'] },
-    { k: ['backyard', 'back yard', 'fenced yard', 'yard'], p: ['a private, fenced backyard', 'a generous backyard'] },
-    { k: ['deck', 'patio', 'pergola'], p: ['an entertainer’s deck', 'an inviting outdoor patio'] },
-    { k: ['balcony', 'terrace'], p: ['a private balcony', 'a sun-soaked terrace'] },
-    { k: ['view', 'overlook'], p: ['captivating views', 'stunning views'] },
-    { k: ['garage'], p: ['a spacious garage', 'attached garage parking'] },
-    { k: ['basement', 'lower level'], p: ['a finished lower level', 'a versatile finished basement'] },
-    { k: ['bonus room', 'flex room', 'office', 'den', 'study'], p: ['a flexible bonus room', 'a dedicated home office'] },
-    { k: ['smart home', 'smart-home', 'nest', 'smart thermostat'], p: ['smart-home technology'] },
-    { k: ['solar'], p: ['energy-saving solar panels'] },
-    { k: ['new roof', 'new hvac', 'new windows', 'new furnace', 'new water heater', 'updated systems', 'new ac'], p: ['major recent upgrades', 'big-ticket updates already done'] },
-    { k: ['remodel', 'renovat', 'updated', 'upgraded', 'move-in', 'move in', 'turnkey', 'turn-key'], p: ['a tasteful, move-in-ready renovation', 'thoughtful updates throughout'] },
-    { k: ['storage'], p: ['ample storage throughout'] },
-    { k: ['laundry', 'mudroom'], p: ['a convenient laundry/mud room'] },
-    { k: ['corner lot', 'cul-de-sac', 'cul de sac', 'large lot', 'acre', 'private lot'], p: ['a desirable lot', 'a premium lot position'] },
+    { k: ['updated kitchen', 'renovated kitchen', 'new kitchen', 'chef'], cat: 'kitchen', p: ['a renovated chef’s kitchen', 'a beautifully updated kitchen', 'a sleek, modern kitchen'] },
+    { k: ['kitchen'], cat: 'kitchen', p: ['a bright, functional kitchen', 'a well-appointed kitchen'] },
+    { k: ['stainless'], cat: 'kitchen', p: ['stainless steel appliances'] },
+    { k: ['quartz', 'granite', 'countertop'], cat: 'kitchen', p: ['stone countertops', 'upgraded countertops'] },
+    { k: ['island'], cat: 'kitchen', p: ['a generous center island'] },
+    { k: ['pantry'], cat: 'kitchen', p: ['a walk-in pantry'] },
+    { k: ['hardwood', 'wood floor'], cat: 'interior', p: ['gleaming hardwood floors', 'rich hardwood flooring'] },
+    { k: ['tile floor', 'tile'], cat: 'interior', p: ['designer tile work'] },
+    { k: ['open floor', 'open concept', 'open-concept', 'open plan'], cat: 'interior', p: ['an open-concept layout', 'a flowing open floor plan'] },
+    { k: ['natural light', 'bright', 'sunlit', 'sunny'], cat: 'interior', p: ['abundant natural light', 'sun-filled living spaces'] },
+    { k: ['high ceiling', 'vaulted', 'cathedral'], cat: 'interior', p: ['soaring ceilings', 'dramatic vaulted ceilings'] },
+    { k: ['fireplace'], cat: 'interior', p: ['a cozy fireplace', 'a statement fireplace'] },
+    { k: ['primary suite', 'master suite', 'owner’s suite', 'owners suite', 'primary bedroom', 'master bedroom'], cat: 'interior', p: ['a spacious primary suite', 'a serene primary retreat'] },
+    { k: ['walk-in closet', 'walk in closet'], cat: 'interior', p: ['generous walk-in closets'] },
+    { k: ['spa', 'soaking tub', 'en-suite', 'ensuite'], cat: 'interior', p: ['a spa-inspired bath', 'a luxurious en-suite bath'] },
+    { k: ['basement', 'lower level'], cat: 'interior', p: ['a finished lower level', 'a versatile finished basement'] },
+    { k: ['bonus room', 'flex room', 'office', 'den', 'study'], cat: 'interior', p: ['a flexible bonus room', 'a dedicated home office'] },
+    { k: ['storage'], cat: 'interior', p: ['ample storage throughout'] },
+    { k: ['laundry', 'mudroom'], cat: 'interior', p: ['a convenient laundry/mud room'] },
+    { k: ['pool'], cat: 'outdoor', p: ['a sparkling pool', 'a resort-style pool'] },
+    { k: ['hot tub', 'jacuzzi', 'spa tub'], cat: 'outdoor', p: ['a relaxing hot tub'] },
+    { k: ['backyard', 'back yard', 'fenced yard', 'yard'], cat: 'outdoor', p: ['a private, fenced backyard', 'a generous backyard'] },
+    { k: ['deck', 'patio', 'pergola'], cat: 'outdoor', p: ['an entertainer’s deck', 'an inviting outdoor patio'] },
+    { k: ['balcony', 'terrace'], cat: 'outdoor', p: ['a private balcony', 'a sun-soaked terrace'] },
+    { k: ['view', 'overlook'], cat: 'outdoor', p: ['captivating views', 'stunning views'] },
+    { k: ['garden', 'landscap'], cat: 'outdoor', p: ['mature, easy-care landscaping'] },
+    { k: ['corner lot', 'cul-de-sac', 'cul de sac', 'large lot', 'acre', 'private lot'], cat: 'outdoor', p: ['a desirable lot', 'a premium lot position'] },
+    { k: ['garage'], cat: 'practical', p: ['a spacious garage', 'attached garage parking'] },
+    { k: ['smart home', 'smart-home', 'nest', 'smart thermostat'], cat: 'practical', p: ['smart-home technology'] },
+    { k: ['solar'], cat: 'practical', p: ['energy-saving solar panels'] },
+    { k: ['new roof', 'new hvac', 'new windows', 'new furnace', 'new water heater', 'updated systems', 'new ac'], cat: 'practical', p: ['major recent system upgrades', 'big-ticket updates already done'] },
+    { k: ['remodel', 'renovat', 'updated', 'upgraded', 'move-in', 'move in', 'turnkey', 'turn-key'], cat: 'practical', p: ['a tasteful, move-in-ready renovation', 'thoughtful updates throughout'] },
   ];
 
-  // Convert the user's freeform features into polished phrases (deduped).
+  // Convert freeform features into [{text, cat}] (deduped, order preserved).
   const polishFeatures = (features) => {
     const out = [];
     const used = new Set();
-    features.forEach((raw) => {
-      const f = raw.trim().toLowerCase();
+    (features || []).forEach((raw) => {
+      const f = String(raw).trim().toLowerCase();
       if (!f) return;
       let matched = false;
       for (const entry of FEATURE_LIB) {
         if (entry.k.some((kw) => f.includes(kw))) {
-          const phrase = pick(entry.p);
           const key = entry.p[0];
-          if (!used.has(key)) { out.push(phrase); used.add(key); matched = true; }
-          else matched = true;
+          if (!used.has(key)) { out.push({ text: pick(entry.p), cat: entry.cat }); used.add(key); }
+          matched = true;
           break;
         }
       }
       if (!matched) {
-        // Unknown feature: use it verbatim but lightly dressed.
-        const clean = raw.trim().replace(/\.$/, '');
-        if (!used.has(clean.toLowerCase())) {
-          out.push(clean.charAt(0) >= 'A' && clean.charAt(0) <= 'Z' ? clean.toLowerCase() : clean);
-          used.add(clean.toLowerCase());
+        const clean = String(raw).trim().replace(/\.$/, '');
+        const key = clean.toLowerCase();
+        if (!used.has(key)) {
+          out.push({ text: clean.charAt(0) >= 'A' && clean.charAt(0) <= 'Z' ? clean.toLowerCase() : clean, cat: 'interior' });
+          used.add(key);
         }
       }
     });
     return out;
   };
 
-  // ---- opening hooks, keyed by tone ----------------------------------------
+  // ---- tone voices -----------------------------------------------------------
   const OPENERS = {
     luxury: [
       'An extraordinary {noun} where timeless design meets everyday comfort.',
       'Refined living defines this exceptional {noun}.',
       'Welcome to a {noun} of rare distinction and craftsmanship.',
-      'Sophistication and ease come together in this remarkable {noun}.',
+      'Some homes simply carry themselves differently — this {noun} is one of them.',
     ],
     warm: [
       'Welcome home to this inviting {noun} with character at every turn.',
@@ -161,102 +159,159 @@ const Generator = (() => {
     ],
   };
 
-  // ---- closing calls to action ---------------------------------------------
+  const STAT_TAILS = {
+    luxury: ['composed with exceptional attention to scale and light', 'where every room earns its place', 'with proportions that photographs only hint at'],
+    warm: ['with room for every rhythm of daily life', 'and every inch of it feels like home', 'with space to spread out and settle in'],
+    modern: ['planned for flexibility and everyday flow', 'with a footprint that adapts to how you actually live', 'and not a wasted square foot among them'],
+    investor: ['with a layout that shows well and holds value', 'and the kind of floor plan that stays in demand', 'with broad appeal to today’s buyers'],
+    classic: ['with comfortable, practical flow throughout', 'thoughtfully arranged for everyday living', 'with a classic layout that simply works'],
+  };
+
   const CLOSERS = {
     luxury: ['Schedule your private showing today.', 'Arrange a private tour and experience it for yourself.', 'Opportunities like this are rare — inquire today.'],
-    warm: ['Come see it for yourself — schedule a tour today.', 'We’d love to show you around. Reach out anytime.', 'Don’t wait — book your showing today.'],
+    warm: ['Come see it for yourself — schedule a tour today.', 'We’d love to show you around. Reach out anytime.', 'Come stand in the kitchen and you’ll get it — schedule a showing today.'],
     modern: ['Book your tour and see it in person.', 'Ready when you are — schedule a showing today.', 'See it live — reach out to tour.'],
     investor: ['Run the numbers, then come take a look.', 'Serious inquiries welcome — reach out for the full breakdown.', 'Let’s talk — schedule a walkthrough today.'],
     classic: ['Call today to schedule your private showing.', 'Don’t miss this one — schedule a tour today.', 'Contact us today for a showing.'],
   };
 
-  // ---- stat sentence builders ----------------------------------------------
-  const statsClause = (d) => {
-    const parts = [];
-    if (d.beds) parts.push(`${d.beds} ${d.beds == 1 ? 'bedroom' : 'bedrooms'}`);
-    if (d.baths) parts.push(`${d.baths} ${d.baths == 1 ? 'bath' : 'baths'}`);
-    if (parts.length === 0 && !d.sqft) return '';
-    let s = parts.length ? `Offering ${oxford(parts)}` : 'Offering';
-    if (d.sqft) s += ` across ${num(d.sqft)} square feet of living space`;
-    return s + '.';
+  // Normalize a location blurb into a "...you're <x>" tail without landmines.
+  const cleanLocation = (text) => {
+    let t = String(text).trim().replace(/\.$/, '');
+    t = t.replace(/within walking distance (of|to)?/gi, 'just minutes from');
+    t = t.replace(/walking distance (of|to)?/gi, 'moments from');
+    if (/^(near|close to|minutes|moments|just|steps|blocks)/i.test(t)) return t.charAt(0).toLowerCase() + t.slice(1);
+    return 'close to ' + t.charAt(0).toLowerCase() + t.slice(1);
   };
 
-  const detailClause = (d) => {
-    const bits = [];
-    if (d.year) bits.push(`Built in ${d.year}`);
-    if (d.lot) bits.push(`set on a ${d.lot} lot`);
-    if (!bits.length) return '';
-    return cap(oxford(bits)) + '.';
-  };
-
-  // ---- MLS / listing description -------------------------------------------
+  // ---- MLS / listing description (two paragraphs, walks through the home) ----
   const buildMLS = (d) => {
     const tone = d.tone || 'classic';
     const noun = typeNoun(d.type);
     const feats = polishFeatures(d.features);
-    const sentences = [];
+    const byCat = { kitchen: [], interior: [], outdoor: [], practical: [] };
+    feats.forEach((f) => (byCat[f.cat] || byCat.interior).push(f.text));
 
-    sentences.push(pick(OPENERS[tone] || OPENERS.classic).replace('{noun}', noun));
+    const p1 = [];
+    const p2 = [];
 
-    const stats = statsClause(d);
-    if (stats) sentences.push(stats);
+    // opener
+    p1.push(pick(OPENERS[tone] || OPENERS.classic).replace('{noun}', noun));
 
-    if (feats.length) {
-      const chosen = pickN(feats, Math.min(feats.length, 4));
-      const lead = pick(['Highlights include', 'Inside you’ll find', 'Standout features include', 'Notable touches include']);
-      sentences.push(`${lead} ${oxford(chosen)}.`);
+    // stats with a tone-flavored tail
+    const statBits = [];
+    if (d.beds) statBits.push(`${d.beds} ${d.beds == 1 ? 'bedroom' : 'bedrooms'}`);
+    if (d.baths) statBits.push(`${d.baths} ${d.baths == 1 ? 'bath' : 'baths'}`);
+    const sq = num(d.sqft);
+    if (statBits.length || sq) {
+      let s = statBits.length ? cap(oxford(statBits)) : 'The floor plan';
+      s += sq ? ` span${statBits.length === 1 ? 's' : ''} ${sq} square feet` : ' fill the home';
+      s += `, ${pick(STAT_TAILS[tone] || STAT_TAILS.classic)}.`;
+      p1.push(s);
     }
 
-    const detail = detailClause(d);
-    if (detail) sentences.push(detail);
+    // interior walk-through
+    const interior = pickN(byCat.interior, 3);
+    if (interior.length) {
+      const lead = pick(['Inside,', 'Step through the door to', 'From the entry,', 'Throughout the main level,']);
+      if (lead === 'Inside,' || lead === 'Throughout the main level,') {
+        p1.push(`${lead} ${oxford(interior)} set the tone.`);
+      } else {
+        p1.push(`${lead} ${oxford(interior)}.`);
+      }
+    }
 
+    // kitchen gets its own beat — it sells houses. If one of the phrases IS
+    // the kitchen ("a renovated chef's kitchen"), make it the subject so we
+    // never write "the kitchen ... with a ... kitchen".
+    const kitchenAll = pickN(byCat.kitchen, 3);
+    const kNoun = kitchenAll.find((k) => k.includes('kitchen'));
+    const kDetails = kitchenAll.filter((k) => k !== kNoun);
+    if (kNoun) {
+      p1.push(pick([
+        `${cap(kNoun)} anchors the heart of the home${kDetails.length ? `, complete with ${oxford(kDetails)}` : ''}.`,
+        `At the center of it all: ${kNoun}${kDetails.length ? `, finished with ${oxford(kDetails)}` : ''}.`,
+        `Cooks will gravitate to ${kNoun}${kDetails.length ? ` outfitted with ${oxford(kDetails)}` : ''}.`,
+      ]));
+    } else if (kDetails.length) {
+      p1.push(pick([
+        `The kitchen delivers with ${oxford(kDetails)}.`,
+        `In the kitchen, ${oxford(kDetails)} make everyday cooking easy.`,
+      ]));
+    }
+
+    // outdoor
+    const outdoor = pickN(byCat.outdoor, 3);
+    if (outdoor.length) {
+      p2.push(pick([
+        `Outside, ${oxford(outdoor)} extend${outdoor.length === 1 ? 's' : ''} the living space.`,
+        `Out back, ${oxford(outdoor)} ${outdoor.length === 1 ? 'is' : 'are'} ready for slow mornings and long evenings.`,
+        `The outdoor story is just as good: ${oxford(outdoor)}.`,
+      ]));
+    }
+
+    // practical wins
+    const practical = pickN(byCat.practical, 3);
+    if (practical.length) {
+      p2.push(pick([
+        `Practical wins, too: ${oxford(practical)}.`,
+        `Behind the scenes, ${oxford(practical)} mean${practical.length === 1 ? 's' : ''} less to worry about.`,
+        `Add in ${oxford(practical)}, and the boxes start checking themselves.`,
+      ]));
+    }
+
+    // provenance
+    const prov = [];
+    if (d.year) prov.push(`built in ${d.year}`);
+    if (d.lot) prov.push(`set on a ${d.lot} lot`);
+    if (prov.length) p2.push(`${cap(oxford(prov))}, it’s been cared for where it counts.`);
+
+    // location
     if (d.neighborhood) {
-      const lead = pick(['Ideally located', 'Perfectly positioned', 'Set in a sought-after spot', 'Wonderfully situated']);
-      sentences.push(`${lead}, you’re ${cleanLocation(d.neighborhood)}.`);
+      const lead = pick(['Ideally located', 'Perfectly positioned', 'Wonderfully situated', 'And the address delivers']);
+      p2.push(`${lead} — you’re ${cleanLocation(d.neighborhood)}.`);
     }
 
-    sentences.push(pick(CLOSERS[tone] || CLOSERS.classic));
-    return sentences.join(' ');
-  };
+    p2.push(pick(CLOSERS[tone] || CLOSERS.classic));
 
-  // Normalize a location blurb into a "...you're <x>" tail without landmines.
-  const cleanLocation = (text) => {
-    let t = text.trim().replace(/\.$/, '');
-    // soften distance phrasing the fair-housing checker dislikes
-    t = t.replace(/within walking distance (of|to)?/gi, 'just minutes from');
-    t = t.replace(/walking distance (of|to)?/gi, 'moments from');
-    // if the agent wrote a list, present it as "close to X, Y, Z"
-    if (/^(near|close to|minutes|moments|just|steps)/i.test(t)) return t.charAt(0).toLowerCase() + t.slice(1);
-    return 'close to ' + t.charAt(0).toLowerCase() + t.slice(1);
+    return p1.join(' ') + '\n\n' + p2.join(' ');
   };
 
   // ---- Instagram caption ----------------------------------------------------
   const HOOK_EMOJI = ['✨', '🔑', '🏡', '📍', '🌟', '🛎️'];
+  const BADGE_HOOK = {
+    justlisted: 'JUST LISTED',
+    openhouse: 'OPEN HOUSE',
+    forsale: 'FOR SALE',
+    newprice: 'NEW PRICE',
+    sold: 'JUST SOLD',
+  };
   const buildInstagram = (d) => {
     const lines = [];
     const noun = typeNoun(d.type);
-    lines.push(`${pick(HOOK_EMOJI)} JUST LISTED ${pick(HOOK_EMOJI)}`);
-    const hook = pick([
+    lines.push(`${pick(HOOK_EMOJI)} ${BADGE_HOOK[d.badge] || 'JUST LISTED'} ${pick(HOOK_EMOJI)}`);
+    if (d.badge === 'openhouse' && d.openhouse) lines.push(`🗓️ ${d.openhouse}`);
+    lines.push(pick([
       `Say hello to your next ${noun}.`,
       `This ${noun} checks all the boxes.`,
       `New on the market and ready to tour.`,
       `The ${noun} you’ve been waiting for just hit the market.`,
-    ]);
-    lines.push(hook);
+    ]));
     lines.push('');
 
     const stat = [];
     if (d.beds) stat.push(`🛏️ ${d.beds} bd`);
     if (d.baths) stat.push(`🛁 ${d.baths} ba`);
-    if (d.sqft) stat.push(`📐 ${num(d.sqft)} sqft`);
-    if (d.price) stat.push(`💰 ${money(d.price)}`);
+    if (num(d.sqft)) stat.push(`📐 ${num(d.sqft)} sqft`);
+    if (money(d.price)) stat.push(`💰 ${money(d.price)}`);
     if (stat.length) lines.push(stat.join('  •  '));
 
     const feats = polishFeatures(d.features);
     if (feats.length) {
-      pickN(feats, Math.min(feats.length, 3)).forEach((f) => lines.push(`✅ ${cap(f.replace(/^a |^an /,''))}`));
+      pickN(feats, Math.min(feats.length, 3)).forEach((f) => lines.push(`✅ ${cap(f.text.replace(/^a |^an /, ''))}`));
     }
     if (d.neighborhood) lines.push(`📍 ${cap(cleanLocation(d.neighborhood))}`);
+    if ((d.photoCount || 0) > 1) { lines.push(''); lines.push('📸 Swipe through — then come see it in person.'); }
 
     lines.push('');
     lines.push(pick(['DM me for a private tour 📩', 'Link in bio to book a showing.', 'Comment TOUR and I’ll send the details 👇', 'Ready to see it? Send me a message.']));
@@ -267,16 +322,25 @@ const Generator = (() => {
   };
 
   const hashtags = (d) => {
-    const tags = ['#justlisted', '#realestate', '#forsale', '#newlisting', '#homeforsale', '#dreamhome', '#realtor'];
+    const tags = ['#justlisted', '#realestate', '#forsale', '#newlisting', '#homeforsale', '#dreamhome', '#realtor', '#housetour', '#hometour'];
     const typeTag = { single: '#singlefamilyhome', condo: '#condoliving', townhouse: '#townhome', multi: '#investmentproperty', land: '#landforsale', luxury: '#luxuryrealestate' }[d.type];
     if (typeTag) tags.push(typeTag);
     if (priceTier(d.price) === 'luxury') tags.push('#luxuryhomes', '#luxurylisting');
-    // a light location hashtag from the first word of the neighborhood/city
+    if (d.badge === 'openhouse') tags.push('#openhouse');
     if (d.city) tags.push('#' + d.city.toLowerCase().replace(/[^a-z0-9]/g, '') + 'realestate');
-    return pickN(tags, Math.min(tags.length, 8)).join(' ');
+    return pickN(tags, Math.min(tags.length, 9)).join(' ');
   };
 
   // ---- Facebook post --------------------------------------------------------
+  const statBlurb = (d) => {
+    const p = [];
+    if (d.beds) p.push(`${d.beds} bed`);
+    if (d.baths) p.push(`${d.baths} bath`);
+    let s = p.length ? ' with ' + oxford(p) : '';
+    if (num(d.sqft)) s += `${p.length ? ',' : ' with'} ${num(d.sqft)} sq ft`;
+    return s;
+  };
+
   const buildFacebook = (d) => {
     const noun = typeNoun(d.type);
     const parts = [];
@@ -285,17 +349,18 @@ const Generator = (() => {
       `Excited to share my newest listing! 🎉`,
       `Just listed and I can’t wait to show it off 👇`,
     ]));
+    if (d.badge === 'openhouse' && d.openhouse) parts.push(`🗓️ Open house: ${d.openhouse}`);
     parts.push('');
 
     const sentence = [];
     const addr = d.address ? `${d.address} ` : '';
     sentence.push(`${addr ? addr + 'is a' : 'This'} ${noun}${statBlurb(d)}.`);
     const feats = polishFeatures(d.features);
-    if (feats.length) sentence.push(`Inside, you’ll find ${oxford(pickN(feats, Math.min(feats.length, 3)))}.`);
+    if (feats.length) sentence.push(`Inside, you’ll find ${oxford(pickN(feats, Math.min(feats.length, 3)).map((f) => f.text))}.`);
     if (d.neighborhood) sentence.push(`It’s ${cleanLocation(d.neighborhood)}.`);
     parts.push(sentence.join(' '));
 
-    if (d.price) { parts.push(''); parts.push(`Offered at ${money(d.price)}.`); }
+    if (money(d.price)) { parts.push(''); parts.push(`Offered at ${money(d.price)}.`); }
 
     parts.push('');
     parts.push(pick(['Want a private tour? Send me a message or comment below 👇', 'Message me to schedule a showing — this one won’t last!', 'Tag someone who needs to see this, and DM me to tour.']));
@@ -306,20 +371,11 @@ const Generator = (() => {
     return parts.join('\n');
   };
 
-  const statBlurb = (d) => {
-    const p = [];
-    if (d.beds) p.push(`${d.beds} bed`);
-    if (d.baths) p.push(`${d.baths} bath`);
-    let s = p.length ? ' with ' + oxford(p) : '';
-    if (d.sqft) s += `${p.length ? ',' : ' with'} ${num(d.sqft)} sq ft`;
-    return s;
-  };
-
   // ---- Email blast ----------------------------------------------------------
   const buildEmail = (d) => {
     const subjOpts = [
       `Just Listed${d.city ? ' in ' + d.city : ''}: ${[d.beds && d.beds + ' Bed', d.baths && d.baths + ' Bath'].filter(Boolean).join(', ')}`.replace(/:\s*$/, ''),
-      `New Listing${d.price ? ' — ' + money(d.price) : ''}${d.address ? ' — ' + d.address : ''}`,
+      `New Listing${money(d.price) ? ' — ' + money(d.price) : ''}${d.address ? ' — ' + d.address : ''}`,
       `Be the first to see this one${d.city ? ' in ' + d.city : ''}`,
     ].filter((s) => s && s.trim());
     const subject = pick(subjOpts);
@@ -330,25 +386,23 @@ const Generator = (() => {
     body.push('Hi there,');
     body.push('');
     const noun = typeNoun(d.type);
-    let intro = `I’m excited to share a new listing I think you’ll want to see${d.address ? ': ' + d.address : ''}.`;
-    body.push(intro);
+    body.push(`I’m excited to share a new listing I think you’ll want to see${d.address ? ': ' + d.address : ''}.`);
     body.push('');
 
-    // reuse a warm version of the MLS body
     const feats = polishFeatures(d.features);
     let para = `This ${noun}${statBlurb(d)} offers `;
-    para += feats.length ? oxford(pickN(feats, Math.min(feats.length, 3))) : 'comfortable, livable space throughout';
+    para += feats.length ? oxford(pickN(feats, Math.min(feats.length, 3)).map((f) => f.text)) : 'comfortable, livable space throughout';
     para += '.';
     if (d.neighborhood) para += ` It’s ${cleanLocation(d.neighborhood)}.`;
     body.push(para);
     body.push('');
 
-    // bullet highlights
     const bullets = [];
-    if (d.price) bullets.push(`Price: ${money(d.price)}`);
-    const bb = [d.beds && d.beds + ' bed', d.baths && d.baths + ' bath', d.sqft && num(d.sqft) + ' sq ft'].filter(Boolean);
+    if (money(d.price)) bullets.push(`Price: ${money(d.price)}`);
+    const bb = [d.beds && d.beds + ' bed', d.baths && d.baths + ' bath', num(d.sqft) && num(d.sqft) + ' sq ft'].filter(Boolean);
     if (bb.length) bullets.push(bb.join(' / '));
-    pickN(feats, Math.min(feats.length, 4)).forEach((f) => bullets.push(cap(f.replace(/^a |^an /, ''))));
+    if (d.badge === 'openhouse' && d.openhouse) bullets.push(`Open house: ${d.openhouse}`);
+    pickN(feats, Math.min(feats.length, 4)).forEach((f) => bullets.push(cap(f.text.replace(/^a |^an /, ''))));
     if (bullets.length) { bullets.forEach((b) => body.push(`• ${b}`)); body.push(''); }
 
     body.push(pick([
@@ -362,40 +416,9 @@ const Generator = (() => {
     return body.join('\n');
   };
 
-  // ---- Flyer copy -----------------------------------------------------------
-  const buildFlyer = (d) => {
-    const out = [];
-    const headline = pick([
-      d.price ? `JUST LISTED — ${money(d.price)}` : 'JUST LISTED',
-      'NEW ON THE MARKET',
-      'YOUR NEXT CHAPTER STARTS HERE',
-    ]);
-    out.push(`HEADLINE:  ${headline}`);
-    if (d.address) out.push(`ADDRESS:   ${d.address}${d.city ? ', ' + d.city : ''}`);
-    out.push('');
-    out.push('AT A GLANCE:');
-    const g = [];
-    if (d.beds) g.push(`${d.beds} Bedrooms`);
-    if (d.baths) g.push(`${d.baths} Bathrooms`);
-    if (d.sqft) g.push(`${num(d.sqft)} Sq Ft`);
-    if (d.lot) g.push(`${d.lot} Lot`);
-    if (d.year) g.push(`Built ${d.year}`);
-    g.forEach((x) => out.push(`   • ${x}`));
-    out.push('');
-
-    const feats = polishFeatures(d.features);
-    if (feats.length) {
-      out.push('FEATURES:');
-      pickN(feats, Math.min(feats.length, 6)).forEach((f) => out.push(`   • ${cap(f.replace(/^a |^an /, ''))}`));
-      out.push('');
-    }
-    if (d.neighborhood) { out.push(`LOCATION:  ${cap(cleanLocation(d.neighborhood))}`); out.push(''); }
-
-    out.push(`CALL TO ACTION:  ${pick(CLOSERS[d.tone] || CLOSERS.classic)}`);
-    const contact = [d.agentName, d.brokerage, d.phone, d.email].filter(Boolean);
-    if (contact.length) { out.push(''); out.push('CONTACT:'); contact.forEach((c) => out.push(`   ${c}`)); }
-    return out.join('\n');
-  };
+  // ---- flyer feature list (used by the visual flyer) -------------------------
+  const flyerFeatures = (d, n = 6) =>
+    pickN(polishFeatures(d.features), n).map((f) => cap(f.text.replace(/^a |^an /, '')));
 
   // ---- public API -----------------------------------------------------------
   const generate = (data) => ({
@@ -403,8 +426,7 @@ const Generator = (() => {
     instagram: buildInstagram(data),
     facebook: buildFacebook(data),
     email: buildEmail(data),
-    flyer: buildFlyer(data),
   });
 
-  return { generate, priceTier, money };
+  return { generate, priceTier, money, num, flyerFeatures, BADGE_HOOK };
 })();
