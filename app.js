@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v5';
+  const APP_VERSION = 'v6';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -568,6 +568,17 @@
     el.className = 'import-status' + (kind ? ' ' + kind : '');
   };
 
+  // fetch a list of image URLs into local photos; returns how many landed
+  const importPhotoURLs = async (urls) => {
+    if (!urls.length) return 0;
+    setImportStatus(`Importing photos 0/${urls.length}…`);
+    const blobs = await Importer.fetchImages(urls, (done, total) => setImportStatus(`Importing photos ${done}/${total}…`));
+    let added = 0;
+    for (const b of blobs) if (b && photos.length < 14) added += (await addPhotoBlob(b, 'imported')) ? 1 : 0;
+    return added;
+  };
+  const importGallery = (ref) => importPhotoURLs(Importer.reiwaGalleryURLs(ref, 12));
+
   const importFromLink = async () => {
     const url = $('importUrl').value.trim();
     if (!url) { setImportStatus('Paste a listing link first.', 'err'); return; }
@@ -584,9 +595,25 @@
         return;
       }
 
+      // importing a listing replaces whatever was loaded — stale fields from a
+      // previous property (especially price) must never bleed into this one
+      clearListing();
       setImportStatus('Fetching the listing page…');
+      const slug = Importer.reiwaSlugInfo(url);
       const page = await Importer.fetchPage(url);
       if (!page) {
+        // REIWA never fully fails: the link itself gives address + suburb,
+        // and the photo gallery doesn't need the page at all.
+        const refOnly = Importer.reiwaRefFromURL(url);
+        if (refOnly) {
+          if (slug) applyParsedFields(slug, true);
+          const added = await importGallery(refOnly);
+          setImportStatus(added
+            ? `⚠ Text proxies are busy right now, so price/beds couldn’t be read — but the address and ${added} photos are in. Add the rest (10 seconds) and you’re away.`
+            : '⚠ Proxies are busy right now — try again in a minute, or paste the listing text below.', added ? 'ok' : 'err');
+          if (added) generate();
+          return;
+        }
         setImportStatus(
           Importer.isBlockedPortal(url)
             ? 'That site blocks automated imports. Tip: almost every WA listing is also on reiwa.com.au — find the same address there and import that link. Or copy the page text into the box below and drag the photos in.'
@@ -619,14 +646,10 @@
         }
       }
       applyParsedFields(parsed, true);
+      if (slug) applyParsedFields(slug, false);   // backstop for thin pages
       const ref = imgURLs.map(Importer.reiwaRef).find(Boolean) || Importer.reiwaRefFromURL(url);
       if (ref) imgURLs = Importer.reiwaGalleryURLs(ref, 12);
-      let added = 0;
-      if (imgURLs.length) {
-        setImportStatus(`Importing photos 0/${imgURLs.length}…`);
-        const blobs = await Importer.fetchImages(imgURLs, (done, total) => setImportStatus(`Importing photos ${done}/${total}…`));
-        for (const b of blobs) if (b && photos.length < 14) added += (await addPhotoBlob(b, 'imported')) ? 1 : 0;
-      }
+      const added = await importPhotoURLs(imgURLs);
 
       const got = [...new Set(parsed.found || [])];
       const bits = [];

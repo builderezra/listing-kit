@@ -1,7 +1,7 @@
 /* Listing Kit — service worker. Network-first with cache fallback: you always
  * get the newest version when online, and the app still works offline / as an
  * installed home-screen app for in-the-field or interview demos. */
-const CACHE = 'listing-kit-v5';
+const CACHE = 'listing-kit-v6';
 const ASSETS = [
   './', './index.html', './styles.css',
   './app.js', './generator.js', './fairhousing.js',

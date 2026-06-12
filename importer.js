@@ -24,32 +24,30 @@ const Importer = (() => {
   };
 
   // ---------------- page text ----------------
-  const fetchPage = async (url) => {
-    // 1) jina reader → clean markdown incl. image links
-    try {
-      const r = await fetchT('https://r.jina.ai/' + url);
-      if (r.ok) {
-        const t = await r.text();
-        const blockedWrap = /Warning: Target URL returned error (40[34]|5\d\d)/.test(t);
-        if (!blockedWrap && t.length > 1200) return { kind: 'md', text: t };
-      }
-    } catch (e) {}
-    // 2) allorigins → raw HTML (flaky infra, but a fine fallback)
-    return fetchPageHTML(url);
-  };
+  // Public proxies are individually unreliable (jina hangs under load,
+  // allorigins has day-long outages, corsproxy is browser-origin-only), so we
+  // RACE all of them and take the first response that validates. Verified
+  // June 2026: corsproxy.io is the most reliable from a browser.
+  const PROXIES = [
+    { kind: 'html', to: 14000, make: (u) => 'https://corsproxy.io/?url=' + encodeURIComponent(u), ok: (t) => t.length > 1500 && /<\w+[\s>]/.test(t) },
+    { kind: 'md', to: 12000, make: (u) => 'https://r.jina.ai/' + u, ok: (t) => t.length > 1200 && !/Warning: Target URL returned error (40[34]|5\d\d)/.test(t) },
+    { kind: 'html', to: 14000, make: (u) => 'https://api.allorigins.win/raw?url=' + encodeURIComponent(u), ok: (t) => t.length > 1200 && /<\w+[\s>]/.test(t) },
+  ];
 
-  // HTML-only fetch (used as fallback and as a second opinion when the
-  // reader returns a thin pre-render shell with no photos)
-  const fetchPageHTML = async (url) => {
-    try {
-      const r = await fetchT('https://api.allorigins.win/raw?url=' + encodeURIComponent(url));
-      if (r.ok) {
+  const raceProxies = (url, list) =>
+    Promise.any(list.map((p) =>
+      fetchT(p.make(url), p.to).then(async (r) => {
+        if (!r.ok) throw new Error('status');
         const t = await r.text();
-        if (t.length > 1200 && /<\w+[\s>]/.test(t)) return { kind: 'html', text: t };
-      }
-    } catch (e) {}
-    return null;
-  };
+        if (!p.ok(t)) throw new Error('invalid');
+        return { kind: p.kind, text: t };
+      })
+    )).catch(() => null);
+
+  const fetchPage = (url) => raceProxies(url, PROXIES);
+
+  // HTML-only fetch (second opinion when a reader result is thin)
+  const fetchPageHTML = (url) => raceProxies(url, PROXIES.filter((p) => p.kind === 'html'));
 
   // ---------------- text cleaning for the parser ----------------
   const decodeEntities = (s) => s
@@ -161,6 +159,34 @@ const Importer = (() => {
     const m = String(u).match(/reiwa\.com\.au\/[a-z0-9-]+?-(\d{6,})\/?/i);
     return m ? { dir: m[1].slice(-2), id: m[1], ext: 'jpg' } : null;
   };
+
+  // The slug also encodes the address: "1-35-filburn-street-scarborough-5022391"
+  // → "1/35 Filburn Street", "Scarborough". The street-type word marks where
+  // the street ends and the suburb begins. Lets a REIWA import fill address +
+  // suburb + full gallery even when every text proxy is down.
+  const STREET_TYPES = new Set(('street st road rd avenue ave av drive dr court ct close cl crescent cres place pl way lane ln parade pde ' +
+    'terrace tce boulevard bvd blvd circuit cct approach app gate rise vista loop mews entrance ent gardens gdns green grove gr heights hts ' +
+    'promenade prom quays outlook retreat dale elbow fairway ramble corner cnr square sq highway hwy view views cove bend brook chase circle ' +
+    'cir crest dell edge gateway glade glen haven island key keys link mead meander nook parkway pass path pocket point quay ridge row run ' +
+    'trail turn vale walk waters wynd').split(' '));
+  const reiwaSlugInfo = (u) => {
+    const m = String(u).match(/reiwa\.com\.au\/([a-z0-9-]+?)-(\d{6,})\/?/i);
+    if (!m) return null;
+    const words = m[1].toLowerCase().split('-');
+    let split = -1;
+    for (let i = words.length - 1; i >= 0; i--) if (STREET_TYPES.has(words[i])) { split = i; break; }
+    const cap = (w) => w.charAt(0).toUpperCase() + w.slice(1);
+    const addrWords = split >= 0 ? words.slice(0, split + 1) : words;
+    const suburb = split >= 0 ? words.slice(split + 1).map(cap).join(' ') : '';
+    let i = 0;
+    const nums = [];
+    while (i < addrWords.length && /^\d+[a-z]?$/.test(addrWords[i])) { nums.push(addrWords[i]); i++; }
+    const street = addrWords.slice(i).map(cap).join(' ');
+    const numPart = nums.length >= 2 ? nums[0] + '/' + nums.slice(1).join(' ') : nums.join('');
+    const address = ((numPart ? numPart + ' ' : '') + street).trim();
+    if (!address) return null;
+    return { address, city: suburb, found: suburb ? ['address (from link)', 'suburb (from link)'] : ['address (from link)'] };
+  };
   const reiwaGalleryURLs = (ref, max = 12) => {
     const urls = [];
     for (let i = 1; i <= max; i++) {
@@ -189,6 +215,13 @@ const Importer = (() => {
         if (b.type.startsWith('image/') && b.size > 5000) return b;
       }
     } catch (e) {}
+    try {
+      const r = await fetchT('https://corsproxy.io/?url=' + encodeURIComponent(u), 16000);
+      if (r.ok) {
+        const b = await r.blob();
+        if (b.type.startsWith('image/') && b.size > 5000) return b;
+      }
+    } catch (e) {}
     return null;
   };
 
@@ -211,5 +244,5 @@ const Importer = (() => {
   const isImageURL = (u) => /\.(jpe?g|png|webp)(\?.*)?$/i.test(String(u).trim()) || /imagecdn|reastatic|domainstatic/i.test(u);
   const isBlockedPortal = (u) => /realestate\.com\.au|domain\.com\.au/i.test(u);
 
-  return { fetchPage, fetchPageHTML, cleanText, jsonLD, extractImages, reiwaRef, reiwaRefFromURL, reiwaGalleryURLs, fetchImages, fetchImageBlob, isImageURL, isBlockedPortal };
+  return { fetchPage, fetchPageHTML, cleanText, jsonLD, extractImages, reiwaRef, reiwaRefFromURL, reiwaSlugInfo, reiwaGalleryURLs, fetchImages, fetchImageBlob, isImageURL, isBlockedPortal };
 })();
