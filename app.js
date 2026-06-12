@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v6';
+  const APP_VERSION = 'v7';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -377,7 +377,8 @@
       d: { ...d.raw, badgeText: d.badgeText, ohLine: d.ohLine, price: d.price, sqft: Generator.num(d.raw.sqft), cars: d.cars, areaUnit: d.areaUnit },
       brand,
       photos: orderedPhotos(),
-      mls: outputs ? outputs.mls : '',
+      // the flyer has its own Highlights sidebar — drop the bullet block
+      mls: outputs ? outputs.mls.split('\n\n').filter((p) => !p.startsWith('Features at a glance')).join('\n\n') : '',
       features: Generator.flyerFeatures(d.raw, 7),
     };
   };
