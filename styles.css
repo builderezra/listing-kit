@@ -21,6 +21,8 @@
 }
 
 * { box-sizing: border-box; }
+/* author display rules (.field{display:flex} etc.) must never beat [hidden] */
+[hidden] { display: none !important; }
 html, body { margin: 0; }
 body {
   font-family: var(--sans);
@@ -148,6 +150,10 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 .tpl-bold { background: linear-gradient(180deg, #1c4658 0%, #0d2530 100%); position: relative; }
 .tpl-bold::after { content: ''; position: absolute; inset: 5px 5px 50% 5px; background: #88a0a8; border-radius: 5px; }
 
+/* inline custom inputs beside the currency / unit selects */
+.pricewrap #currencyCustom { width: 74px; flex: 0 0 auto; }
+.sizewrap #areaUnitCustom { width: 96px; flex: 0 0 auto; }
+
 /* quick import */
 .import-box { background: var(--hi); border: 1px solid var(--line); border-radius: 11px; padding: 12px; margin-bottom: 14px; }
 .import-title { font-size: 13px; font-weight: 700; color: var(--navy); display: block; margin-bottom: 8px; }
@@ -261,6 +267,22 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 }
 .gfx-foot span { font-size: 12px; color: var(--muted); }
 .dl-all { margin-top: 16px; width: 100%; padding: 11px; font-size: 14px; }
+
+/* missing after auto-fill: red ring until the agent fills it */
+input.missing, textarea.missing {
+  border-color: var(--red);
+  box-shadow: 0 0 0 2.5px rgba(192, 57, 43, .18);
+  background: #fef7f6;
+}
+
+/* carousel photo picker */
+.car-pick-bar { margin: 2px 0 10px; }
+.car-pick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.car-pick-img {
+  width: 52px; height: 40px; object-fit: cover; border-radius: 6px; cursor: pointer;
+  border: 2px solid var(--teal); transition: opacity .12s, border-color .12s;
+}
+.car-pick-img.off { opacity: .35; border-color: var(--line); filter: grayscale(.8); }
 
 /* carousel strip */
 .gfx-sub { font-family: var(--serif); font-size: 17px; margin: 26px 0 10px; }

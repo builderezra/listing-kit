@@ -42,9 +42,9 @@ const Generator = (() => {
     return cur === 'kr' ? s + ' kr' : cur + s;   // kr is a suffix currency
   };
 
-  // area helpers — the app supports sq ft and m² listings
-  const areaLong = (u) => (u === 'sqm' ? 'square metres' : 'square feet');
-  const areaShort = (u) => (u === 'sqm' ? 'm²' : 'sq ft');
+  // area helpers — sq ft, m², or a custom label ("squares", "acres") passed through
+  const areaLong = (u) => (u === 'sqm' ? 'square metres' : u === 'sqft' ? 'square feet' : u || 'square metres');
+  const areaShort = (u) => (u === 'sqm' ? 'm²' : u === 'sqft' ? 'sq ft' : u || 'm²');
 
   const priceTier = (price) => {
     const v = Number(String(price || '').replace(/[^0-9.]/g, ''));
@@ -65,7 +65,9 @@ const Generator = (() => {
     land: ['lot', 'parcel', 'property'],
     luxury: ['estate', 'residence', 'home'],
   };
-  const typeNoun = (type) => pick(TYPE_NOUN[type] || TYPE_NOUN.single);
+  // custom property type ("beach shack", "penthouse") becomes the noun verbatim
+  const typeNoun = (type, custom) =>
+    (type === 'customtype' && custom ? custom.toLowerCase() : pick(TYPE_NOUN[type] || TYPE_NOUN.single));
 
   // ---- feature dictionary: raw input -> polished phrasing + category ---------
   // cat: kitchen | interior | outdoor | practical — drives sentence grouping.
@@ -225,7 +227,7 @@ const Generator = (() => {
   // ---- MLS / listing description (headline, full walk-through, bullets, CTA) ----
   const buildMLS = (d) => {
     const tone = d.tone || 'classic';
-    const noun = typeNoun(d.type);
+    const noun = typeNoun(d.type, d.typeCustom);
     const feats = polishFeatures(d.features);
     const byCat = { kitchen: [], interior: [], outdoor: [], practical: [] };
     feats.forEach((f) => (byCat[f.cat] || byCat.interior).push(f.text));
@@ -378,7 +380,7 @@ const Generator = (() => {
 
   const buildInstagram = (d) => {
     const lines = [];
-    const noun = typeNoun(d.type);
+    const noun = typeNoun(d.type, d.typeCustom);
     lines.push(`${pick(HOOK_EMOJI)} ${badgeText(d)} ${pick(HOOK_EMOJI)}`);
     if (d.badge === 'openhouse' && d.openhouse) lines.push(`🗓️ ${d.openhouse}`);
     lines.push(pick([
@@ -433,7 +435,7 @@ const Generator = (() => {
   };
 
   const buildFacebook = (d) => {
-    const noun = typeNoun(d.type);
+    const noun = typeNoun(d.type, d.typeCustom);
     const parts = [];
     parts.push(pick([
       `🏡 NEW LISTING — just hit the market!`,
@@ -464,7 +466,7 @@ const Generator = (() => {
 
   // ---- Email blast ----------------------------------------------------------
   const buildEmail = (d) => {
-    const noun = typeNoun(d.type);
+    const noun = typeNoun(d.type, d.typeCustom);
     const feats = polishFeatures(d.features);
     const where = d.city || 'the area';
     const bedBit = d.beds ? `${d.beds}-bed ` : '';
@@ -516,8 +518,9 @@ const Generator = (() => {
         `Some homes I send to everyone — this one I wanted my list to see first${d.address ? ': ' + d.address + (d.city ? ', ' + d.city : '') : ''}.`,
       ]));
       body.push('');
-      let para = `It’s a ${noun}${statBlurb(d)}`;
-      para += feats.length ? ` — plus ${oxford(pickN(feats, Math.min(feats.length, 3)).map((f) => f.text))}.` : '.';
+      // beds/baths/size live in the bullets below — keep the prose about feel
+      let para = `It’s a ${noun}`;
+      para += feats.length ? ` with ${oxford(pickN(feats, Math.min(feats.length, 3)).map((f) => f.text))}.` : ' worth a closer look.';
       if (d.neighborhood) para += ` And it’s ${cleanLocation(d.neighborhood)}.`;
       body.push(para);
     }

@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v7';
+  const APP_VERSION = 'v8';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -182,7 +182,7 @@
       const img = new Image();
       img.onload = () => { renderPhotoGrid(); rerenderVisuals(); };
       img.src = url;
-      photos.push({ url, img, name: f.name });
+      photos.push({ url, img, name: f.name, inCarousel: true });
     });
     renderPhotoGrid();
   };
@@ -192,7 +192,7 @@
     const img = new Image();
     img.onload = () => { renderPhotoGrid(); rerenderVisuals(); };
     img.src = dataURL;
-    photos.push({ url: dataURL, img, name });
+    photos.push({ url: dataURL, img, name, inCarousel: true });
     renderPhotoGrid();
   };
 
@@ -201,7 +201,7 @@
     new Promise((resolve) => {
       const url = URL.createObjectURL(blob);
       const img = new Image();
-      img.onload = () => { photos.push({ url, img, name }); renderPhotoGrid(); resolve(true); };
+      img.onload = () => { photos.push({ url, img, name, inCarousel: true }); renderPhotoGrid(); resolve(true); };
       img.onerror = () => { URL.revokeObjectURL(url); resolve(false); };
       img.src = url;
     });
@@ -261,17 +261,18 @@
     address: $('address').value.trim(),
     city: $('city').value.trim(),
     price: $('price').value.trim(),
-    currency: $('currency').value,
+    currency: $('currency').value === 'custom' ? ($('currencyCustom').value.trim() || '$') : $('currency').value,
     badge: $('badge').value,
     badgeCustom: $('badgeCustom').value.trim(),
     openhouse: $('openhouse').value.trim(),
     type: $('type').value,
+    typeCustom: $('typeCustom').value.trim(),
     tone: $('tone').value,
     beds: $('beds').value.trim(),
     baths: $('baths').value.trim(),
     cars: $('cars').value.trim(),
     sqft: $('sqft').value.trim(),
-    areaUnit: $('areaUnit').value,
+    areaUnit: $('areaUnit').value === 'customunit' ? ($('areaUnitCustom').value.trim() || 'm²') : $('areaUnit').value,
     year: $('year').value.trim(),
     lot: $('lot').value.trim(),
     features: $('features').value.split(/[,\n]/).map((s) => s.trim()).filter(Boolean),
@@ -329,8 +330,20 @@
     section.hidden = false;
     row.innerHTML = '';
 
+    // photo picker — tap to include/exclude slides
+    const pickRow = $('carPick');
+    pickRow.innerHTML = '';
+    d.photos.forEach((p) => {
+      const im = document.createElement('img');
+      im.src = p.url;
+      im.className = 'car-pick-img' + (p.inCarousel === false ? ' off' : '');
+      im.title = p.inCarousel === false ? 'Excluded — tap to include' : 'Included — tap to exclude';
+      im.addEventListener('click', () => { p.inCarousel = p.inCarousel === false; renderCarousel(vizData()); });
+      pickRow.appendChild(im);
+    });
+
     const feats = Generator.flyerFeatures(d.raw, 6);
-    const slides = d.photos.slice(0, 6);
+    const slides = d.photos.filter((p) => p.inCarousel !== false).slice(0, 6);
     const total = slides.length + 2;
 
     const addSlide = (label, renderFn) => {
@@ -550,15 +563,32 @@
     saveDraft();
   };
 
+  // ---------------- missing-field flags (after paste/import) ----------------
+  // After an auto-fill, anything still empty gets a red ring so it's obvious
+  // what didn't come through. The ring clears as soon as the field gets typed in.
+  const KEY_FIELDS = ['address', 'city', 'price', 'beds', 'baths', 'cars', 'sqft', 'features'];
+  const flagMissingFields = () => {
+    let missing = 0;
+    KEY_FIELDS.forEach((id) => {
+      const empty = !$(id).value.trim();
+      $(id).classList.toggle('missing', empty);
+      if (empty) missing++;
+    });
+    return missing;
+  };
+  const clearMissingFlags = () => KEY_FIELDS.forEach((id) => $(id).classList.remove('missing'));
+
   // ---------------- paste-to-parse (site-agnostic, via parser.js) ----------------
   const parsePaste = () => {
     const t = $('pasteBox').value;
     if (!t.trim()) return;
     const r = Parser.parse(t);
     applyParsedFields(r, false);
-    $('parseNote').textContent = r.found.length
+    const missing = flagMissingFields();
+    $('parseNote').textContent = (r.found.length
       ? `✓ Found: ${[...new Set(r.found)].join(', ')}`
-      : 'Nothing recognized — fill the fields manually.';
+      : 'Nothing recognized — fill the fields manually.')
+      + (missing ? ` · ${missing} field${missing === 1 ? '' : 's'} still empty (marked red)` : '');
   };
 
   // ---------------- link import ----------------
@@ -656,7 +686,8 @@
       const bits = [];
       if (got.length) bits.push(got.join(', '));
       bits.push(added ? `${added} photo${added === 1 ? '' : 's'}` : 'no photos (drag them in from the page)');
-      setImportStatus(`✓ Imported: ${bits.join(' · ')}${parsed.price ? '' : ' — no advertised price found (offers campaign?), add one if you have it'}`, 'ok');
+      const stillEmpty = flagMissingFields();
+      setImportStatus(`✓ Imported: ${bits.join(' · ')}${parsed.price ? '' : ' — no advertised price found (offers campaign?), add one if you have it'}${stillEmpty ? ` · ${stillEmpty} field${stillEmpty === 1 ? '' : 's'} still empty (marked red)` : ''}`, 'ok');
 
       // one-action flow: if we got the essentials, build the kit right away
       if ((parsed.address || parsed.beds) && added) generate();
@@ -694,8 +725,8 @@
     Object.entries(EXAMPLE).forEach(([k, v]) => { if ($(k)) $(k).value = v; });
     $('currency').value = '$'; $('areaUnit').value = 'sqm';
     if (!brand.agentName) {
-      brand.agentName = 'Ezra Smith'; brand.brokerage = 'Sunset Coast Realty';
-      brand.phone = '0400 555 142'; brand.email = 'ezra@sunsetcoast.com.au';
+      brand.agentName = 'John Doe'; brand.brokerage = 'Doe & Co Realty';
+      brand.phone = '0400 000 000'; brand.email = 'john@doeco.com.au';
       $('agentName').value = brand.agentName; $('brokerage').value = brand.brokerage;
       $('phone').value = brand.phone; $('email').value = brand.email;
       saveBrand();
@@ -712,7 +743,7 @@
 
   // ---------------- draft autosave (listing fields survive a refresh) ----------------
   const DRAFT_KEY = 'lk_draft_v1';
-  const LISTING_FIELDS = ['address', 'city', 'price', 'currency', 'badge', 'badgeCustom', 'openhouse', 'type', 'tone', 'beds', 'baths', 'cars', 'sqft', 'areaUnit', 'year', 'lot', 'features', 'neighborhood'];
+  const LISTING_FIELDS = ['address', 'city', 'price', 'currency', 'currencyCustom', 'badge', 'badgeCustom', 'openhouse', 'type', 'typeCustom', 'tone', 'beds', 'baths', 'cars', 'sqft', 'areaUnit', 'areaUnitCustom', 'year', 'lot', 'features', 'neighborhood'];
   let draftTimer = null;
   const saveDraft = () => {
     clearTimeout(draftTimer);
@@ -727,8 +758,7 @@
       const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
       if (!draft) return;
       LISTING_FIELDS.forEach((id) => { if (draft[id] != null && draft[id] !== '') $(id).value = draft[id]; });
-      $('openhouseWrap').hidden = $('badge').value !== 'openhouse';
-      $('badgeCustomWrap').hidden = $('badge').value !== 'custom';
+      syncCustomWraps();
     } catch (e) {}
   };
   const clearListing = () => {
@@ -738,8 +768,8 @@
       else el.value = '';
     });
     applyRegionDefaults();
-    $('openhouseWrap').hidden = true;
-    $('badgeCustomWrap').hidden = true;
+    syncCustomWraps();
+    clearMissingFlags();
     photos.forEach((p) => { if (p.url.startsWith('blob:')) URL.revokeObjectURL(p.url); });
     photos = []; heroIndex = 0;
     renderPhotoGrid();
@@ -774,7 +804,10 @@
 
   // ---------------- events ----------------
   form.addEventListener('submit', (e) => { e.preventDefault(); generate(); });
-  form.addEventListener('input', saveDraft);
+  form.addEventListener('input', (e) => {
+    if (e.target && e.target.classList) e.target.classList.remove('missing');
+    saveDraft();
+  });
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => renderTab(t.dataset.tab)));
   $('copyBtn').addEventListener('click', doCopy);
   $('rewordBtn').addEventListener('click', () => { if (outputs) generate(); });
@@ -812,13 +845,46 @@
     if (files && files.length) { addPhotoFiles(files); rerenderVisuals(); }
   });
   $('flyerOpen').addEventListener('click', () => { if (outputs) Flyer.openPrint(flyerOpts()); });
-  $('badge').addEventListener('change', () => {
+  // selects with a Custom… option reveal their own text input
+  const wireCustomToggles = () => {
+    $('badge').addEventListener('change', () => {
+      $('openhouseWrap').hidden = $('badge').value !== 'openhouse';
+      $('badgeCustomWrap').hidden = $('badge').value !== 'custom';
+      if ($('badge').value === 'custom') $('badgeCustom').focus();
+      rerenderVisuals();
+    });
+    $('type').addEventListener('change', () => {
+      $('typeCustomWrap').hidden = $('type').value !== 'customtype';
+      if ($('type').value === 'customtype') $('typeCustom').focus();
+      rerenderVisuals();
+    });
+    $('currency').addEventListener('change', () => {
+      $('currencyCustom').hidden = $('currency').value !== 'custom';
+      if ($('currency').value === 'custom') $('currencyCustom').focus();
+      rerenderVisuals();
+    });
+    $('areaUnit').addEventListener('change', () => {
+      $('areaUnitCustom').hidden = $('areaUnit').value !== 'customunit';
+      if ($('areaUnit').value === 'customunit') $('areaUnitCustom').focus();
+      rerenderVisuals();
+    });
+    // keep the visible custom-input state in sync (drafts, region defaults)
+    syncCustomWraps();
+  };
+  const syncCustomWraps = () => {
     $('openhouseWrap').hidden = $('badge').value !== 'openhouse';
     $('badgeCustomWrap').hidden = $('badge').value !== 'custom';
-    rerenderVisuals();
-  });
-  ['badgeCustom', 'openhouse', 'cars', 'currency', 'areaUnit'].forEach((id) =>
+    $('typeCustomWrap').hidden = $('type').value !== 'customtype';
+    $('currencyCustom').hidden = $('currency').value !== 'custom';
+    $('areaUnitCustom').hidden = $('areaUnit').value !== 'customunit';
+  };
+  ['badgeCustom', 'openhouse', 'cars', 'currency', 'areaUnit', 'typeCustom', 'currencyCustom', 'areaUnitCustom'].forEach((id) =>
     $(id).addEventListener('input', rerenderVisuals));
+  // custom badge/type text also flows through the written copy — refresh it
+  // once the agent finishes typing (change = on blur)
+  ['badgeCustom', 'typeCustom'].forEach((id) =>
+    $(id).addEventListener('change', () => { if (outputs) generate(); }));
+  wireCustomToggles();
   document.querySelectorAll('.tpl').forEach((t) => t.addEventListener('click', () => {
     brand.templateId = t.dataset.tpl;
     saveBrand(); markTemplate(); rerenderVisuals();
