@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v8';
+  const APP_VERSION = 'v9';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -213,12 +213,38 @@
 
   const FOCUS_ORDER = ['center', 'top', 'bottom'];
   const FOCUS_ICON = { center: '⊙', top: '⬆', bottom: '⬇' };
+  let dragFrom = null;   // index being dragged for reorder
+  const movePhoto = (from, to) => {
+    if (from === to || from == null || to == null) return;
+    const heroPhoto = photos[heroIndex];
+    const [moved] = photos.splice(from, 1);
+    photos.splice(to, 0, moved);
+    heroIndex = Math.max(0, photos.indexOf(heroPhoto));
+    renderPhotoGrid();
+    rerenderVisuals();
+  };
   const renderPhotoGrid = () => {
     const grid = $('photoGrid');
     grid.innerHTML = '';
     photos.forEach((p, i) => {
       const cell = document.createElement('div');
       cell.className = 'photo-card' + (i === heroIndex ? ' hero' : '');
+      cell.draggable = true;
+      cell.title = 'Drag to reorder';
+      cell.addEventListener('dragstart', (e) => {
+        dragFrom = i;
+        cell.classList.add('dragging');
+        try { e.dataTransfer.setData('text/plain', String(i)); e.dataTransfer.effectAllowed = 'move'; } catch (err) {}
+      });
+      cell.addEventListener('dragend', () => { cell.classList.remove('dragging'); dragFrom = null; });
+      cell.addEventListener('dragover', (e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; cell.classList.add('dragover'); });
+      cell.addEventListener('dragleave', () => cell.classList.remove('dragover'));
+      cell.addEventListener('drop', (e) => {
+        e.preventDefault();
+        e.stopPropagation();   // don't bubble to the page-level photo dropzone
+        cell.classList.remove('dragover');
+        movePhoto(dragFrom, i);
+      });
       const focus = p.focus || 'center';
       cell.innerHTML = `<img src="${p.url}" alt="">` +
         (i === heroIndex ? '<span class="hero-tag">★ hero</span>' : '') +
@@ -639,8 +665,9 @@
         if (refOnly) {
           if (slug) applyParsedFields(slug, true);
           const added = await importGallery(refOnly);
+          const gaps = flagMissingFields();
           setImportStatus(added
-            ? `⚠ Text proxies are busy right now, so price/beds couldn’t be read — but the address and ${added} photos are in. Add the rest (10 seconds) and you’re away.`
+            ? `⚠ Text proxies are busy right now, so price/beds couldn’t be read — but the address and ${added} photos are in. Fill the ${gaps} red field${gaps === 1 ? '' : 's'} (10 seconds) and you’re away.`
             : '⚠ Proxies are busy right now — try again in a minute, or paste the listing text below.', added ? 'ok' : 'err');
           if (added) generate();
           return;
@@ -696,49 +723,6 @@
     } finally {
       btn.disabled = false; btn.textContent = 'Import';
     }
-  };
-
-  // ---------------- example listing (with synthesized photos) ----------------
-  const samplePhoto = (hueA, hueB, emoji) => {
-    const c = document.createElement('canvas');
-    c.width = 1600; c.height = 1100;
-    const x = c.getContext('2d');
-    const g = x.createLinearGradient(0, 0, 1600, 1100);
-    g.addColorStop(0, `hsl(${hueA}, 38%, 62%)`);
-    g.addColorStop(1, `hsl(${hueB}, 42%, 38%)`);
-    x.fillStyle = g; x.fillRect(0, 0, 1600, 1100);
-    x.globalAlpha = 0.25; x.fillStyle = '#fff';
-    for (let i = 0; i < 6; i++) { x.beginPath(); x.arc(140 + i * 270, i % 2 ? 280 : 760, 150, 0, Math.PI * 2); x.fill(); }
-    x.globalAlpha = 1;
-    x.font = '300px serif'; x.textAlign = 'center'; x.textBaseline = 'middle';
-    x.fillText(emoji, 800, 560);
-    return c.toDataURL('image/jpeg', 0.85);
-  };
-
-  const EXAMPLE = {
-    address: '24 Seaview Terrace', city: 'Scarborough', price: '985,000', type: 'single', tone: 'warm',
-    beds: '4', baths: '2', cars: '2', sqft: '220', year: '2004', lot: '450 m²',
-    features: 'Renovated kitchen, stone benchtops, open-plan living, alfresco entertaining area, double garage, solar panels, reverse-cycle aircon, walk-in robe',
-    neighborhood: 'minutes from Scarborough Beach, the coastal path, and local cafés',
-  };
-  const loadExample = () => {
-    Object.entries(EXAMPLE).forEach(([k, v]) => { if ($(k)) $(k).value = v; });
-    $('currency').value = '$'; $('areaUnit').value = 'sqm';
-    if (!brand.agentName) {
-      brand.agentName = 'John Doe'; brand.brokerage = 'Doe & Co Realty';
-      brand.phone = '0400 000 000'; brand.email = 'john@doeco.com.au';
-      $('agentName').value = brand.agentName; $('brokerage').value = brand.brokerage;
-      $('phone').value = brand.phone; $('email').value = brand.email;
-      saveBrand();
-    }
-    if (!photos.length) {
-      addPhotoDataURL(samplePhoto(95, 200, '🏡'), 'exterior');
-      addPhotoDataURL(samplePhoto(35, 20, '🛋️'), 'living-room');
-      addPhotoDataURL(samplePhoto(140, 170, '🌳'), 'backyard');
-    }
-    document.querySelectorAll('#featureChips .chip').forEach((c) => c.classList.remove('added'));
-    // photos load async from dataURLs; generate after they decode
-    setTimeout(generate, 120);
   };
 
   // ---------------- draft autosave (listing fields survive a refresh) ----------------
@@ -812,7 +796,6 @@
   $('copyBtn').addEventListener('click', doCopy);
   $('rewordBtn').addEventListener('click', () => { if (outputs) generate(); });
   $('clearBtn').addEventListener('click', clearListing);
-  $('exampleBtn').addEventListener('click', loadExample);
 
   // import + paste UX
   $('importBtn').addEventListener('click', importFromLink);
@@ -921,7 +904,7 @@
   $('verTag').textContent = 'Listing Kit ' + APP_VERSION;
 
   // integration/test hook
-  window.ListingKit = { addPhotoDataURL, generate, loadExample, importFromLink };
+  window.ListingKit = { addPhotoDataURL, generate, importFromLink };
 
   // register service worker for offline / installable use
   if ('serviceWorker' in navigator) {

@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=8" />
+  <link rel="stylesheet" href="styles.css?v=9" />
 </head>
 <body>
   <header class="topbar">
@@ -130,7 +130,8 @@
               </div>
               <div class="import-status" id="importStatus" hidden></div>
               <div class="or-divider">or paste the listing text</div>
-              <textarea id="pasteBox" rows="3" placeholder="On the listing page press Ctrl/Cmd+A (select all), Ctrl/Cmd+C (copy), then click here and Ctrl/Cmd+V. Price, beds, baths, cars and size fill in automatically. Pasting a copied photo adds it to your photos too."></textarea>
+              <p class="hint paste-hint">On the listing page: <kbd>Ctrl/Cmd+A</kbd> select all → <kbd>Ctrl/Cmd+C</kbd> copy → paste below. Price, beds, baths, cars &amp; size fill in automatically. Pasting a copied photo adds it to your photos.</p>
+              <textarea id="pasteBox" rows="3" placeholder="Paste the listing text (or a copied photo) here…"></textarea>
               <div class="importrow2">
                 <button type="button" class="mini-btn ghost" id="clipBtn">📋 Paste from clipboard</button>
                 <span class="parse-note" id="parseNote"></span>
@@ -304,7 +305,6 @@
         <div class="actions">
           <button type="submit" class="generate-btn" id="generateBtn">Generate marketing kit ✨</button>
           <div class="actions-links">
-            <button type="button" class="link-btn" id="exampleBtn">Load example listing</button>
             <button type="button" class="link-btn" id="clearBtn">Start a new listing</button>
           </div>
         </div>
@@ -327,7 +327,7 @@
         <div class="empty" id="emptyState">
           <div class="empty-art">📸</div>
           <p>Add the listing on the left and hit <strong>Generate</strong>.</p>
-          <p class="muted">No listing handy? <em>Load example listing</em> below the button.</p>
+          <p class="muted">Fastest start: paste a reiwa.com.au link into <em>Quick import</em>.</p>
         </div>
 
         <article class="panel-content" id="graphicsContent" hidden>
@@ -399,12 +399,12 @@
     <p>Runs in your browser — photos and details are never uploaded (link import fetches via public read proxies). The compliance check is decision support, not legal advice; always defer to your agency’s compliance guidance. <span id="verTag"></span></p>
   </footer>
 
-  <script src="generator.js?v=8"></script>
-  <script src="fairhousing.js?v=8"></script>
-  <script src="parser.js?v=8"></script>
-  <script src="importer.js?v=8"></script>
-  <script src="visuals.js?v=8"></script>
-  <script src="flyer.js?v=8"></script>
-  <script src="app.js?v=8"></script>
+  <script src="generator.js?v=9"></script>
+  <script src="fairhousing.js?v=9"></script>
+  <script src="parser.js?v=9"></script>
+  <script src="importer.js?v=9"></script>
+  <script src="visuals.js?v=9"></script>
+  <script src="flyer.js?v=9"></script>
+  <script src="app.js?v=9"></script>
 </body>
 </html>
