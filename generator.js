@@ -563,6 +563,62 @@ const Generator = (() => {
   const flyerFeatures = (d, n = 6) =>
     pickN(polishFeatures(d.features), n).map((f) => cap(f.text.replace(/^a |^an /, '')));
 
+  // ---- house style preferences ----------------------------------------------
+  // Free-text directives -> mechanical transforms we can honestly deliver.
+  const parsePrefs = (rawText) => {
+    // phones autocorrect to curly quotes — normalise before matching
+    const text = String(rawText || '').replace(/[’‘]/g, "'").replace(/[“”]/g, '"');
+    const t = text.toLowerCase();
+    const p = {
+      noEmojis: /\bno emojis?\b|\bdon'?t use emojis?\b|\bwithout emojis?\b|\bavoid emojis?\b/.test(t),
+      noHashtags: /\bno hashtags?\b|\bdon'?t use hashtags?\b|\bavoid hashtags?\b/.test(t),
+      noExclaim: /\bno exclamations?( marks?| points?)?\b|\bdon'?t use exclamations?\b/.test(t),
+      short: /\bshort(er)?\b|\bbrief\b|\bconcise\b|\bkeep it short\b/.test(t),
+      signoff: '',
+      banned: [],
+    };
+    const so = text.match(/sign[- ]?off with[:\s]+["“']?([^\n.,"”']{2,30})/i);
+    if (so) p.signoff = so[1].trim();
+    const bre = /(?:don'?t say|never say|avoid saying|don'?t use the word|avoid the word)[:\s]+["“']?([a-z' -]{2,30}?)["”']?(?=[,.\n]|$)/gi;
+    let m;
+    while ((m = bre.exec(text))) {
+      const w = m[1].trim().toLowerCase();
+      if (w && !/emoji|hashtag|exclamation/.test(w)) p.banned.push(w);
+    }
+    return p;
+  };
+
+  const EMOJI_RE = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}\u{2190}-\u{21FF}]/gu;
+  const stripEmojis = (s) => s
+    .split('\n')
+    .map((l) => l.replace(EMOJI_RE, '').replace(/ {2,}/g, ' ').replace(/^[\s•·–-]*$/, '').trimStart())
+    .join('\n')
+    .replace(/\n{3,}/g, '\n\n');
+
+  const applyPrefs = (outputs, p) => {
+    if (!p) return outputs;
+    const out = { ...outputs };
+    if (p.short) {
+      const parts = out.mls.split('\n\n');
+      if (parts.length > 3) out.mls = [parts[0], parts[1], parts[parts.length - 1]].join('\n\n');
+      out.email = out.email.split('\n').filter((l) => !l.startsWith('(Alt subject:') && !l.startsWith('P.S.')).join('\n').trimEnd();
+    }
+    if (p.noHashtags) {
+      out.instagram = out.instagram.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n').trimEnd();
+    }
+    if (p.signoff) {
+      const sig = cap(p.signoff).replace(/,?$/, ',');
+      out.email = out.email.replace(/^Best,$/m, sig);
+    }
+    if (p.noExclaim) {
+      Object.keys(out).forEach((k) => { out[k] = out[k].replace(/!+/g, '.').replace(/\.{2,}/g, '.'); });
+    }
+    if (p.noEmojis) {
+      Object.keys(out).forEach((k) => { out[k] = stripEmojis(out[k]); });
+    }
+    return out;
+  };
+
   // ---- public API -----------------------------------------------------------
   const generate = (data) => ({
     mls: buildMLS(data),
@@ -571,5 +627,5 @@ const Generator = (() => {
     email: buildEmail(data),
   });
 
-  return { generate, priceTier, money, num, flyerFeatures, BADGE_HOOK, badgeText };
+  return { generate, priceTier, money, num, flyerFeatures, BADGE_HOOK, badgeText, parsePrefs, applyPrefs };
 })();

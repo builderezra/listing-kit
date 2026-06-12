@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=9" />
+  <link rel="stylesheet" href="styles.css?v=10" />
 </head>
 <body>
   <header class="topbar">
@@ -33,21 +33,21 @@
             <div class="row">
               <div class="field">
                 <label for="agentName">Name</label>
-                <input type="text" id="agentName" placeholder="Ezra Smith" />
+                <input type="text" id="agentName" />
               </div>
               <div class="field">
                 <label for="brokerage">Agency</label>
-                <input type="text" id="brokerage" placeholder="Sunset Coast Realty" />
+                <input type="text" id="brokerage" />
               </div>
             </div>
             <div class="row">
               <div class="field">
                 <label for="phone">Phone</label>
-                <input type="text" id="phone" placeholder="0400 555 142" />
+                <input type="text" id="phone" />
               </div>
               <div class="field">
                 <label for="email">Email</label>
-                <input type="text" id="email" placeholder="ezra@sunsetcoast.com.au" />
+                <input type="text" id="email" />
               </div>
             </div>
             <div class="row">
@@ -111,6 +111,11 @@
                 <button type="button" class="tpl" data-tpl="bold"><span class="tpl-art tpl-bold"></span>Bold</button>
               </div>
             </div>
+            <div class="field">
+              <label for="prefs">House style preferences <span class="hint">— applied to all generated copy</span></label>
+              <textarea id="prefs" rows="2"></textarea>
+              <p class="hint">Understands: <em>no emojis · no hashtags · no exclamation marks · shorter copy · sign off with … · don’t say …</em> (e.g. “no emojis, sign off with Cheers, don’t say cozy”)</p>
+            </div>
             <div class="design-io">
               <button type="button" class="link-btn" id="designExport">⬇️ Export design file</button>
               <label class="link-btn" for="designImport">⬆️ Import design file</label>
@@ -149,12 +154,12 @@
 
             <div class="field">
               <label for="address">Address</label>
-              <input type="text" id="address" placeholder="24 Seaview Terrace" />
+              <input type="text" id="address" />
             </div>
             <div class="row">
               <div class="field">
                 <label for="city">Suburb / area</label>
-                <input type="text" id="city" placeholder="Scarborough" />
+                <input type="text" id="city" />
               </div>
               <div class="field">
                 <label for="price">Price</label>
@@ -172,8 +177,8 @@
                     <option value="¥">¥</option>
                     <option value="custom">…</option>
                   </select>
-                  <input type="text" id="currencyCustom" placeholder="e.g. US$" hidden />
-                  <input type="text" id="price" inputmode="numeric" placeholder="985,000" />
+                  <input type="text" id="currencyCustom" hidden />
+                  <input type="text" id="price" inputmode="numeric" />
                 </div>
               </div>
             </div>
@@ -191,11 +196,11 @@
               </div>
               <div class="field" id="openhouseWrap" hidden>
                 <label for="openhouse">Home open date/time</label>
-                <input type="text" id="openhouse" placeholder="Sat 14 June · 1–1:45pm" />
+                <input type="text" id="openhouse" />
               </div>
               <div class="field" id="badgeCustomWrap" hidden>
                 <label for="badgeCustom">Custom badge text</label>
-                <input type="text" id="badgeCustom" placeholder="COMING SOON" />
+                <input type="text" id="badgeCustom" />
               </div>
             </div>
             <div class="row">
@@ -215,7 +220,7 @@
               </div>
               <div class="field" id="typeCustomWrap" hidden>
                 <label for="typeCustom">Custom property type</label>
-                <input type="text" id="typeCustom" placeholder="e.g. beach house, penthouse" />
+                <input type="text" id="typeCustom" />
               </div>
               <div class="field">
                 <label for="tone">Copy tone</label>
@@ -231,44 +236,44 @@
             <div class="row three">
               <div class="field">
                 <label for="beds">Beds</label>
-                <input type="number" id="beds" min="0" step="1" placeholder="4" />
+                <input type="number" id="beds" min="0" step="1" />
               </div>
               <div class="field">
                 <label for="baths">Baths</label>
-                <input type="number" id="baths" min="0" step="0.5" placeholder="2" />
+                <input type="number" id="baths" min="0" step="0.5" />
               </div>
               <div class="field">
                 <label for="cars">Cars</label>
-                <input type="number" id="cars" min="0" step="1" placeholder="2" />
+                <input type="number" id="cars" min="0" step="1" />
               </div>
             </div>
             <div class="row">
               <div class="field">
                 <label for="sqft">Internal size</label>
                 <div class="sizewrap">
-                  <input type="text" id="sqft" inputmode="numeric" placeholder="220" />
+                  <input type="text" id="sqft" inputmode="numeric" />
                   <select id="areaUnit" aria-label="Area unit">
                     <option value="sqm">m²</option>
                     <option value="sqft">sq ft</option>
                     <option value="customunit">…</option>
                   </select>
-                  <input type="text" id="areaUnitCustom" placeholder="e.g. squares" hidden />
+                  <input type="text" id="areaUnitCustom" hidden />
                 </div>
               </div>
               <div class="field">
                 <label for="lot">Block / lot size</label>
-                <input type="text" id="lot" placeholder="450 m²" />
+                <input type="text" id="lot" />
               </div>
             </div>
             <div class="row">
               <div class="field">
                 <label for="year">Year built</label>
-                <input type="text" id="year" inputmode="numeric" placeholder="2004" />
+                <input type="text" id="year" inputmode="numeric" />
               </div>
             </div>
             <div class="field">
               <label for="features">Key features</label>
-              <textarea id="features" rows="3" placeholder="Renovated kitchen, stone benchtops, alfresco area, double garage, solar panels…"></textarea>
+              <textarea id="features" rows="3"></textarea>
               <div class="chips" id="featureChips" aria-label="Quick-add features">
                 <button type="button" class="chip">Renovated kitchen</button>
                 <button type="button" class="chip">Stone benchtops</button>
@@ -285,7 +290,7 @@
             </div>
             <div class="field">
               <label for="neighborhood">Location highlights</label>
-              <input type="text" id="neighborhood" placeholder="minutes from the beach, cafés, and the train station" />
+              <input type="text" id="neighborhood" />
             </div>
           </div>
         </details>
@@ -399,12 +404,12 @@
     <p>Runs in your browser — photos and details are never uploaded (link import fetches via public read proxies). The compliance check is decision support, not legal advice; always defer to your agency’s compliance guidance. <span id="verTag"></span></p>
   </footer>
 
-  <script src="generator.js?v=9"></script>
-  <script src="fairhousing.js?v=9"></script>
-  <script src="parser.js?v=9"></script>
-  <script src="importer.js?v=9"></script>
-  <script src="visuals.js?v=9"></script>
-  <script src="flyer.js?v=9"></script>
-  <script src="app.js?v=9"></script>
+  <script src="generator.js?v=10"></script>
+  <script src="fairhousing.js?v=10"></script>
+  <script src="parser.js?v=10"></script>
+  <script src="importer.js?v=10"></script>
+  <script src="visuals.js?v=10"></script>
+  <script src="flyer.js?v=10"></script>
+  <script src="app.js?v=10"></script>
 </body>
 </html>

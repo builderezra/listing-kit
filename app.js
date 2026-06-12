@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v9';
+  const APP_VERSION = 'v10';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -21,6 +21,7 @@
     logo: '', headshot: '',      // dataURLs (persisted)
     templateId: 'modern',
     font: 'auto',                // headline font: auto | serif | sans
+    prefs: '',                   // house style directives ("no emojis, sign off with Cheers")
     region: 'au',                // au | us | uk | other — drives defaults + compliance framing
   };
   brand.logoImg = null; brand.headImg = null; // live Image objects
@@ -50,6 +51,7 @@
     $('phone').value = brand.phone; $('email').value = brand.email;
     $('brandPrimary').value = brand.primary; $('brandAccent').value = brand.accent;
     $('brandFont').value = brand.font || 'auto';
+    $('prefs').value = brand.prefs || '';
     $('region').value = brand.region || 'au';
     applyRegionDefaults();
     setImgPreview('logo', brand.logo); setImgPreview('head', brand.headshot);
@@ -311,10 +313,21 @@
   // ---------------- generate ----------------
   const generate = () => {
     const data = readForm();
-    outputs = Generator.generate(data);
+    const prefs = Generator.parsePrefs(brand.prefs);
+    outputs = Generator.applyPrefs(Generator.generate(data), prefs);
     report = FairHousing.scan({
       ...outputs,
       'your input': [data.features.join(', '), data.neighborhood, data.address].filter(Boolean).join('. '),
+    });
+    // the agent's own banned words join the compliance report
+    (prefs.banned || []).forEach((w) => {
+      const re = new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
+      const channels = Object.keys(outputs).filter((k) => re.test(outputs[k]));
+      if (channels.length) {
+        report.findings.push({ match: w, cls: 'Your style rule', sev: 'medium', why: `You asked to avoid “${w}”.`, fix: 'Edit the text in place, or hit ↻ Reword for different phrasing.', channels });
+        report.counts.medium++;
+        report.clear = false;
+      }
     });
     $('emptyState').hidden = true;
     updateComplianceDot();
@@ -876,6 +889,8 @@
   bindBrandField('brokerage', 'brokerage');
   bindBrandField('phone', 'phone');
   bindBrandField('email', 'email');
+  bindBrandField('prefs', 'prefs');
+  $('prefs').addEventListener('change', () => { if (outputs) generate(); });
   bindBrandField('brandPrimary', 'primary');
   bindBrandField('brandAccent', 'accent');
   bindBrandField('brandFont', 'font');

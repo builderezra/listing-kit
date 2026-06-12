@@ -57,13 +57,21 @@ body {
 }
 .panel { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
 .form-panel { padding: 16px 18px; }
-/* the output panel scrolls on its own, independent of the form side */
-.out-panel {
-  min-height: 70vh; position: sticky; top: 16px;
-  max-height: calc(100vh - 32px); overflow-y: auto; overflow-x: hidden;
-  overscroll-behavior: contain;
-}
+/* desktop = app-style split view: the page doesn't scroll, each pane does.
+   No more "panel bottom hidden until the page is scrolled all the way". */
+.out-panel { min-height: 70vh; }
 .out-panel .tabs { position: sticky; top: 0; z-index: 5; }
+@media (min-width: 921px) {
+  html, body { height: 100%; }
+  body { display: flex; flex-direction: column; overflow: hidden; }
+  .topbar, .foot { flex: 0 0 auto; }
+  .layout { flex: 1; min-height: 0; align-items: stretch; width: 100%; }
+  .form-panel, .out-panel {
+    overflow-y: auto; overflow-x: hidden; max-height: 100%;
+    overscroll-behavior: contain;
+  }
+  .foot { padding: 8px 24px 12px; }
+}
 
 /* ---------- collapsible form sections ---------- */
 .section { border: 1px solid var(--line-2); border-radius: 11px; margin-bottom: 12px; background: #fdfcf9; }
@@ -278,11 +286,17 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 .gfx-foot span { font-size: 12px; color: var(--muted); }
 .dl-all { margin-top: 16px; width: 100%; padding: 11px; font-size: 14px; }
 
-/* missing after auto-fill: red ring until the agent fills it */
+/* missing after auto-fill: red ring + one pulse until the agent fills it */
+@keyframes missing-pulse {
+  0% { box-shadow: 0 0 0 2.5px rgba(192, 57, 43, .2); }
+  50% { box-shadow: 0 0 0 6px rgba(192, 57, 43, .35); }
+  100% { box-shadow: 0 0 0 2.5px rgba(192, 57, 43, .2); }
+}
 input.missing, textarea.missing {
-  border-color: var(--red);
-  box-shadow: 0 0 0 2.5px rgba(192, 57, 43, .18);
+  border-color: var(--red) !important;
+  box-shadow: 0 0 0 2.5px rgba(192, 57, 43, .2);
   background: #fef7f6;
+  animation: missing-pulse .9s ease-in-out 2;
 }
 
 /* carousel photo picker */
