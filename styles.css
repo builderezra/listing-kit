@@ -84,6 +84,16 @@ body {
 }
 .studio-hint b { color: var(--gold, #e3b34d); }
 
+/* respect reduced-motion preference (loadbar slide, spinners, tour transitions, etc.) */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}
+
+/* legibility warning chip in the studio */
+.st-contrast { font-size: 12px; background: #fdf3e3; color: #4a3410; border: 1px solid #f0d8a8; border-radius: 8px; padding: 7px 10px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.st-contrast[hidden] { display: none; }
+.st-contrast button { font: 600 11.5px var(--sans); background: #fff; border: 1px solid #e2c789; border-radius: 6px; padding: 4px 8px; cursor: pointer; color: #4a3410; }
+
 /* ---------- channel share row + tab icons ---------- */
 .tabico { vertical-align: -2px; margin-right: 1px; }
 .channel-share { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; margin-bottom: 10px; background: var(--hi); border: 1px solid var(--line); border-radius: 10px; }

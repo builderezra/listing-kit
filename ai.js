@@ -102,16 +102,16 @@ const AI = (() => {
     return call(
       RESEARCH_SYSTEM,
       `Research the immediate area around this property and return the location-highlights phrase wrapped in [HL]…[/HL]:\n${where}`,
-      700,
+      1200,
       [{ type: 'web_search_20260209', name: 'web_search', max_uses: 4 }],
       true,
     ).then((t) => {
-      const m = t.match(/\[HL\]([\s\S]*?)\[\/HL\]/i);   // extract only the marked phrase
-      let phrase = (m ? m[1] : t).trim();
-      // strip any stray commentary / quotes if the model skipped the markers
-      phrase = phrase.replace(/^(here(?:'s| is)[^:]*:\s*|sure[,!]?\s*|i (?:have|'ve)[^:]*:\s*|location highlights:\s*)/i, '')
+      const m = t.match(/\[HL\]([\s\S]*?)\[\/HL\]/i);   // extract ONLY the marked phrase
+      // no markers = the model didn't produce a vetted phrase — return nothing rather
+      // than dump unvetted prose (which could carry fair-housing-risk language) into the field
+      if (!m) return '';
+      return m[1].replace(/^(here(?:'s| is)[^:]*:\s*|sure[,!]?\s*|i (?:have|'ve)[^:]*:\s*|location highlights:\s*)/i, '')
         .replace(/^["'“]+|["'”]+$/g, '').trim();
-      return phrase;
     });
   };
 

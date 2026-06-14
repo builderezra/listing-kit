@@ -273,7 +273,9 @@ const Generator = (() => {
     const sq = num(d.sqft);
     if (statBits.length || sq) {
       let s = statBits.length ? cap(oxford(statBits)) : 'The floor plan';
-      s += sq ? ` span${statBits.length === 1 ? 's' : ''} ${sq} ${areaLong(d.areaUnit)}` : ' fill the home';
+      // verb agrees with the subject: "4 bedrooms span", "1 bedroom spans", "The floor plan spans"
+      const subjPlural = statBits.length >= 2 || (statBits.length === 1 && Number(d.beds || d.baths) !== 1);
+      s += sq ? ` ${subjPlural ? 'span' : 'spans'} ${sq} ${areaLong(d.areaUnit)}` : ` ${subjPlural ? 'fill' : 'fills'} the home`;
       s += `, ${pick(STAT_TAILS[tone] || STAT_TAILS.classic)}.`;
       p1.push(s);
     }
@@ -697,7 +699,9 @@ const Generator = (() => {
     return p;
   };
 
-  const EMOJI_RE = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}\u{2190}-\u{21FF}]/gu;
+  // emoji blocks only — deliberately NOT the arrow range (U+2190–21FF), so legitimate
+  // typographic arrows/glyphs in copy survive "no emojis"
+  const EMOJI_RE = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu;
   const stripEmojis = (s) => s
     .split('\n')
     .map((l) => l.replace(EMOJI_RE, '').replace(/ {2,}/g, ' ').replace(/^[\s•·–-]*$/, '').trimStart())

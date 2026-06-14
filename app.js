@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v23';
+  const APP_VERSION = 'v24';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -318,9 +318,10 @@
       });
       cell.querySelector('.photo-x').addEventListener('click', () => {
         if (p.url.startsWith('blob:')) URL.revokeObjectURL(p.url);
+        const wasHero = photos[heroIndex];     // keep the ★ on the same photo (by reference)
         photos.splice(i, 1);
-        if (heroIndex >= photos.length) heroIndex = 0;
-        else if (i < heroIndex) heroIndex--;
+        heroIndex = photos.indexOf(wasHero);
+        if (heroIndex < 0 || heroIndex >= photos.length) heroIndex = 0;
         renderPhotoGrid(); rerenderVisuals();
       });
       grid.appendChild(cell);
@@ -510,9 +511,12 @@
       pickRow.appendChild(im);
     });
 
-    const feats = Generator.flyerFeatures(d.raw, 6);
+    const feats = Generator.flyerFeatures(d.raw, 8);
     const slides = d.photos.filter((p) => p.inCarousel !== false).slice(0, 6);
     const total = slides.length + 2;
+    // bind a caption to each photo ONCE so toggling/re-rendering doesn't reshuffle them
+    let fi = 0;
+    slides.forEach((p) => { if (p._caption == null) p._caption = feats[fi++] || ''; });
 
     const addSlide = (label, renderFn, photo) => {
       const cell = document.createElement('div');
@@ -534,14 +538,25 @@
 
     addSlide('1 · Cover', (cv) => Visuals.render(brand.templateId, 'square', cv, d));
     slides.forEach((p, i) =>
-      addSlide(`${i + 2} · Photo`, (cv) => Visuals.featureSlide(cv, { photo: p, caption: feats[i] || '', brand, idx: i + 1, total }), p));
+      addSlide(`${i + 2} · Photo`, (cv) => Visuals.featureSlide(cv, { photo: p, caption: p._caption || '', brand, idx: i + 1, total }), p));
     addSlide(`${total} · CTA`, (cv) => Visuals.ctaSlide(cv, { brand, address: d.address, badgeText: d.badgeText }));
   };
 
+  // ---- native share (Web Share API, with download fallback) ----
+  const canShareFiles = () => { try { return !!(navigator.canShare && navigator.share); } catch (e) { return false; } };
+  const shareCanvas = async (canvas, filename, text) => {
+    try {
+      const blob = await new Promise((r) => canvas.toBlob(r, 'image/png'));
+      const file = new File([blob], filename, { type: 'image/png' });
+      if (navigator.canShare && navigator.canShare({ files: [file] })) { await navigator.share({ files: [file], text: text || '' }); return true; }
+    } catch (e) { if (e && e.name === 'AbortError') return true; }   // user cancelled the sheet — that's fine
+    return false;
+  };
+
   // ---- carousel slide lightbox (zoom + edit) ----
-  let lbState = { photo: null, n: 1 };
+  let lbState = { photo: null, n: 1, cv: null };
   const openLightbox = (cv, photo, n) => {
-    lbState = { photo, n };
+    lbState = { photo, n, cv };
     $('lbImg').src = cv.toDataURL('image/png');
     $('lightbox').hidden = false;
   };
@@ -551,7 +566,17 @@
     $('lightbox').addEventListener('click', (e) => { if (e.target === $('lightbox')) closeLightbox(); });
     $('lbDownload').addEventListener('click', () => { const a = document.createElement('a'); a.href = $('lbImg').src; a.download = `${slug()}-carousel-${String(lbState.n).padStart(2, '0')}.png`; a.click(); });
     $('lbEdit').addEventListener('click', () => { closeLightbox(); openStudio(lbState.photo ? photos.indexOf(lbState.photo) : undefined); });
+    if (canShareFiles()) { $('lbShare').hidden = false; $('lbShare').addEventListener('click', async () => { if (lbState.cv) { const ok = await shareCanvas(lbState.cv, `${slug()}-carousel-${String(lbState.n).padStart(2, '0')}.png`, (outputs && outputs.instagram) || ''); if (!ok) $('lbDownload').click(); } }); }
     window.addEventListener('keydown', (e) => { if (!$('lightbox').hidden && e.key === 'Escape') closeLightbox(); });
+  };
+  const wireShare = () => {
+    if (!canShareFiles()) return;
+    $('sharePost').hidden = false;
+    $('sharePost').addEventListener('click', async () => {
+      const cap = (outputs && outputs.instagram) || '';
+      const ok = await shareCanvas($('cvSquare'), `${slug()}-instagram.png`, cap);
+      if (!ok) { Visuals.download($('cvSquare'), `${slug()}-instagram.png`); copyText(cap); }
+    });
   };
 
   const slug = () => ($('address').value.trim() || 'listing').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -681,7 +706,8 @@
     const subM = raw.match(/^\s*subject:\s*(.+)$/im);
     const addr = $('address').value.trim();
     const subject = subM ? subM[1].trim() : (addr ? `New listing — ${addr}` : 'New listing');
-    const body = raw.replace(/^\s*subject:.*$/im, '').replace(/^\s*preview:.*$/im, '').trim();
+    // drop the meta lines (Subject:, (Alt subject: …), Preview text: …) from the body
+    const body = raw.split('\n').filter((l) => !/^\s*(subject:|\(alt subject:|preview text:)/i.test(l)).join('\n').trim();
     const url = svc.url(subject, body);
     if (svcId === 'mailto') window.location.href = url; else window.open(url, '_blank', 'noopener');
   };
@@ -748,8 +774,9 @@
   const renderCompliance = () => {
     const body = $('complianceBody');
     body.innerHTML = '';
+    if (!report) return;   // nothing generated yet — don't dereference report.findings
     const summary = document.createElement('div');
-    const level = !report || report.clear ? 'clear' : report.counts.high ? 'alert' : 'warn';
+    const level = report.clear ? 'clear' : report.counts.high ? 'alert' : 'warn';
     summary.className = 'compliance-summary ' + level;
     const total = report.findings.length;
     if (report.clear) {
@@ -824,11 +851,13 @@
       if (v == null || v === '') return;
       if (overwrite || !$(id).value.trim()) $(id).value = fmt ? fmt(v) : v;
     };
-    fillText('price', r.price, (v) => Number(v).toLocaleString('en-US'));
+    // separator-formatted numbers ("985,000") must not become NaN in the field
+    const num = (v) => { const n = Number(String(v).replace(/[^0-9.]/g, '')); return isFinite(n) && n > 0 ? n.toLocaleString('en-US') : String(v); };
+    fillText('price', r.price, num);
     fillText('beds', r.beds);
     fillText('baths', r.baths);
     fillText('cars', r.cars);
-    fillText('sqft', r.sqft, (v) => Number(v).toLocaleString('en-US'));
+    fillText('sqft', r.sqft, num);
     fillText('year', r.year);
     fillText('lot', r.lot);
     fillText('address', r.address);
@@ -1024,6 +1053,9 @@
     renderPhotoGrid();
     document.querySelectorAll('#featureChips .chip').forEach((c) => c.classList.remove('added'));
     outputs = null; report = null;
+    // a cleared listing must not let Undo/Redo resurrect the previous property's copy
+    history = { mls: [], instagram: [], facebook: [], email: [] };
+    redoStack = { mls: [], instagram: [], facebook: [], email: [] };
     ['graphicsContent', 'flyerContent', 'content', 'complianceContent'].forEach((id) => ($(id).hidden = true));
     $('emptyState').hidden = false;
     $('complianceDot').className = 'dot';
@@ -1178,11 +1210,18 @@
     $('aiModel').addEventListener('change', () => { AI.setModel($('aiModel').value); showKeyStatus(); });
     $('aiTest').addEventListener('click', async () => {
       const typed = $('aiKey').value.trim();
-      if (typed) AI.setKey(typed);
-      if (!AI.available()) { $('aiKeyStatus').textContent = 'Paste a key first.'; return; }
+      const prev = AI.getKey();
+      if (!typed && !prev) { $('aiKeyStatus').textContent = 'Paste a key first.'; return; }
       $('aiKeyStatus').textContent = 'Testing…'; $('aiKeyStatus').className = 'parse-note';
-      try { await AI.test(); $('aiKey').value = ''; $('aiKey').placeholder = '•••• saved — paste a new key to replace'; $('aiKeyStatus').textContent = `✓ Key works — AI ready (${AI.modelLabel()})`; }
-      catch (e) { $('aiKeyStatus').textContent = AI.explain(e); }
+      if (typed) AI.setKey(typed);   // tentatively use the typed key for the test
+      try {
+        await AI.test();
+        $('aiKey').value = ''; $('aiKey').placeholder = '•••• saved — paste a new key to replace';
+        $('aiKeyStatus').textContent = `✓ Key works — AI ready (${AI.modelLabel()})`;
+      } catch (e) {
+        AI.setKey(prev);   // a failed test must never leave a broken key saved/“available”
+        $('aiKeyStatus').textContent = AI.explain(e);
+      }
     });
     $('aiPolishBtn').addEventListener('click', () => runAI('polish'));
     $('aiApply').addEventListener('click', () => { const i = $('aiInstruction').value.trim(); if (i) runAI('instruct', i); else $('aiInstruction').focus(); });
@@ -1382,8 +1421,15 @@
   wireDropZone();
   wireDownloads();
   wireLightbox();
+  wireShare();
   wireEditableOutput();
   wireAI();
+  // accessibility: announce async status updates to screen readers
+  ['importStatus', 'parseNote', 'researchStatus', 'aiStatus', 'aiKeyStatus', 'stAiStatus'].forEach((id) => { const e = $(id); if (e) { e.setAttribute('role', 'status'); e.setAttribute('aria-live', 'polite'); } });
+  // ⌘/Ctrl+Enter generates from anywhere (except while the studio overlay is open)
+  window.addEventListener('keydown', (e) => {
+    if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && $('studio').hidden) { e.preventDefault(); generate(); }
+  });
   wirePhotoEditor();
   renderPalettes();
   window.addEventListener('resize', () => { if (activeTab === 'flyer' && outputs) scaleFlyer(); });

@@ -204,6 +204,37 @@ const Studio = (() => {
         bw = dw; bh = dh;
       }
       ctx2d.filter = 'none';
+    } else if (L.type === 'ribbon') {
+      // a filled banner with centred text (rotate via L.rot to make a corner ribbon)
+      ctx2d.font = `800 ${L.size}px ${SANS}`;
+      bw = (L.wf || 0.6) * w; bh = L.size * 1.9;
+      ctx2d.fillStyle = resolveColor(L.color);
+      ctx2d.fillRect(-bw / 2, -bh / 2, bw, bh);
+      ctx2d.strokeStyle = 'rgba(255,255,255,.5)'; ctx2d.lineWidth = Math.max(1, L.size * 0.04);
+      ctx2d.strokeRect(-bw / 2 + L.size * 0.25, -bh / 2 + L.size * 0.25, bw - L.size * 0.5, bh - L.size * 0.5);
+      ctx2d.fillStyle = onColor(resolveColor(L.color));
+      ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'middle';
+      const oldSp = ctx2d.letterSpacing; try { ctx2d.letterSpacing = (L.size * 0.12) + 'px'; } catch (e) {}
+      ctx2d.fillText(String(L.text || '').toUpperCase(), 0, 1);
+      try { ctx2d.letterSpacing = oldSp || '0px'; } catch (e) {}
+    } else if (L.type === 'statsstrip') {
+      // pill chips parsed from the stats fact, e.g. "4 BD · 2 BA · 2 CAR · 520 M²"
+      const parts = String(L.text || '').split(/[·•|]/).map((s) => s.trim()).filter(Boolean);
+      ctx2d.font = `700 ${L.size}px ${SANS}`;
+      const padX = L.size * 0.7, gap = L.size * 0.45, chh = L.size * 2;
+      const widths = parts.map((p) => ctx2d.measureText(p).width + padX * 2);
+      const totalW = widths.reduce((a, b) => a + b, 0) + gap * Math.max(0, parts.length - 1);
+      let x = -totalW / 2;
+      ctx2d.textAlign = 'center'; ctx2d.textBaseline = 'middle';
+      parts.forEach((p, k) => {
+        const cw = widths[k];
+        ctx2d.fillStyle = resolveColor(L.color);
+        roundRect(x, -chh / 2, cw, chh, chh / 2); ctx2d.fill();
+        ctx2d.fillStyle = onColor(resolveColor(L.color));
+        ctx2d.fillText(p, x + cw / 2, 1);
+        x += cw + gap;
+      });
+      bw = totalW || L.size; bh = chh;
     } else {
       // text + badge
       const m = measure(L);
@@ -222,14 +253,25 @@ const Studio = (() => {
         ctx2d.textAlign = L.align;
         const ax = L.align === 'left' ? -m.textW / 2 : L.align === 'right' ? m.textW / 2 : 0;
         const startY = -bh / 2;
+        const drawLines = (style) => { ctx2d.fillStyle = style; m.lines.forEach((ln, i) => ctx2d.fillText(ln, ax, startY + i * m.lh)); };
+        // outer glow (soft halo) — drawn first so text sits on top
+        if (L.glow) { ctx2d.save(); ctx2d.shadowColor = resolveColor(L.glowColor || 'white'); ctx2d.shadowBlur = L.size * 0.6; drawLines(fill); ctx2d.restore(); }
+        // drop shadow on the real fill
         if (L.shadow) { ctx2d.shadowColor = 'rgba(0,0,0,.45)'; ctx2d.shadowBlur = L.size * 0.25; ctx2d.shadowOffsetY = 2; }
         if (L.outline) {
           ctx2d.lineWidth = L.size * 0.1; ctx2d.lineJoin = 'round';
           ctx2d.strokeStyle = L.stroke ? resolveColor(L.stroke) : onColor(fill);
           m.lines.forEach((ln, i) => ctx2d.strokeText(ln, ax, startY + i * m.lh));
         }
-        ctx2d.fillStyle = fill;
-        m.lines.forEach((ln, i) => ctx2d.fillText(ln, ax, startY + i * m.lh));
+        // gradient or solid fill
+        let style = fill;
+        if (L.tgrad) {
+          const g = ctx2d.createLinearGradient(0, startY, 0, startY + m.bh);
+          g.addColorStop(0, resolveColor(L.tgrad[0]));
+          g.addColorStop(1, resolveColor(L.tgrad[1]));
+          style = g;
+        }
+        drawLines(style);
         ctx2d.shadowColor = 'transparent'; ctx2d.shadowBlur = 0; ctx2d.shadowOffsetY = 0;
       }
     }
@@ -303,6 +345,8 @@ const Studio = (() => {
       homeopen: { ...base, type: 'badge', text: 'HOME OPEN · SAT 11:00', color: 'primary', size: Math.round(w * 0.03), weight: 700, yf: 0.88, xf: 0.5 },
       agent: { ...base, text: [b.agentName, b.phone, b.brokerage].filter(Boolean).join('\n') || 'Your Name\n0400 000 000\nAgency', align: 'left', weight: 600, size: Math.round(w * 0.03), xf: 0.22, yf: 0.9 },
       disclaimer: { ...base, text: 'All information believed accurate but not guaranteed — verify independently.', weight: 400, size: Math.round(w * 0.017), yf: 0.975, wrapf: 0.92, shadow: false, opacity: 0.85 },
+      ribbon: { ...base, type: 'ribbon', text: 'SOLD', color: '#c0392b', wf: 0.62, size: Math.round(w * 0.04), xf: 0.74, yf: 0.2, rot: 45 },
+      statsstrip: { ...base, type: 'statsstrip', field: 'stats', text: f.stats || '4 BD · 2 BA · 2 CAR', color: 'primary', size: Math.round(w * 0.028), yf: 0.9, xf: 0.5, shadow: false },
       rect: { id: 0, type: 'rect', shape: 'rect', color: 'primary', xf: 0.5, yf: 0.88, wf: 1, hf: 0.16, radius: 0, opacity: 1, rot: 0 },
       ellipse: { id: 0, type: 'rect', shape: 'ellipse', color: 'accent', xf: 0.5, yf: 0.5, wf: 0.3, hf: 0.3, opacity: 1, rot: 0 },
       scrim: { id: 0, type: 'rect', shape: 'rect', color: 'dark', grad: 'up', xf: 0.5, yf: 0.84, wf: 1, hf: 0.5, radius: 0, opacity: 0.9, rot: 0 },
@@ -349,18 +393,14 @@ const Studio = (() => {
     return null;
   };
   const sizeOf = (L) => (L.type === 'text' || L.type === 'badge') ? L.size : (L.type === 'rect' ? L.hf : L.wf);
-  const setSize = (L, v) => {
-    if (L.type === 'text' || L.type === 'badge') L.size = Math.max(12, Math.round(v));
-    else if (L.type === 'rect') { const k = v / (L.hf || v); L.hf = Math.min(2, Math.max(0.02, v)); if (L.shape === 'ellipse') L.wf = Math.min(2, Math.max(0.02, L.wf * k)); }
-    else L.wf = Math.min(2, Math.max(0.04, v));   // image keeps aspect (height derived)
-  };
   const onDown = (e) => {
     const p = pt(e);
     const cur = layers.find((x) => x.id === selId);
     if (cur && cur._c && !cur.locked) {
       const br = boxCorners(cur._c)[2];
       if (Math.hypot(p.x - br.x, p.y - br.y) <= handleR() * 1.9) {
-        drag = { id: cur.id, resize: true, startDist: Math.max(8, Math.hypot(p.x - cur._c.cx, p.y - cur._c.cy)), startSize: sizeOf(cur), moved: false };
+        // capture the starting dimensions so resize scales from them (no drift / clamp distortion)
+        drag = { id: cur.id, resize: true, startDist: Math.max(8, Math.hypot(p.x - cur._c.cx, p.y - cur._c.cy)), startSize: sizeOf(cur), startWf: cur.wf, startHf: cur.hf, moved: false };
         e.preventDefault(); return;
       }
     }
@@ -376,7 +416,11 @@ const Studio = (() => {
     const p = pt(e); const L = layers.find((x) => x.id === drag.id); if (!L) return;
     if (drag.resize) {
       const factor = Math.hypot(p.x - L._c.cx, p.y - L._c.cy) / drag.startDist;
-      setSize(L, drag.startSize * factor);
+      if (L.type === 'text' || L.type === 'badge') L.size = Math.max(12, Math.round(drag.startSize * factor));
+      else if (L.type === 'rect') {
+        L.hf = Math.min(2, Math.max(0.02, drag.startHf * factor));
+        if (L.shape === 'ellipse') L.wf = Math.min(2, Math.max(0.02, drag.startWf * factor));   // keep the ellipse's aspect
+      } else L.wf = Math.min(2, Math.max(0.04, drag.startWf * factor));   // image/photo keep aspect (height derived)
       render(); syncPanel(); e.preventDefault(); return;
     }
     let xf = Math.min(1, Math.max(0, (p.x - drag.dx) / W()));
@@ -526,6 +570,8 @@ const Studio = (() => {
   const layerLabel = (L) => {
     if (L.type === 'image') return L.src === 'logo' ? 'Logo' : 'Headshot';
     if (L.type === 'photo') return 'Photo';
+    if (L.type === 'ribbon') return 'Ribbon: ' + String(L.text || '').slice(0, 12);
+    if (L.type === 'statsstrip') return 'Stats strip';
     if (L.type === 'rect') return L.grad && L.grad !== 'none' ? 'Scrim' : (L.shape === 'ellipse' ? 'Ellipse' : 'Bar');
     const t = (L.text || '').split('\n')[0];
     return (t.length > 18 ? t.slice(0, 18) + '…' : t) || 'Text';
@@ -599,6 +645,8 @@ const Studio = (() => {
       $('stBold').classList.toggle('on', (L.weight || 0) >= 700);
       $('stShadow').classList.toggle('on', !!L.shadow);
       $('stOutline').classList.toggle('on', !!L.outline);
+      $('stGlow').classList.toggle('on', !!L.glow);
+      $('stTGrad').classList.toggle('on', !!L.tgrad);
       $('stEyedrop').hidden = typeof window.EyeDropper === 'undefined';
       $('stWrap').classList.toggle('on', !!L.wrapf);
       ['L', 'C', 'R'].forEach((a) => $('stAlign' + a).classList.toggle('on', L.align === { L: 'left', C: 'center', R: 'right' }[a]));
@@ -615,6 +663,8 @@ const Studio = (() => {
     $('stLock').textContent = L.locked ? '🔒 Locked' : '🔓 Lock';
     $('stLock').classList.toggle('on', !!L.locked);
     $('stHide').textContent = L.hidden ? '🙈 Hidden' : '👁 Visible';
+    if ($('stPasteStyle')) $('stPasteStyle').disabled = !styleClip;
+    updateContrast();
   };
 
   // ---- starter template gallery ---------------------------------------------
@@ -799,11 +849,42 @@ const Studio = (() => {
     try {
       const blob = await new Promise((r) => cv.toBlob(r, 'image/png'));
       if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); flashBtn('stCopyImg', '✓ Copied'); }
-      else exportImage('image/png');
-    } catch (e) { try { exportImage('image/png'); } catch (e2) {} }
+      else { exportImage('image/png'); flashBtn('stCopyImg', '↓ Downloaded'); }   // clipboard image unsupported (e.g. Firefox)
+    } catch (e) { try { exportImage('image/png'); flashBtn('stCopyImg', '↓ Downloaded'); } catch (e2) {} }
     finally { render(true); }
   };
   const eyedrop = () => { const L = sel(); if (!L || typeof window.EyeDropper === 'undefined') return; new window.EyeDropper().open().then((r) => setColor(L, r.sRGBHex)).catch(() => {}); };
+
+  // copy / paste a layer's look (format painter) — visual style keys only
+  let styleClip = null;
+  const STYLE_KEYS = ['color', 'font', 'weight', 'align', 'shadow', 'outline', 'glow', 'glowColor', 'tgrad', 'stroke', 'wrapf', 'opacity', 'rot'];
+  const copyStyle = () => { const L = sel(); if (!L) return; styleClip = {}; STYLE_KEYS.forEach((k) => { if (L[k] !== undefined) styleClip[k] = JSON.parse(JSON.stringify(L[k])); }); if ($('stPasteStyle')) $('stPasteStyle').disabled = false; };
+  const pasteStyle = () => { const L = sel(); if (!L || !styleClip) return; Object.keys(styleClip).forEach((k) => { L[k] = JSON.parse(JSON.stringify(styleClip[k])); }); commit(); };
+
+  // legibility checker — warn when a text layer is low-contrast against what's behind it
+  const srgb = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4); };
+  const relLum = (r, g, b) => 0.2126 * srgb(r) + 0.7152 * srgb(g) + 0.0722 * srgb(b);
+  const hexLum = (hex) => { const h = (hex || '#000').replace('#', ''); const n = parseInt(h.length === 3 ? h.split('').map((x) => x + x).join('') : h, 16); return relLum((n >> 16) & 255, (n >> 8) & 255, n & 255); };
+  const updateContrast = () => {
+    const box = $('stContrast'); if (!box) return;
+    const L = sel();
+    if (!L || L.type !== 'text' || !L._c || L._c.w < 2) { box.hidden = true; return; }
+    let bgLum;
+    try {
+      const x0 = Math.max(0, Math.round(L._c.cx - L._c.w / 2)), y0 = Math.max(0, Math.round(L._c.cy - L._c.h / 2));
+      const ww = Math.max(2, Math.min(W() - x0, Math.round(L._c.w))), hh = Math.max(2, Math.min(H() - y0, Math.round(L._c.h)));
+      const d = ctx2d.getImageData(x0, y0, ww, hh).data;
+      let r = 0, g = 0, b = 0, n = 0;
+      for (let i = 0; i < d.length; i += 16) { r += d[i]; g += d[i + 1]; b += d[i + 2]; n++; }
+      bgLum = relLum(r / n, g / n, b / n);
+    } catch (e) { box.hidden = true; return; }   // tainted canvas → skip silently
+    const tLum = hexLum(resolveColor(L.color));
+    const ratio = (Math.max(bgLum, tLum) + 0.05) / (Math.min(bgLum, tLum) + 0.05);
+    if (ratio >= 3) { box.hidden = true; return; }
+    box.hidden = false;
+    box.innerHTML = '⚠ This text may be hard to read here. <button type="button" id="stContrastFix">Add shadow + outline</button>';
+    $('stContrastFix').addEventListener('click', () => { L.shadow = true; L.outline = true; commit(); });
+  };
 
   // ---- export ----------------------------------------------------------------
   const exportImage = (type) => {
@@ -914,6 +995,10 @@ const Studio = (() => {
     $('stBold').addEventListener('click', () => { const L = cur(); if (L) { L.weight = (L.weight || 0) >= 700 ? 400 : 800; commit(); } });
     $('stShadow').addEventListener('click', () => { const L = cur(); if (L) { L.shadow = !L.shadow; commit(); } });
     $('stOutline').addEventListener('click', () => { const L = cur(); if (L) { L.outline = !L.outline; commit(); } });
+    $('stGlow').addEventListener('click', () => { const L = cur(); if (L) { L.glow = !L.glow; commit(); } });
+    $('stTGrad').addEventListener('click', () => { const L = cur(); if (L) { if (L.tgrad) L.tgrad = null; else L.tgrad = [L.color, Visuals.shade(resolveColor(L.color), 40)]; commit(); } });
+    $('stCopyStyle').addEventListener('click', copyStyle);
+    $('stPasteStyle').addEventListener('click', pasteStyle);
     $('stWrap').addEventListener('click', () => { const L = cur(); if (L) { L.wrapf = L.wrapf ? 0 : 0.82; commit(); } });
     ['L', 'C', 'R'].forEach((a) => $('stAlign' + a).addEventListener('click', () => { const L = cur(); if (L) { L.align = { L: 'left', C: 'center', R: 'right' }[a]; commit(); } }));
     $('stShapeRect').addEventListener('click', () => { const L = cur(); if (L) { L.shape = 'rect'; commit(); } });
