@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=21" />
+  <link rel="stylesheet" href="styles.css?v=22" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -519,6 +519,7 @@
         <button type="button" class="mini-btn ghost" id="stUndo" title="Undo (⌘Z)" aria-label="Undo">↩︎</button>
         <button type="button" class="mini-btn ghost" id="stRedo" title="Redo (⌘⇧Z)" aria-label="Redo">↪︎</button>
         <button type="button" class="mini-btn ghost" id="stHelp" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
+        <button type="button" class="mini-btn ghost" id="stCopyImg" title="Copy the design to your clipboard">⧉ Copy</button>
         <button type="button" class="mini-btn" id="stExport">⬇️ PNG</button>
         <button type="button" class="mini-btn ghost" id="stExportJpg" title="Export as JPG">JPG</button>
         <button type="button" class="st-close" id="stClose" aria-label="Close studio">×</button>
@@ -557,6 +558,15 @@
             <button type="button" data-tpl="corner">SOLD corner</button>
           </div>
         </div>
+        <div class="st-group st-ai">
+          <div class="st-group-title">✨ AI design <span class="hint">— composes a full layout from your details</span></div>
+          <div class="st-row">
+            <input type="text" id="stAiVibe" placeholder="Optional vibe — e.g. luxury, bold, minimal" />
+            <button type="button" id="stAiGen">Generate</button>
+          </div>
+          <div class="st-ai-status" id="stAiStatus" hidden></div>
+          <div class="st-ai-picker" id="stAiPicker" hidden></div>
+        </div>
         <div class="st-group">
           <div class="st-group-title">Add a layer</div>
           <div class="st-add" id="stAdd">
@@ -569,6 +579,7 @@
             <button type="button" data-add="homeopen">+ Home open</button>
             <button type="button" data-add="agent">+ Agent details</button>
             <button type="button" data-add="disclaimer">+ Disclaimer</button>
+            <button type="button" data-add="photo" id="stAddPhoto">+ Photo</button>
             <button type="button" data-add="logo" id="stAddLogo">+ Logo</button>
             <button type="button" data-add="head" id="stAddHead">+ Headshot</button>
             <button type="button" data-add="rect">+ Bar</button>
@@ -579,30 +590,74 @@
         <div class="st-group">
           <div class="st-group-title">Background</div>
           <div class="st-bg" id="stBg"></div>
+          <div class="st-row">
+            <label class="filebtn st-upload" id="stUploadLbl">⬆ Upload photo<input type="file" id="stUpload" accept="image/*" multiple hidden /></label>
+          </div>
+          <div class="st-sub">Colours &amp; gradients</div>
+          <div class="st-bg-presets" id="stBgPresets"></div>
+          <div class="st-bg-custom">
+            <div class="st-row st-grad-row">
+              <input type="color" id="stBgC1" title="Gradient colour 1" />
+              <input type="color" id="stBgC2" title="Gradient colour 2" />
+              <button type="button" id="stBgRadial" title="Radial gradient">◉ Radial</button>
+              <button type="button" id="stBgSolid" title="Use colour 1 as a solid fill">Solid</button>
+            </div>
+            <div class="st-slider"><span class="st-slk">Angle</span><input type="range" id="stBgAngle" min="0" max="360" step="5" /><span class="st-slv" id="stBgAngleV"></span></div>
+          </div>
+          <div id="stBgPhoto" hidden>
+            <div class="st-slider"><span class="st-slk">Darken</span><input type="range" id="stBgDarken" min="0" max="70" step="1" /><span class="st-slv" id="stBgDarkenV"></span><button type="button" class="st-slr" id="stBgDarkenR" title="Reset">⟲</button></div>
+          </div>
+        </div>
+        <div class="st-group" id="stPhotoCtl" hidden>
+          <div class="st-group-title">Photo <span class="hint">— drag &amp; corner-resize on the canvas</span></div>
+          <div class="st-row">
+            <button type="button" id="stPhRect">▭ Rect</button>
+            <button type="button" id="stPhRound">▢ Rounded</button>
+            <button type="button" id="stPhCircle">⬤ Circle</button>
+          </div>
+          <div class="st-slider" id="stPhRadiusRow"><span class="st-slk">Round</span><input type="range" id="stPhRadius" min="0" max="180" step="2" /><span class="st-slv" id="stPhRadiusV"></span></div>
+          <div class="st-sub">Adjust colour</div>
+          <div class="st-slider"><span class="st-slk">Bright</span><input type="range" id="stPhB" min="40" max="180" step="1" /><span class="st-slv" id="stPhBV"></span></div>
+          <div class="st-slider"><span class="st-slk">Contrast</span><input type="range" id="stPhC" min="40" max="180" step="1" /><span class="st-slv" id="stPhCV"></span></div>
+          <div class="st-slider"><span class="st-slk">Saturate</span><input type="range" id="stPhS" min="0" max="200" step="1" /><span class="st-slv" id="stPhSV"></span></div>
+          <div class="st-slider"><span class="st-slk">Hue</span><input type="range" id="stPhHue" class="st-centered" min="-180" max="180" step="1" /><span class="st-slv" id="stPhHueV"></span></div>
+          <div class="st-slider"><span class="st-slk">Warmth</span><input type="range" id="stPhSep" min="0" max="100" step="1" /><span class="st-slv" id="stPhSepV"></span></div>
+          <div class="st-row"><button type="button" id="stPhReset">Reset adjustments</button></div>
         </div>
         <div class="st-group" id="stLayerCtl" hidden>
           <div class="st-group-title">Selected layer <span class="hint">— drag it on the canvas to move</span></div>
           <textarea id="stText" rows="2"></textarea>
-          <label class="st-slider" id="stSizeRow">Size <input type="range" id="stSize" min="16" max="260" step="1" /></label>
+          <div class="st-slider" id="stSizeRow"><span class="st-slk">Size</span><input type="range" id="stSize" min="16" max="260" step="1" /><span class="st-slv" id="stSizeV"></span></div>
           <div id="stColorWrap">
             <div class="st-sub">Colour</div>
             <div class="st-colors" id="stColors"></div>
           </div>
-          <label class="st-slider">Opacity <input type="range" id="stOpacity" min="0" max="100" step="1" /></label>
-          <label class="st-slider">Rotate <input type="range" id="stRot" min="-180" max="180" step="1" /></label>
+          <div class="st-slider"><span class="st-slk">Opacity</span><input type="range" id="stOpacity" min="0" max="100" step="1" /><span class="st-slv" id="stOpacityV"></span><button type="button" class="st-slr" id="stOpacityR" title="Reset to 100%">⟲</button></div>
+          <div class="st-slider"><span class="st-slk">Rotate</span><input type="range" id="stRot" class="st-centered" min="-180" max="180" step="1" /><span class="st-slv" id="stRotV"></span><button type="button" class="st-slr" id="stRotR" title="Reset to level (0°)">⟲</button></div>
           <div class="st-row" id="stWrapRow">
             <button type="button" id="stWrap">Wrap text</button>
+            <button type="button" id="stFit" title="Shrink to fit the canvas">Fit text</button>
           </div>
           <div class="st-row" id="stRowStyle">
             <button type="button" id="stFont">Serif</button>
             <button type="button" id="stBold">Bold</button>
             <button type="button" id="stShadow">Shadow</button>
             <button type="button" id="stOutline">Outline</button>
+            <button type="button" id="stEyedrop" title="Pick a colour from anywhere on screen" hidden>🎯 Pick</button>
           </div>
           <div class="st-row" id="stRowAlign">
             <button type="button" id="stAlignL">⯇</button>
             <button type="button" id="stAlignC">≡</button>
             <button type="button" id="stAlignR">⯈</button>
+          </div>
+          <div class="st-sub">Place on canvas</div>
+          <div class="st-row" id="stRowPlace">
+            <button type="button" id="stPlL" title="Left">⬅</button>
+            <button type="button" id="stPlCx" title="Centre across">⬌</button>
+            <button type="button" id="stPlR" title="Right">➡</button>
+            <button type="button" id="stPlT" title="Top">⬆</button>
+            <button type="button" id="stPlCy" title="Middle">⬍</button>
+            <button type="button" id="stPlB" title="Bottom">⬇</button>
           </div>
           <div class="st-row" id="stRowShape">
             <button type="button" id="stShapeRect">▭ Rect</button>
@@ -671,14 +726,14 @@
     </div>
   </div>
 
-  <script src="generator.js?v=21"></script>
-  <script src="fairhousing.js?v=21"></script>
-  <script src="parser.js?v=21"></script>
-  <script src="importer.js?v=21"></script>
-  <script src="visuals.js?v=21"></script>
-  <script src="flyer.js?v=21"></script>
-  <script src="ai.js?v=21"></script>
-  <script src="studio.js?v=21"></script>
-  <script src="app.js?v=21"></script>
+  <script src="generator.js?v=22"></script>
+  <script src="fairhousing.js?v=22"></script>
+  <script src="parser.js?v=22"></script>
+  <script src="importer.js?v=22"></script>
+  <script src="visuals.js?v=22"></script>
+  <script src="flyer.js?v=22"></script>
+  <script src="ai.js?v=22"></script>
+  <script src="studio.js?v=22"></script>
+  <script src="app.js?v=22"></script>
 </body>
 </html>

@@ -60,6 +60,33 @@ const Studio = (() => {
     return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`;
   };
 
+  // photo colour-adjustment filters (honest: no house alteration) → CSS filter
+  const photoFilterCSS = (f) => {
+    if (!f) return '';
+    const p = [];
+    if (f.b != null && f.b !== 100) p.push(`brightness(${f.b}%)`);
+    if (f.c != null && f.c !== 100) p.push(`contrast(${f.c}%)`);
+    if (f.s != null && f.s !== 100) p.push(`saturate(${f.s}%)`);
+    if (f.h) p.push(`hue-rotate(${f.h}deg)`);
+    if (f.sep) p.push(`sepia(${f.sep}%)`);
+    if (f.blur) p.push(`blur(${f.blur}px)`);
+    return p.join(' ');
+  };
+  // build a linear (by angle) or radial gradient fill across the canvas
+  // (resolveColor so brand tokens like 'primary' work, not just #hex)
+  const gradFill = (g, w, h) => {
+    const c1 = resolveColor(g.c1), c2 = resolveColor(g.c2);
+    if (g.radial) {
+      const grd = ctx2d.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.05, w / 2, h / 2, Math.hypot(w, h) / 2);
+      grd.addColorStop(0, c1); grd.addColorStop(1, c2); return grd;
+    }
+    const a = (g.angle || 0) * Math.PI / 180;
+    const len = (Math.abs(Math.cos(a)) * w + Math.abs(Math.sin(a)) * h) / 2;
+    const dx = Math.cos(a) * len, dy = Math.sin(a) * len;
+    const grd = ctx2d.createLinearGradient(w / 2 - dx, h / 2 - dy, w / 2 + dx, h / 2 + dy);
+    grd.addColorStop(0, c1); grd.addColorStop(1, c2); return grd;
+  };
+
   // ---- background ------------------------------------------------------------
   const drawBackground = () => {
     const w = W(), h = H();
@@ -70,10 +97,16 @@ const Studio = (() => {
       const dw = img.width * s, dh = img.height * s;
       const fy = { top: 0, center: 0.5, bottom: 1 }[p.focus || 'center'];
       ctx2d.save();
-      if (p.fcss) { try { ctx2d.filter = p.fcss; } catch (e) {} }
+      const f = p.fcss || photoFilterCSS(p.filter);
+      if (f) { try { ctx2d.filter = f; } catch (e) {} }
       ctx2d.drawImage(img, (w - dw) / 2, (h - dh) * fy, dw, dh);
       ctx2d.restore();
       ctx2d.filter = 'none';
+      if (bg.darken) { ctx2d.fillStyle = `rgba(0,0,0,${bg.darken})`; ctx2d.fillRect(0, 0, w, h); }
+    } else if (bg.type === 'gradient') {
+      ctx2d.fillStyle = gradFill(bg, w, h); ctx2d.fillRect(0, 0, w, h);
+    } else if (bg.type === 'color') {
+      ctx2d.fillStyle = resolveColor(bg.color || ctxData.brand.primary); ctx2d.fillRect(0, 0, w, h);
     } else {
       const b = ctxData.brand;
       const g = ctx2d.createLinearGradient(0, 0, w, h);
@@ -151,9 +184,12 @@ const Studio = (() => {
       else if (L.radius) { roundRect(x, y, bw, bh, L.radius); ctx2d.fill(); }
       else ctx2d.fillRect(x, y, bw, bh);
       if (L.stroke) { ctx2d.lineWidth = Math.max(1, L.strokeWf * w); ctx2d.strokeStyle = resolveColor(L.stroke); if (L.shape === 'ellipse') ctx2d.stroke(); else { roundRect(x, y, bw, bh, L.radius || 0); ctx2d.stroke(); } }
-    } else if (L.type === 'image') {
-      const img = L.src === 'logo' ? ctxData.brand.logoImg : ctxData.brand.headImg;
+    } else if (L.type === 'image' || L.type === 'photo') {
+      let img, filt = '';
+      if (L.type === 'photo') { const p = ctxData.photos[L.photoIndex]; img = p && p.img; filt = photoFilterCSS(L.filter); }
+      else img = L.src === 'logo' ? ctxData.brand.logoImg : ctxData.brand.headImg;
       if (!img || !img.width) { ctx2d.restore(); L._c = { cx, cy, w: 0, h: 0, rot: L.rot || 0, pad: 0 }; return; }
+      if (filt) { try { ctx2d.filter = filt; } catch (e) {} }
       const dw = L.wf * w;
       if (L.shape === 'circle') {
         const d = dw, s = Math.max(d / img.width, d / img.height);
@@ -163,9 +199,11 @@ const Studio = (() => {
         bw = d; bh = d;
       } else {
         const dh = dw * (img.height / img.width);
-        ctx2d.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+        if (L.shape === 'rounded' && L.radius) { ctx2d.save(); roundRect(-dw / 2, -dh / 2, dw, dh, L.radius); ctx2d.clip(); ctx2d.drawImage(img, -dw / 2, -dh / 2, dw, dh); ctx2d.restore(); }
+        else ctx2d.drawImage(img, -dw / 2, -dh / 2, dw, dh);
         bw = dw; bh = dh;
       }
+      ctx2d.filter = 'none';
     } else {
       // text + badge
       const m = measure(L);
@@ -275,6 +313,12 @@ const Studio = (() => {
       const img = kind === 'logo' ? ctxData.brand.logoImg : ctxData.brand.headImg;
       if (!img || !img.width) return;
       const L = { id: uid++, type: 'image', src: kind, shape: kind === 'head' ? 'circle' : 'rect', xf: kind === 'head' ? 0.82 : 0.5, yf: kind === 'head' ? 0.85 : 0.5, wf: kind === 'head' ? 0.2 : 0.32, opacity: 1, rot: 0 };
+      layers.push(L); selId = L.id; commit(); return;
+    }
+    if (kind === 'photo') {
+      if (!ctxData.photos.length) return;
+      const pi = bg.type === 'photo' ? bg.photoIndex : 0;
+      const L = { id: uid++, type: 'photo', photoIndex: pi, shape: 'rect', radius: Math.round(W() * 0.03), xf: 0.5, yf: 0.5, wf: 0.5, filter: { b: 100, c: 100, s: 100, h: 0, sep: 0, blur: 0 }, opacity: 1, rot: 0 };
       layers.push(L); selId = L.id; commit(); return;
     }
     const proto = presets()[kind];
@@ -401,29 +445,87 @@ const Studio = (() => {
 
   // ---- side panel ------------------------------------------------------------
   const sel = () => layers.find((x) => x.id === selId);
+  // slider helpers: snap to the nearest "nice" value within a threshold, and a readout
+  const snapTo = (v, pts, th) => { for (const p of pts) if (Math.abs(v - p) <= th) return p; return v; };
+  const slv = (id, txt) => { const e = $(id); if (e) e.textContent = txt; };
   const TOKENS = [['white', '#ffffff'], ['dark', '#1c2b30'], ['primary', null], ['accent', null]];
   const RECENT_LS = 'lk_studio_colors';
   const recents = () => { try { return JSON.parse(localStorage.getItem(RECENT_LS) || '[]'); } catch (e) { return []; } };
   const pushRecent = (hex) => { let r = recents().filter((x) => x !== hex); r.unshift(hex); r = r.slice(0, 6); try { localStorage.setItem(RECENT_LS, JSON.stringify(r)); } catch (e) {} };
+
+  // photo colour-adjust + shape panel
+  const syncPhotoPanel = (L) => {
+    const f = L.filter || {};
+    $('stPhRect').classList.toggle('on', L.shape !== 'rounded' && L.shape !== 'circle');
+    $('stPhRound').classList.toggle('on', L.shape === 'rounded');
+    $('stPhCircle').classList.toggle('on', L.shape === 'circle');
+    $('stPhRadiusRow').style.display = L.shape === 'rounded' ? '' : 'none';
+    $('stPhRadius').value = L.radius || 0; slv('stPhRadiusV', Math.round(L.radius || 0) + '');
+    const set = (id, v, suf) => { $(id).value = v; slv(id + 'V', v + suf); };
+    set('stPhB', f.b == null ? 100 : f.b, '%'); set('stPhC', f.c == null ? 100 : f.c, '%'); set('stPhS', f.s == null ? 100 : f.s, '%');
+    set('stPhHue', f.h || 0, '°'); set('stPhSep', f.sep || 0, '%');
+  };
+
+  // curated background colours + gradients
+  const BG_PRESETS = () => {
+    const b = ctxData.brand;
+    return [
+      { type: 'color', color: '#ffffff' },
+      { type: 'color', color: '#111417' },
+      { type: 'color', color: b.primary },
+      { type: 'gradient', c1: Visuals.shade(b.primary, 22), c2: Visuals.shade(b.primary, -30), angle: 135 },
+      { type: 'gradient', c1: b.primary, c2: b.accent, angle: 135 },
+      { type: 'gradient', c1: '#2193b0', c2: '#6dd5ed', angle: 135 },
+      { type: 'gradient', c1: '#0f2027', c2: '#2c5364', angle: 135 },
+      { type: 'gradient', c1: '#3a1c71', c2: '#d76d77', angle: 135 },
+      { type: 'gradient', c1: '#ee9ca7', c2: '#ffdde1', angle: 135 },
+      { type: 'gradient', c1: '#f7971e', c2: '#ffd200', angle: 135 },
+      { type: 'gradient', c1: '#c9a36a', c2: '#5d4a2e', angle: 135 },
+      { type: 'gradient', c1: '#283048', c2: '#859398', angle: 135 },
+    ];
+  };
+  const presetCSS = (p) => p.type === 'color' ? p.color : `linear-gradient(${(p.angle || 135)}deg, ${p.c1}, ${p.c2})`;
+  const sameBg = (p) => p.type === bg.type && (p.type === 'color' ? p.color === bg.color : (p.c1 === bg.c1 && p.c2 === bg.c2 && !bg.radial));
 
   const renderBgPicker = () => {
     const box = $('stBg'); box.innerHTML = '';
     ctxData.photos.forEach((p, i) => {
       const im = document.createElement('img');
       im.src = p.url; im.className = 'st-bg-thumb' + (bg.type === 'photo' && bg.photoIndex === i ? ' active' : '');
-      im.style.filter = p.fcss || '';
-      im.addEventListener('click', () => { bg = { type: 'photo', photoIndex: i }; renderBgPicker(); commit(); });
+      im.style.filter = p.fcss || photoFilterCSS(p.filter) || '';
+      im.addEventListener('click', () => { bg = { type: 'photo', photoIndex: i, darken: bg.type === 'photo' ? (bg.darken || 0) : 0 }; renderBgPicker(); commit(); });
       box.appendChild(im);
     });
-    const col = document.createElement('button');
-    col.className = 'st-bg-color' + (bg.type === 'color' ? ' active' : '');
-    col.style.background = ctxData.brand.primary; col.title = 'Brand colour';
-    col.addEventListener('click', () => { bg = { type: 'color' }; renderBgPicker(); commit(); });
-    box.appendChild(col);
+    if (!ctxData.photos.length) box.innerHTML = '<div class="st-tpl-empty">No photos yet — upload one below, or use a colour.</div>';
+
+    // colour / gradient preset tiles
+    const pbox = $('stBgPresets'); pbox.innerHTML = '';
+    BG_PRESETS().forEach((p) => {
+      const t = document.createElement('button');
+      t.className = 'st-bg-preset' + (sameBg(p) ? ' active' : '');
+      t.style.background = presetCSS(p); t.title = p.type === 'color' ? p.color : 'gradient';
+      t.addEventListener('click', () => { bg = { ...p }; renderBgPicker(); commit(); });
+      pbox.appendChild(t);
+    });
+
+    // custom gradient inputs reflect the current gradient (or sensible defaults)
+    const b = ctxData.brand;
+    $('stBgC1').value = (bg.type === 'gradient' ? bg.c1 : (bg.type === 'color' ? bg.color : b.primary));
+    $('stBgC2').value = (bg.type === 'gradient' ? bg.c2 : b.accent);
+    const ang = bg.type === 'gradient' ? (bg.angle || 0) : 135;
+    $('stBgAngle').value = ang; slv('stBgAngleV', ang + '°');
+    $('stBgRadial').classList.toggle('on', !!(bg.type === 'gradient' && bg.radial));
+
+    // photo-only darken control
+    $('stBgPhoto').hidden = bg.type !== 'photo';
+    const dk = Math.round((bg.darken || 0) * 100);
+    $('stBgDarken').value = dk; slv('stBgDarkenV', dk + '%');
+    const ap = $('stAddPhoto'); if (ap) ap.disabled = !ctxData.photos.length;
   };
 
   const layerLabel = (L) => {
     if (L.type === 'image') return L.src === 'logo' ? 'Logo' : 'Headshot';
+    if (L.type === 'photo') return 'Photo';
     if (L.type === 'rect') return L.grad && L.grad !== 'none' ? 'Scrim' : (L.shape === 'ellipse' ? 'Ellipse' : 'Bar');
     const t = (L.text || '').split('\n')[0];
     return (t.length > 18 ? t.slice(0, 18) + '…' : t) || 'Text';
@@ -482,18 +584,22 @@ const Studio = (() => {
     if (!L) return;
     const isText = L.type === 'text' || L.type === 'badge';
     const hasColor = isText || L.type === 'rect';
+    const isPhoto = L.type === 'photo';
     const show = (id, on) => { const el = $(id); if (el) el.style.display = on ? '' : 'none'; };
     show('stText', isText); show('stSizeRow', isText); show('stColorWrap', hasColor);
     show('stRowStyle', isText); show('stRowAlign', L.type === 'text'); show('stRowShape', L.type === 'rect');
     show('stWrapRow', L.type === 'text');
+    const pc = $('stPhotoCtl'); if (pc) pc.hidden = !isPhoto;
+    if (isPhoto) syncPhotoPanel(L);
     if (isText) {
       $('stText').value = L.text;
-      $('stSize').value = L.size;
+      $('stSize').value = L.size; slv('stSizeV', L.size + 'px');
       $('stFont').textContent = L.font === 'serif' ? 'Serif' : 'Sans';
       $('stFont').classList.toggle('on', L.font === 'serif');
       $('stBold').classList.toggle('on', (L.weight || 0) >= 700);
       $('stShadow').classList.toggle('on', !!L.shadow);
       $('stOutline').classList.toggle('on', !!L.outline);
+      $('stEyedrop').hidden = typeof window.EyeDropper === 'undefined';
       $('stWrap').classList.toggle('on', !!L.wrapf);
       ['L', 'C', 'R'].forEach((a) => $('stAlign' + a).classList.toggle('on', L.align === { L: 'left', C: 'center', R: 'right' }[a]));
     }
@@ -503,8 +609,9 @@ const Studio = (() => {
       $('stGrad').classList.toggle('on', !!(L.grad && L.grad !== 'none'));
     }
     if (hasColor) renderColorSwatches(L);
-    $('stOpacity').value = Math.round((L.opacity == null ? 1 : L.opacity) * 100);
-    $('stRot').value = L.rot || 0;
+    const op = Math.round((L.opacity == null ? 1 : L.opacity) * 100);
+    $('stOpacity').value = op; slv('stOpacityV', op + '%');
+    $('stRot').value = L.rot || 0; slv('stRotV', (L.rot || 0) + '°');
     $('stLock').textContent = L.locked ? '🔒 Locked' : '🔓 Lock';
     $('stLock').classList.toggle('on', !!L.locked);
     $('stHide').textContent = L.hidden ? '🙈 Hidden' : '👁 Visible';
@@ -566,6 +673,138 @@ const Studio = (() => {
     });
   };
 
+  // ---- AI auto-layout: map the AI's JSON onto real studio layers -------------
+  // The studio is the source of truth: every value is clamped, every colour
+  // brand-checked, and all text is bound from the real listing facts (or a
+  // fixed label whitelist) — the AI cannot inject a fabricated fact or claim.
+  const AI_LABELS = ['FOR SALE', 'FOR LEASE', 'NEW LISTING', 'JUST LISTED', 'HOME OPEN', 'UNDER OFFER', 'SOLD', 'AUCTION', 'EXPRESSIONS OF INTEREST', 'PRICE GUIDE', 'INSPECT', 'CONTACT', 'VIEW NOW', 'ENQUIRE', 'OFFERS FROM'];
+  const GRADS = ['none', 'up', 'down', 'left', 'right'];
+  const clampN = (v, a, b, d) => { const n = Number(v); return isNaN(n) ? d : Math.max(a, Math.min(b, n)); };
+  const okColor = (c, fb) => (['white', 'dark', 'primary', 'accent'].includes(c) || /^#[0-9a-f]{6}$/i.test(c)) ? c : fb;
+  const factOf = (ref) => {
+    if (!ref) return null;
+    if (ctxData.fields[ref] != null && ctxData.fields[ref] !== '') return ctxData.fields[ref];
+    if (ctxData.brand[ref] != null && ctxData.brand[ref] !== '') return ctxData.brand[ref];
+    return null;
+  };
+  const mapAILayer = (L) => {
+    if (!L || typeof L !== 'object') return null;
+    const base = { id: uid++, xf: clampN(L.xf, 0, 1, 0.5), yf: clampN(L.yf, 0, 1, 0.5), opacity: clampN(L.opacity, 0, 1, 1), rot: clampN(L.rot, -180, 180, 0) };
+    const t = L.type;
+    if (t === 'shape') return { ...base, type: 'rect', shape: L.shape === 'ellipse' ? 'ellipse' : 'rect', color: okColor(L.color, 'primary'), wf: clampN(L.wf, 0.02, 1, 0.5), hf: clampN(L.hf, 0.02, 1, 0.2), radius: clampN(L.radius, 0, 200, 0), grad: GRADS.includes(L.grad) ? L.grad : 'none' };
+    if (t === 'scrim') {
+      const cover = clampN(L.coverf, 0.1, 1, 0.4);
+      const g = { bottom: [0.5, 1 - cover / 2, 1, cover, 'up'], top: [0.5, cover / 2, 1, cover, 'down'], left: [cover / 2, 0.5, cover, 1, 'right'], right: [1 - cover / 2, 0.5, cover, 1, 'left'], full: [0.5, 0.5, 1, 1, 'none'] }[L.edge] || [0.5, 0.84, 1, 0.45, 'up'];
+      return { ...base, type: 'rect', shape: 'rect', xf: g[0], yf: g[1], wf: g[2], hf: g[3], grad: g[4], color: okColor(L.color, 'dark'), radius: 0, opacity: clampN(L.strength, 0, 1, 0.55) };
+    }
+    if (t === 'logo' || t === 'headshot') {
+      const src = t === 'logo' ? 'logo' : 'head';
+      const img = src === 'logo' ? ctxData.brand.logoImg : ctxData.brand.headImg;
+      if (!img || !img.width) return null;
+      return { ...base, type: 'image', src, shape: (L.shape === 'circle' || L.shape === 'rect') ? L.shape : (t === 'logo' ? 'rect' : 'circle'), wf: clampN(L.wf, 0.03, 0.6, 0.18) };
+    }
+    // text-bearing
+    let str = null;
+    if (t === 'text') { const lit = String(L.text || '').trim().toUpperCase(); if (AI_LABELS.includes(lit)) str = lit; else return null; }
+    else if (t === 'agent') str = [ctxData.brand.agentName, ctxData.brand.phone, ctxData.brand.brokerage].filter(Boolean).join('\n') || null;
+    else str = factOf(L.textRef);
+    if (!str) return null;
+    if (L.uppercase) str = String(str).toUpperCase();
+    const kind = (t === 'badge' || t === 'text' || L.textRef === 'badge') ? 'badge' : 'text';
+    return { ...base, type: kind, text: String(str), size: clampN(L.size, 12, 280, 60), color: okColor(L.color, 'white'), font: L.font === 'serif' ? 'serif' : 'sans', weight: [300, 400, 500, 600, 700, 800, 900].includes(L.weight) ? L.weight : 700, align: ['left', 'center', 'right'].includes(L.align) ? L.align : 'center', shadow: !!L.shadow, outline: !!L.outline, wrapf: (L.wrapf >= 0.2 && L.wrapf <= 1) ? L.wrapf : 0 };
+  };
+  const mapAIBg = (b) => {
+    if (!b || typeof b !== 'object') return { type: 'color', color: ctxData.brand.primary };
+    if (b.type === 'photo' && ctxData.photos.length) {
+      const idx = clampN(b.photoIndex, 0, ctxData.photos.length - 1, 0) | 0;
+      const br = b.filter && b.filter.brightness;
+      return { type: 'photo', photoIndex: idx, darken: (br < 0) ? Math.min(0.6, -br / 100 * 0.6) : 0 };
+    }
+    if (b.type === 'solid') return { type: 'color', color: okColor(b.color, ctxData.brand.primary) };
+    if (b.type === 'gradient') return { type: 'gradient', c1: okColor(b.from, ctxData.brand.primary), c2: okColor(b.to, ctxData.brand.accent), angle: clampN(b.angle, 0, 360, 135), radial: b.mode === 'radial' };
+    return { type: 'color', color: ctxData.brand.primary };
+  };
+  // shrink a text/badge layer until it fits the canvas (or its wrap width)
+  const fitLayer = (L) => {
+    if (!ctx2d || !(L.type === 'text' || L.type === 'badge')) return;
+    const target = (L.wrapf ? L.wrapf : 0.92) * W();
+    if (measure(L).bw <= target) return;
+    let lo = 12, hi = L.size;
+    for (let i = 0; i < 22; i++) { const mid = (lo + hi) / 2; L.size = mid; if (measure(L).bw > target) hi = mid; else lo = mid; }
+    L.size = Math.max(12, Math.floor(lo));
+  };
+  // apply a chosen AI design as ONE undoable step; returns false if non-viable
+  const applyAIDesign = (d) => {
+    if (!d || !Array.isArray(d.layers)) return false;
+    const mapped = d.layers.slice(0, 12).map(mapAILayer).filter(Boolean);
+    if (!mapped.some((l) => l.type === 'text' || l.type === 'badge')) return false;  // empty/graphic-only → reject
+    if (SIZES[d.size]) { sizeKey = d.size; document.querySelectorAll('#stSizes button').forEach((x) => x.classList.toggle('active', x.dataset.size === sizeKey)); }
+    mapped.forEach(fitLayer);   // never let AI text overflow the canvas
+    bg = mapAIBg(d.background);
+    layers = mapped; selId = null; renderBgPicker(); commit();
+    return true;
+  };
+
+  let aiVariations = [];
+  const aiStatus = (msg, kind) => { const e = $('stAiStatus'); if (!e) return; e.hidden = !msg; e.textContent = msg || ''; e.className = 'st-ai-status' + (kind ? ' ' + kind : ''); };
+  const renderAiPicker = () => {
+    const box = $('stAiPicker'); if (!box) return;
+    box.innerHTML = ''; box.hidden = !aiVariations.length;
+    aiVariations.forEach((d, i) => {
+      const b = document.createElement('button'); b.className = 'st-ai-opt';
+      const name = document.createElement('span'); name.textContent = (d.name || ('Design ' + (i + 1)));
+      const why = document.createElement('small'); why.textContent = String(d.rationale || '').slice(0, 140);
+      b.append(name, why);
+      b.addEventListener('click', () => { if (applyAIDesign(d)) aiStatus('Applied — tweak anything, or Undo (⌘Z) to revert.'); else aiStatus('That option didn’t pass checks — try another or Regenerate.', 'err'); });
+      box.appendChild(b);
+    });
+    if (aiVariations.length) { const r = document.createElement('button'); r.className = 'st-ai-regen'; r.textContent = '↻ Regenerate'; r.addEventListener('click', runAi); box.appendChild(r); }
+  };
+  const runAi = async () => {
+    if (typeof AI === 'undefined' || !AI.available()) { aiStatus('Add your Anthropic API key in “Your brand” (close the studio first) to use AI design.', 'err'); return; }
+    const btn = $('stAiGen'); btn.disabled = true; btn.textContent = '…';
+    aiVariations = []; renderAiPicker();
+    let secs = 0; aiStatus('Designing…');
+    const tick = setInterval(() => { secs++; aiStatus(`Designing… ${secs}s (usually 10–25s)`); }, 1000);
+    try {
+      const dims = SIZES[sizeKey];
+      aiVariations = await AI.designLayout({
+        size: sizeKey, w: dims[0], h: dims[1], n: 3, vibe: $('stAiVibe').value.trim(),
+        photoCount: ctxData.photos.length, facts: ctxData.fields, brand: ctxData.brand,
+        hasLogo: !!(ctxData.brand.logoImg && ctxData.brand.logoImg.width), hasHead: !!(ctxData.brand.headImg && ctxData.brand.headImg.width),
+      });
+      clearInterval(tick);
+      aiStatus(`✓ ${aiVariations.length} design${aiVariations.length === 1 ? '' : 's'} — tap one to apply.`);
+      renderAiPicker();
+    } catch (e) {
+      clearInterval(tick);
+      aiStatus(typeof AI !== 'undefined' && AI.explain ? AI.explain(e) : 'AI design failed — try again.', 'err');
+    } finally { btn.disabled = false; btn.textContent = 'Generate'; }
+  };
+  const resetAi = () => { aiVariations = []; renderAiPicker(); aiStatus(''); if ($('stAiVibe')) $('stAiVibe').value = ''; };
+
+  // ---- quick actions: place on canvas, fit text, copy-to-clipboard, eyedropper
+  const alignTo = (dir) => {
+    const L = sel(); if (!L || !L._c) return;
+    const w = W(), h = H(), m = 0.04;
+    const hw = L._c.w / 2 + L._c.pad, hh = L._c.h / 2 + L._c.pad;
+    if (dir === 'l') L.xf = (m * w + hw) / w; else if (dir === 'cx') L.xf = 0.5; else if (dir === 'r') L.xf = (w - m * w - hw) / w;
+    else if (dir === 't') L.yf = (m * h + hh) / h; else if (dir === 'cy') L.yf = 0.5; else if (dir === 'b') L.yf = (h - m * h - hh) / h;
+    commit();
+  };
+  const fitSel = () => { const L = sel(); if (L) { fitLayer(L); commit(); } };
+  const flashBtn = (id, txt, ms) => { const b = $(id); if (!b) return; const o = b.textContent; b.textContent = txt; setTimeout(() => { b.textContent = o; }, ms || 1400); };
+  const copyImage = async () => {
+    render(false);
+    try {
+      const blob = await new Promise((r) => cv.toBlob(r, 'image/png'));
+      if (window.ClipboardItem && navigator.clipboard && navigator.clipboard.write) { await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]); flashBtn('stCopyImg', '✓ Copied'); }
+      else exportImage('image/png');
+    } catch (e) { try { exportImage('image/png'); } catch (e2) {} }
+    finally { render(true); }
+  };
+  const eyedrop = () => { const L = sel(); if (!L || typeof window.EyeDropper === 'undefined') return; new window.EyeDropper().open().then((r) => setColor(L, r.sRGBHex)).catch(() => {}); };
+
   // ---- export ----------------------------------------------------------------
   const exportImage = (type) => {
     render(false);
@@ -595,6 +834,28 @@ const Studio = (() => {
     renderBgPicker(); render(); syncPanel(); renderLayersPanel(); resetHistory(); dirty = false;
   };
 
+  // ---- upload a photo from inside the studio --------------------------------
+  // Uses the app's addPhoto callback (persists to the listing gallery) when
+  // provided; falls back to a studio-local load so it always works.
+  const loadLocalPhoto = (file) => new Promise((res) => {
+    const r = new FileReader();
+    r.onload = () => { const img = new Image(); img.onload = () => res({ url: r.result, img, focus: 'center', filter: { b: 100, c: 100, s: 100, w: 0 } }); img.onerror = () => res(null); img.src = r.result; };
+    r.onerror = () => res(null);
+    r.readAsDataURL(file);
+  });
+  const uploadFiles = async (files) => {
+    let last = -1;
+    for (const file of files) {
+      let p = null;
+      if (ctxData.addPhoto) { try { p = await ctxData.addPhoto(file); } catch (e) { p = null; } }
+      if (!p) p = await loadLocalPhoto(file);
+      if (!p) continue;
+      if (!ctxData.photos.includes(p)) ctxData.photos.push(p);
+      last = ctxData.photos.indexOf(p);
+    }
+    if (last >= 0) { bg = { type: 'photo', photoIndex: last, darken: 0 }; renderBgPicker(); commit(); }
+  };
+
   // ---- open / wire -----------------------------------------------------------
   let wired = false;
   const wire = () => {
@@ -606,16 +867,49 @@ const Studio = (() => {
     document.querySelectorAll('#stSizes button').forEach((b) => b.addEventListener('click', () => { sizeKey = b.dataset.size; document.querySelectorAll('#stSizes button').forEach((x) => x.classList.toggle('active', x === b)); commit(); }));
     document.querySelectorAll('#stAdd button').forEach((b) => b.addEventListener('click', () => add(b.dataset.add)));
     document.querySelectorAll('#stStarters button').forEach((b) => b.addEventListener('click', () => applyStarter(b.dataset.tpl)));
+    $('stAiGen').addEventListener('click', runAi);
+    $('stAiVibe').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runAi(); } });
+
+    // background: upload, gradient/solid, darken
+    $('stUpload').addEventListener('change', (e) => { const files = [...(e.target.files || [])]; e.target.value = ''; if (files.length) uploadFiles(files); });
+    const customGrad = () => ({ type: 'gradient', c1: $('stBgC1').value, c2: $('stBgC2').value, angle: Number($('stBgAngle').value) || 0, radial: !!(bg.type === 'gradient' && bg.radial) });
+    $('stBgC1').addEventListener('input', () => { bg = customGrad(); render(); });
+    $('stBgC2').addEventListener('input', () => { bg = customGrad(); render(); });
+    $('stBgC1').addEventListener('change', () => { bg = customGrad(); renderBgPicker(); commit(); });
+    $('stBgC2').addEventListener('change', () => { bg = customGrad(); renderBgPicker(); commit(); });
+    $('stBgAngle').addEventListener('input', () => { bg = customGrad(); slv('stBgAngleV', $('stBgAngle').value + '°'); render(); });
+    $('stBgAngle').addEventListener('change', () => { bg = customGrad(); renderBgPicker(); commit(); });
+    $('stBgRadial').addEventListener('click', () => { bg = { ...customGrad(), radial: !(bg.type === 'gradient' && bg.radial) }; renderBgPicker(); commit(); });
+    $('stBgSolid').addEventListener('click', () => { bg = { type: 'color', color: $('stBgC1').value }; renderBgPicker(); commit(); });
+    $('stBgDarken').addEventListener('input', () => { if (bg.type === 'photo') { bg.darken = Number($('stBgDarken').value) / 100; slv('stBgDarkenV', $('stBgDarken').value + '%'); render(); } });
+    $('stBgDarken').addEventListener('change', () => { if (bg.type === 'photo') commit(); });
+    $('stBgDarkenR').addEventListener('click', () => { if (bg.type === 'photo') { bg.darken = 0; renderBgPicker(); commit(); } });
+
+    // photo layer: shape + colour adjustments
+    const ph = (fn) => () => { const L = sel(); if (L && L.type === 'photo') fn(L); };
+    const phShape = (s) => ph((L) => { L.shape = s; commit(); });
+    $('stPhRect').addEventListener('click', phShape('rect'));
+    $('stPhRound').addEventListener('click', phShape('rounded'));
+    $('stPhCircle').addEventListener('click', phShape('circle'));
+    $('stPhRadius').addEventListener('input', ph((L) => { L.radius = Number($('stPhRadius').value); slv('stPhRadiusV', L.radius + ''); render(); }));
+    $('stPhRadius').addEventListener('change', commit);
+    const phFilter = (id, key, suf) => { const live = ph((L) => { L.filter = L.filter || {}; L.filter[key] = Number($(id).value); slv(id + 'V', $(id).value + suf); render(); }); $(id).addEventListener('input', live); $(id).addEventListener('change', commit); };
+    phFilter('stPhB', 'b', '%'); phFilter('stPhC', 'c', '%'); phFilter('stPhS', 's', '%'); phFilter('stPhHue', 'h', '°'); phFilter('stPhSep', 'sep', '%');
+    $('stPhReset').addEventListener('click', ph((L) => { L.filter = { b: 100, c: 100, s: 100, h: 0, sep: 0, blur: 0 }; commit(); }));
 
     const cur = () => sel();
     $('stText').addEventListener('input', () => { const L = cur(); if (L) { L.text = $('stText').value; L.edited = true; render(); renderLayersPanel(); } });
     $('stText').addEventListener('change', commit);
-    $('stSize').addEventListener('input', () => { const L = cur(); if (L) { L.size = Number($('stSize').value); render(); } });
+    $('stSize').addEventListener('input', () => { const L = cur(); if (L) { L.size = Number($('stSize').value); slv('stSizeV', L.size + 'px'); render(); } });
     $('stSize').addEventListener('change', commit);
-    $('stOpacity').addEventListener('input', () => { const L = cur(); if (L) { L.opacity = Number($('stOpacity').value) / 100; render(); } });
+    $('stOpacity').addEventListener('input', () => { const L = cur(); if (L) { const v = snapTo(Number($('stOpacity').value), [0, 25, 50, 75, 100], 3); $('stOpacity').value = v; L.opacity = v / 100; slv('stOpacityV', v + '%'); render(); } });
     $('stOpacity').addEventListener('change', commit);
-    $('stRot').addEventListener('input', () => { const L = cur(); if (L) { L.rot = Number($('stRot').value); render(); } });
+    $('stOpacity').addEventListener('dblclick', () => { const L = cur(); if (L) { L.opacity = 1; commit(); } });
+    $('stOpacityR').addEventListener('click', () => { const L = cur(); if (L) { L.opacity = 1; commit(); } });
+    $('stRot').addEventListener('input', () => { const L = cur(); if (L) { const v = snapTo(Number($('stRot').value), [-180, -135, -90, -45, 0, 45, 90, 135, 180], 4); $('stRot').value = v; L.rot = v; slv('stRotV', v + '°'); render(); } });
     $('stRot').addEventListener('change', commit);
+    $('stRot').addEventListener('dblclick', () => { const L = cur(); if (L) { L.rot = 0; commit(); } });
+    $('stRotR').addEventListener('click', () => { const L = cur(); if (L) { L.rot = 0; commit(); } });
     $('stFont').addEventListener('click', () => { const L = cur(); if (L) { L.font = L.font === 'serif' ? 'sans' : 'serif'; commit(); } });
     $('stBold').addEventListener('click', () => { const L = cur(); if (L) { L.weight = (L.weight || 0) >= 700 ? 400 : 800; commit(); } });
     $('stShadow').addEventListener('click', () => { const L = cur(); if (L) { L.shadow = !L.shadow; commit(); } });
@@ -635,6 +929,10 @@ const Studio = (() => {
     $('stRedo').addEventListener('click', redo);
     $('stExport').addEventListener('click', () => exportImage('image/png'));
     $('stExportJpg').addEventListener('click', () => exportImage('image/jpeg'));
+    $('stCopyImg').addEventListener('click', copyImage);
+    $('stFit').addEventListener('click', fitSel);
+    $('stEyedrop').addEventListener('click', eyedrop);
+    [['stPlL', 'l'], ['stPlCx', 'cx'], ['stPlR', 'r'], ['stPlT', 't'], ['stPlCy', 'cy'], ['stPlB', 'b']].forEach(([id, d]) => $(id).addEventListener('click', () => alignTo(d)));
     $('stClose').addEventListener('click', tryClose);
     $('stHelp').addEventListener('click', () => $('stCheats').hidden = !$('stCheats').hidden);
     $('stRestoreBtn').addEventListener('click', () => { const w = loadWip(); if (w) restoreWip(w); });
@@ -705,6 +1003,7 @@ const Studio = (() => {
     renderBgPicker(); renderTplList(); render(); syncPanel(); renderLayersPanel();
     resetHistory(); dirty = false; guides = [];
     $('stCheats').hidden = true;
+    resetAi();
     // offer to restore the previous unsaved session if it's the same listing
     $('stRestore').hidden = !(wip && wip.layers && wip.layers.length && wip.addr === addrKey());
     $('studio').hidden = false;

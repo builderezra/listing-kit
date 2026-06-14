@@ -115,6 +115,73 @@ const AI = (() => {
     });
   };
 
+  // ---- AI auto-layout: compose a full Design Studio graphic (structured JSON) -
+  // The model only emits LAYOUT/COLOUR/TYPOGRAPHY decisions + references to real
+  // facts — it never writes property copy or touches pixels. The studio binds
+  // the actual fact strings, so a fabricated price/feature is structurally
+  // impossible. Fair-housing language is blocked the same way (no free text
+  // except a fixed status/CTA whitelist).
+  const LABEL_WHITELIST = ['FOR SALE', 'FOR LEASE', 'NEW LISTING', 'JUST LISTED', 'HOME OPEN', 'UNDER OFFER', 'SOLD', 'AUCTION', 'EXPRESSIONS OF INTEREST', 'PRICE GUIDE', 'INSPECT', 'CONTACT', 'VIEW NOW', 'ENQUIRE', 'OFFERS FROM'];
+
+  const designSystem = (ctx) => `You are the layout director inside "Listing Kit Design Studio", a 100% client-side real-estate graphics editor used by agents in Perth, Western Australia. Your ONLY job is to compose designs by returning STRICT JSON that maps onto the studio's layer model. You choose background, colours, typography, position, scale, rotation, opacity and visual hierarchy. You do NOT write marketing copy and you do NOT generate or alter imagery.
+
+OUTPUT: return ONE JSON object and nothing else — no prose, no markdown, no code fences. Shape:
+{"variations":[Design, ...]}  // exactly ${ctx.n} designs, best first, meaningfully different from each other.
+Design = {"name":"<=40 chars","rationale":"<=120 chars, about VISUAL design only","size":"${ctx.size}","background":Background,"layers":[Layer,...]}  // 3-7 layers, array order = paint order (index 0 = back).
+
+Coordinates xf,yf are FRACTIONS in [0,1] giving the CENTRE of a layer. (0,0)=top-left, (1,1)=bottom-right. Canvas = ${ctx.size} ${ctx.w}x${ctx.h}px.
+
+Background (pick one):
+ {"type":"photo","photoIndex":<0..${Math.max(0, ctx.photoCount - 1)}>,"filter":{"brightness":-100..100}}   // an EXISTING listing photo; filter optional
+ {"type":"solid","color":"primary|accent|dark|white|#hex"}
+ {"type":"gradient","from":"<color>","to":"<color>","mode":"linear|radial","angle":0..360}
+${ctx.photoCount ? `There are ${ctx.photoCount} photos (indices 0..${ctx.photoCount - 1}).` : 'There are NO photos — use solid or gradient only.'}
+
+Layer types & required keys (common: xf,yf required; opacity 0..1, rot -180..180 optional):
+ Text from a FACT — {"type":"price|address|stats|agent","textRef":"price|address|stats|badge|agentName|phone|brokerage","size":12..280,"color":"<color>","font":"serif|sans","weight":300..900,"align":"left|center|right","shadow":bool,"outline":bool,"wrapf":0 or 0.2..1,"uppercase":bool}
+ Status/CTA label — {"type":"text","text":"<EXACTLY one of: ${LABEL_WHITELIST.join(', ')}>", ...same text styling...}
+ Badge (status pill) — {"type":"badge","textRef":"badge","color":"<color>", ...text styling...}
+ Shape — {"type":"shape","shape":"rect|ellipse","color":"<color>","wf":0.02..1,"hf":0.02..1,"radius":0..200,"grad":"none|up|down|left|right"}
+ Scrim (readability gradient) — {"type":"scrim","edge":"top|bottom|left|right|full","color":"dark|#hex","strength":0..1,"coverf":0.1..1}
+ ${ctx.hasLogo ? '' : '(no logo asset — do NOT use a logo layer) '}${ctx.hasHead ? '' : '(no headshot asset — do NOT use a headshot layer) '}Brand image — {"type":"logo|headshot","shape":"rect|circle","wf":0.03..0.6}
+
+THE ONLY FACTS YOU MAY USE (reference via textRef; you may NOT type these values yourself, invent, infer, round, reformat or embellish them):
+ price = ${ctx.facts.price ? JSON.stringify(ctx.facts.price) : '(absent)'}
+ address = ${ctx.facts.address ? JSON.stringify(ctx.facts.address) : '(absent)'}
+ stats = ${ctx.facts.stats ? JSON.stringify(ctx.facts.stats) : '(absent)'}
+ badge = ${ctx.facts.badge ? JSON.stringify(ctx.facts.badge) : '(absent)'}
+ agentName = ${ctx.brand.agentName ? JSON.stringify(ctx.brand.agentName) : '(absent)'}
+ phone = ${ctx.brand.phone ? JSON.stringify(ctx.brand.phone) : '(absent)'}
+ brokerage = ${ctx.brand.brokerage ? JSON.stringify(ctx.brand.brokerage) : '(absent)'}
+ brand primary = ${ctx.brand.primary}   accent = ${ctx.brand.accent}
+If a field is "(absent)" you MUST omit any layer referencing it — never substitute a placeholder like "[price]" or "Contact agent". The "agent" type combines agentName/phone/brokerage that are present.
+
+SAFETY (legal hard line — never violate, including in name/rationale): never produce or imply who should live there ("perfect for families", "ideal for couples/students/retirees", "family-friendly"), proximity/lifestyle claims ("walking distance", "close to schools/beach", "quiet", "safe"), or any school/crime/safety/religion/race/nationality/family-status/disability/age claim. You can only place the four facts + a whitelisted label, so do not try to smuggle claims anywhere.
+
+AUSTRALIAN CONVENTIONS: currency AUD, areas m²; the status already uses "home open" (never "open house"); never reformat the price.
+
+READABILITY & TASTE: light ("white") text only over dark areas — over a photo or light background put a "scrim" or dark "shape" behind it, or use dark/primary text. The most important fact (usually price or status) is the largest element; establish clear hierarchy. Keep every layer centre within 0.06–0.94 of the edges. Stay within the brand palette (prefer tokens primary/accent/white/dark). At most one serif + one sans. Avoid rotating text beyond ~8°. Make the ${ctx.n} designs differ in background type, hierarchy and layout axis — not just recoloured.
+
+Now produce the JSON.`;
+
+  const parseDesigns = (raw) => {
+    let s = String(raw).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+    const m = s.match(/\{[\s\S]*\}/);
+    if (m) s = m[0];
+    let o = null;
+    try { o = JSON.parse(s); } catch (e) { try { o = JSON.parse(s.replace(/,\s*([}\]])/g, '$1')); } catch (e2) { o = null; } }
+    const arr = o && Array.isArray(o.variations) ? o.variations : [];
+    return arr.slice(0, 3);
+  };
+
+  const designLayout = async (ctx) => {
+    const sys = designSystem(ctx);
+    const user = `Compose ${ctx.n} distinct ${ctx.size} designs for this listing as JSON.` + (ctx.vibe ? ` Style direction from the agent: "${String(ctx.vibe).slice(0, 200)}" — honour it within every rule above.` : '');
+    const designs = parseDesigns(await call(sys, user, 3000));
+    if (!designs.length) throw new Error('The AI didn’t return a usable design — try again.');
+    return designs;
+  };
+
   // ---- AI design styling (text-only → template + colours + font) ------------
   const STYLE_SYSTEM = [
     'You are a brand designer for real estate marketing. Given a vibe, choose a cohesive visual identity.',
@@ -175,5 +242,5 @@ const AI = (() => {
     return e && e.message ? e.message : 'Something went wrong.';
   };
 
-  return { MODELS, available, getKey, setKey, getModel, setModel, modelLabel, polish, instruct, research, designStyle, test, explain };
+  return { MODELS, available, getKey, setKey, getModel, setModel, modelLabel, polish, instruct, research, designStyle, designLayout, test, explain };
 })();

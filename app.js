@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v21';
+  const APP_VERSION = 'v22';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -561,7 +561,11 @@
   // open the design studio from anywhere (works before a kit is generated too)
   const openStudio = () => {
     const s = studioFields();
-    Studio.open({ photos: s.photos, brand, fields: s.fields }, 'square');
+    Studio.open({
+      photos: s.photos, brand, fields: s.fields,
+      // lets the studio upload a photo straight into the listing gallery
+      addPhoto: async (file) => { const ok = await addPhotoBlob(file, 'studio'); if (!ok) return null; syncFcss(); return photos[photos.length - 1]; },
+    }, 'square');
   };
 
   // ---------------- flyer tab ----------------
