@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v11';
+  const APP_VERSION = 'v12';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -323,16 +323,14 @@
   });
 
   // ---------------- generate ----------------
-  const generate = () => {
+  // (re)run the fair-housing scan + banned-word check over the current outputs
+  const runScan = () => {
     const data = readForm();
-    const prefs = brand.prefs || {};
-    outputs = Generator.applyPrefs(Generator.generate(data), prefs);
     report = FairHousing.scan({
       ...outputs,
       'your input': [data.features.join(', '), data.neighborhood, data.address].filter(Boolean).join('. '),
     });
-    // the agent's own banned words join the compliance report
-    String(prefs.banned || '').split(',').map((w) => w.trim().toLowerCase()).filter(Boolean).forEach((w) => {
+    String((brand.prefs || {}).banned || '').split(',').map((w) => w.trim().toLowerCase()).filter(Boolean).forEach((w) => {
       const re = new RegExp('\\b' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\b', 'i');
       const channels = Object.keys(outputs).filter((k) => re.test(outputs[k]));
       if (channels.length) {
@@ -341,8 +339,14 @@
         report.clear = false;
       }
     });
-    $('emptyState').hidden = true;
     updateComplianceDot();
+  };
+
+  const generate = () => {
+    const data = readForm();
+    outputs = Generator.applyPrefs(Generator.generate(data), brand.prefs || {});
+    runScan();
+    $('emptyState').hidden = true;
     renderTab(activeTab);
   };
 
@@ -487,6 +491,8 @@
     $('copytext').textContent = text;
     updateCharcount();
     resetCopyBtn();
+    $('aiBar').hidden = false;
+    $('aiStatus').textContent = '';
   };
 
   const updateCharcount = () => {
@@ -811,6 +817,112 @@
 
   const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+  // ---------------- AI polish (bring-your-own-key) ----------------
+  const AI_CHANNEL = {
+    mls: 'property listing description',
+    instagram: 'Instagram caption',
+    facebook: 'Facebook post',
+    email: 'database email (keep the Subject and Preview text lines at the top)',
+  };
+  const TYPE_WORD = { single: 'house', apartment: 'apartment', villa: 'villa', townhouse: 'townhouse', condo: 'condo', multi: 'multi-family property', luxury: 'luxury home', land: 'block of land' };
+
+  // the only facts the model is allowed to use — built straight from the form
+  const aiFacts = () => {
+    const d = readForm();
+    const L = [];
+    if (d.address) L.push(`Address: ${d.address}${d.city ? ', ' + d.city : ''}`);
+    if (Generator.money(d.price)) L.push(`Price: ${Generator.money(d.price, d.currency)}`);
+    L.push(`Property type: ${d.type === 'customtype' && d.typeCustom ? d.typeCustom : (TYPE_WORD[d.type] || 'home')}`);
+    const bb = [d.beds && `${d.beds} bed`, d.baths && `${d.baths} bath`, d.cars && `${d.cars} car`].filter(Boolean);
+    if (bb.length) L.push(`Configuration: ${bb.join(', ')}`);
+    if (Generator.num(d.sqft)) L.push(`Internal size: ${Generator.num(d.sqft)} ${d.areaUnit === 'sqm' ? 'm²' : d.areaUnit === 'sqft' ? 'sq ft' : d.areaUnit}`);
+    if (d.lot) L.push(`Land / block: ${d.lot}`);
+    if (d.year) L.push(`Year built: ${d.year}`);
+    if (d.features.length) L.push(`Features (use only these): ${d.features.join(', ')}`);
+    if (d.neighborhood) L.push(`Location highlights: ${d.neighborhood}`);
+    if (d.badge === 'openhouse' && d.openhouse) L.push(`Home open: ${d.openhouse}`);
+    L.push(`Status: ${Generator.badgeText(d)}`);
+    const contact = [d.agentName, d.brokerage, d.phone, d.email].filter(Boolean).join(', ');
+    if (contact) L.push(`Agent (for sign-off): ${contact}`);
+    return L.join('\n');
+  };
+
+  const aiStyle = () => {
+    const p = brand.prefs || {};
+    const S = [`Tone: ${$('tone').selectedOptions[0].textContent}`];
+    S.push(`Region: ${({ au: 'Australia — Australian English', us: 'United States — US English', uk: 'United Kingdom — British English', other: 'international English' }[brand.region])}`);
+    if (p.noEmojis) S.push('Do not use any emojis.');
+    if (p.noHashtags) S.push('Do not use hashtags.');
+    if (p.noExclaim) S.push('Do not use exclamation marks.');
+    if (p.short) S.push('Keep it concise.');
+    if (p.greeting) S.push(`Emails open with "${p.greeting}".`);
+    if (p.signoff) S.push(`Emails sign off with "${p.signoff}".`);
+    if (p.banned) S.push(`Never use these words: ${p.banned}.`);
+    return S.join('\n');
+  };
+
+  const aiBusy = (on, msg, kind) => {
+    $('aiStatus').textContent = msg || '';
+    $('aiStatus').className = 'ai-status' + (kind ? ' ' + kind : '');
+    $('aiPolishBtn').disabled = on; $('aiApply').disabled = on;
+    $('aiPolishBtn').textContent = on ? '…' : '✨ Polish';
+  };
+
+  const runAI = async (mode, instruction) => {
+    if (!outputs || !AI_CHANNEL[activeTab]) return;
+    if (!AI.available()) {
+      $('brandSection').open = true;
+      setTimeout(() => $('aiKey').focus(), 50);
+      aiBusy(false, 'Add your API key in “Your brand” to enable AI.', 'err');
+      return;
+    }
+    aiBusy(true, mode === 'polish' ? 'Polishing…' : 'Revising…');
+    try {
+      const opts = { channelLabel: AI_CHANNEL[activeTab], currentText: outputs[activeTab], facts: aiFacts(), style: aiStyle() };
+      const text = mode === 'polish' ? await AI.polish(opts) : await AI.instruct({ ...opts, instruction });
+      if (!text) { aiBusy(false, 'No change returned — try again.', 'err'); return; }
+      // mechanical house-style is still enforced, and compliance re-scanned
+      const single = Generator.applyPrefs({ [activeTab]: text }, brand.prefs || {});
+      outputs[activeTab] = single[activeTab];
+      $('copytext').textContent = outputs[activeTab];
+      updateCharcount();
+      runScan();
+      aiBusy(false, '✓ Updated with ' + AI.modelLabel(), 'ok');
+      if (mode === 'instruct') $('aiInstruction').value = '';
+    } catch (e) {
+      aiBusy(false, AI.explain(e), 'err');
+    }
+  };
+
+  const wireAI = () => {
+    // populate key + model from localStorage; show status
+    $('aiModel').value = AI.getModel();
+    const showKeyStatus = () => {
+      $('aiKeyStatus').textContent = AI.available() ? `✓ AI ready (${AI.modelLabel()})` : '';
+      $('aiKeyStatus').className = 'parse-note';
+    };
+    if (AI.available()) $('aiKey').placeholder = '•••• saved — paste a new key to replace';
+    showKeyStatus();
+    $('aiKeySave').addEventListener('click', () => {
+      const k = $('aiKey').value.trim();
+      if (!k) { AI.setKey(''); $('aiKeyStatus').textContent = 'Key cleared.'; return; }
+      AI.setKey(k); $('aiKey').value = ''; $('aiKey').placeholder = '•••• saved — paste a new key to replace';
+      showKeyStatus();
+    });
+    $('aiModel').addEventListener('change', () => { AI.setModel($('aiModel').value); showKeyStatus(); });
+    $('aiTest').addEventListener('click', async () => {
+      const typed = $('aiKey').value.trim();
+      if (typed) AI.setKey(typed);
+      if (!AI.available()) { $('aiKeyStatus').textContent = 'Paste a key first.'; return; }
+      $('aiKeyStatus').textContent = 'Testing…'; $('aiKeyStatus').className = 'parse-note';
+      try { await AI.test(); $('aiKey').value = ''; $('aiKey').placeholder = '•••• saved — paste a new key to replace'; $('aiKeyStatus').textContent = `✓ Key works — AI ready (${AI.modelLabel()})`; }
+      catch (e) { $('aiKeyStatus').textContent = AI.explain(e); }
+    });
+    $('aiPolishBtn').addEventListener('click', () => runAI('polish'));
+    $('aiApply').addEventListener('click', () => { const i = $('aiInstruction').value.trim(); if (i) runAI('instruct', i); else $('aiInstruction').focus(); });
+    $('aiInstruction').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); const i = e.target.value.trim(); if (i) runAI('instruct', i); } });
+  };
+
   // ---------------- events ----------------
   form.addEventListener('submit', (e) => { e.preventDefault(); generate(); });
   form.addEventListener('input', (e) => {
@@ -934,6 +1046,7 @@
   wireDropZone();
   wireDownloads();
   wireEditableOutput();
+  wireAI();
   renderPalettes();
   window.addEventListener('resize', () => { if (activeTab === 'flyer' && outputs) scaleFlyer(); });
 

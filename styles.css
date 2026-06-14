@@ -164,6 +164,20 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 .tpl-bold { background: linear-gradient(180deg, #1c4658 0%, #0d2530 100%); position: relative; }
 .tpl-bold::after { content: ''; position: absolute; inset: 5px 5px 50% 5px; background: #88a0a8; border-radius: 5px; }
 
+/* AI polish settings + bar */
+.ai-settings { border-top: 1px dashed var(--line); padding-top: 12px; }
+.ai-settings .hint a { color: var(--teal); }
+.airow { display: flex; gap: 8px; margin-bottom: 8px; }
+.airow input, .airow select { flex: 1; }
+.copy-btn.ai { background: linear-gradient(120deg, #efe7d4, #f5eede); border-color: var(--gold); color: #8a5a1e; }
+.copy-btn.ai:hover { filter: brightness(1.03); }
+.copy-btn.ai:disabled { opacity: .6; cursor: wait; }
+.ai-bar { display: flex; gap: 8px; align-items: center; margin-top: 12px; flex-wrap: wrap; }
+.ai-bar input { flex: 1; min-width: 200px; font-size: 13.5px; }
+.ai-status { font-size: 12.5px; color: var(--muted); flex-basis: 100%; }
+.ai-status.ok { color: var(--green); }
+.ai-status.err { color: var(--red); }
+
 /* house style preference checks */
 .prefs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; margin-bottom: 10px; }
 .pref-check {

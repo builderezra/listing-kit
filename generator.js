@@ -599,18 +599,20 @@ const Generator = (() => {
     if (!p) return outputs;
     const out = { ...outputs };
     if (p.short) {
-      const parts = out.mls.split('\n\n');
-      if (parts.length > 3) out.mls = [parts[0], parts[1], parts[parts.length - 1]].join('\n\n');
-      out.email = out.email.split('\n').filter((l) => !l.startsWith('(Alt subject:') && !l.startsWith('P.S.')).join('\n').trimEnd();
+      if (out.mls) {
+        const parts = out.mls.split('\n\n');
+        if (parts.length > 3) out.mls = [parts[0], parts[1], parts[parts.length - 1]].join('\n\n');
+      }
+      if (out.email) out.email = out.email.split('\n').filter((l) => !l.startsWith('(Alt subject:') && !l.startsWith('P.S.')).join('\n').trimEnd();
     }
-    if (p.noHashtags) {
+    if (p.noHashtags && out.instagram) {
       out.instagram = out.instagram.split('\n').filter((l) => !/^\s*#/.test(l)).join('\n').trimEnd();
     }
-    if (p.greeting) {
+    if (p.greeting && out.email) {
       const hi = cap(p.greeting.trim()).replace(/[,!.]*$/, ',');
       out.email = out.email.replace(/^Hi there,$/m, hi);
     }
-    if (p.signoff) {
+    if (p.signoff && out.email) {
       const sig = cap(p.signoff.trim()).replace(/[,!.]*$/, ',');
       out.email = out.email.replace(/^Best,$/m, sig);
     }
