@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=14" />
+  <link rel="stylesheet" href="styles.css?v=15" />
 </head>
 <body>
   <header class="topbar">
@@ -110,6 +110,11 @@
                 <button type="button" class="tpl" data-tpl="classic"><span class="tpl-art tpl-classic"></span>Classic</button>
                 <button type="button" class="tpl" data-tpl="bold"><span class="tpl-art tpl-bold"></span>Bold</button>
               </div>
+              <div class="airow" style="margin-top: 8px;">
+                <input type="text" id="styleVibe" placeholder="Describe a look — e.g. luxury beachy, bold modern" />
+                <button type="button" class="mini-btn ai" id="styleApply">✨ AI style</button>
+              </div>
+              <span class="parse-note" id="styleStatus"></span>
             </div>
             <div class="field">
               <label>House style <span class="hint">— applied to all generated copy, saved with your brand</span></label>
@@ -499,13 +504,48 @@
     <p>Runs in your browser — photos and details are never uploaded (link import fetches via public read proxies). The compliance check is decision support, not legal advice; always defer to your agency’s compliance guidance. <span id="verTag"></span></p>
   </footer>
 
-  <script src="generator.js?v=14"></script>
-  <script src="fairhousing.js?v=14"></script>
-  <script src="parser.js?v=14"></script>
-  <script src="importer.js?v=14"></script>
-  <script src="visuals.js?v=14"></script>
-  <script src="flyer.js?v=14"></script>
-  <script src="ai.js?v=14"></script>
-  <script src="app.js?v=14"></script>
+  <div class="modal-overlay" id="photoEditor" hidden>
+    <div class="modal photo-editor">
+      <div class="pe-head">
+        <span class="pe-title">Edit photo</span>
+        <button type="button" class="pe-close" id="peClose" aria-label="Close">×</button>
+      </div>
+      <div class="pe-preview"><img id="pePreview" alt="" /></div>
+      <div class="pe-presets" id="pePresets">
+        <button type="button" data-preset="none">Original</button>
+        <button type="button" data-preset="airy">Bright &amp; airy</button>
+        <button type="button" data-preset="crisp">Crisp</button>
+        <button type="button" data-preset="warm">Warm</button>
+        <button type="button" data-preset="mono">B&amp;W</button>
+      </div>
+      <div class="pe-sliders">
+        <label>Brightness <input type="range" id="peB" min="60" max="140" step="1" value="100" /></label>
+        <label>Contrast <input type="range" id="peC" min="60" max="140" step="1" value="100" /></label>
+        <label>Saturation <input type="range" id="peS" min="0" max="160" step="1" value="100" /></label>
+        <label>Warmth <input type="range" id="peW" min="0" max="100" step="1" value="0" /></label>
+      </div>
+      <div class="pe-focus">
+        <span>Crop focus</span>
+        <div class="pe-focus-btns" id="peFocus">
+          <button type="button" data-focus="top">Top</button>
+          <button type="button" data-focus="center">Centre</button>
+          <button type="button" data-focus="bottom">Bottom</button>
+        </div>
+      </div>
+      <div class="pe-actions">
+        <button type="button" class="link-btn" id="peReset">Reset</button>
+        <button type="button" class="generate-btn pe-done" id="peDone">Done</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="generator.js?v=15"></script>
+  <script src="fairhousing.js?v=15"></script>
+  <script src="parser.js?v=15"></script>
+  <script src="importer.js?v=15"></script>
+  <script src="visuals.js?v=15"></script>
+  <script src="flyer.js?v=15"></script>
+  <script src="ai.js?v=15"></script>
+  <script src="app.js?v=15"></script>
 </body>
 </html>

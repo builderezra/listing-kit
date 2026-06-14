@@ -23,6 +23,7 @@ const Flyer = (() => {
     const accent = brand.accent || '#c08a3e';
     const onPrim = Visuals.onColor(primary);
     const hero = photos[0] ? photos[0].url : '';
+    const heroFilter = photos[0] && photos[0].fcss ? photos[0].fcss : '';
     const strip = photos.slice(1, 4);
 
     const rent = d.mode === 'rent';
@@ -109,7 +110,7 @@ ${print ? '<div class="printbar"><button onclick="window.print()">🖨️ Print 
     <span class="brok">${esc(brand.brokerage || '')}</span>
   </div>
   <div class="hero">
-    ${hero ? `<img src="${hero}" alt="">` : '<div class="noimg">🏡</div>'}
+    ${hero ? `<img src="${hero}" alt="" style="filter:${heroFilter}">` : '<div class="noimg">🏡</div>'}
     ${d.price ? `<div class="pricetag">${esc(d.price)}</div>` : ''}
   </div>
   <div class="addr">
@@ -121,7 +122,7 @@ ${print ? '<div class="printbar"><button onclick="window.print()">🖨️ Print 
     <div class="desc">${mlsParas}</div>
     ${features.length ? `<div class="side"><h3>Highlights</h3><ul>${features.map((f) => `<li>${esc(f)}</li>`).join('')}</ul></div>` : ''}
   </div>
-  ${strip.length ? `<div class="strip">${strip.map((p) => `<img src="${p.url}" alt="">`).join('')}${strip.length < 3 ? '<div class="ph">🏡</div>'.repeat(3 - strip.length) : ''}</div>` : ''}
+  ${strip.length ? `<div class="strip">${strip.map((p) => `<img src="${p.url}" alt="" style="filter:${p.fcss || ''}">`).join('')}${strip.length < 3 ? '<div class="ph">🏡</div>'.repeat(3 - strip.length) : ''}</div>` : ''}
   <div class="agent">
     ${brand.headshot ? `<img class="head" src="${brand.headshot}" alt="">` : ''}
     <div class="who">

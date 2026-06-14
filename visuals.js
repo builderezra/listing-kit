@@ -53,7 +53,7 @@ const Visuals = (() => {
   // cover-fit an image into a rect (optionally rounded); placeholder if no img.
   // focus biases the vertical crop: 'top' keeps rooflines, 'bottom' keeps yards.
   const FOCUS_Y = { top: 0, center: 0.5, bottom: 1 };
-  const cover = (ctx, img, x, y, w, h, r, brand, focus) => {
+  const cover = (ctx, img, x, y, w, h, r, brand, focus, filter) => {
     ctx.save();
     if (r) { rr(ctx, x, y, w, h, r); ctx.clip(); }
     else { ctx.beginPath(); ctx.rect(x, y, w, h); ctx.clip(); }
@@ -61,7 +61,9 @@ const Visuals = (() => {
       const s = Math.max(w / img.width, h / img.height);
       const dw = img.width * s, dh = img.height * s;
       const fy = FOCUS_Y[focus] != null ? FOCUS_Y[focus] : 0.5;
+      if (filter) { try { ctx.filter = filter; } catch (e) {} }
       ctx.drawImage(img, x + (w - dw) / 2, y + (h - dh) * fy, dw, dh);
+      ctx.filter = 'none';
     } else {
       const g = ctx.createLinearGradient(x, y, x + w, y + h);
       g.addColorStop(0, shade(brand.primary, 26));
@@ -175,7 +177,7 @@ const Visuals = (() => {
   // =====================  MODERN — full-bleed photo + gradient  ================
   const modern = (ctx, W, H, d, kind) => {
     const b = d.brand;
-    cover(ctx, d.hero, 0, 0, W, H, 0, b, d.heroFocus);
+    cover(ctx, d.hero, 0, 0, W, H, 0, b, d.heroFocus, d.heroFilter);
 
     // legibility gradients
     let g = ctx.createLinearGradient(0, H * 0.4, 0, H);
@@ -236,7 +238,7 @@ const Visuals = (() => {
 
     if (kind === 'wide') {
       // photo left, content right
-      cover(ctx, d.hero, 44, 44, 596, H - 88, 0, b, d.heroFocus);
+      cover(ctx, d.hero, 44, 44, 596, H - 88, 0, b, d.heroFocus, d.heroFilter);
       badge(ctx, 64, 64, d.badgeText, b.accent, onColor(b.accent), 19, 4);
       ctx.textAlign = 'center';
       let y = d.ohLine ? 150 : 175;
@@ -258,13 +260,13 @@ const Visuals = (() => {
     const photoW = W - m * 2;
     const thumbs = (d.photos || []).length >= 3;
     const mainH = kind === 'story' ? (thumbs ? 880 : 1010) : (thumbs ? 500 : 590);
-    cover(ctx, d.hero, m, m, photoW, mainH, 0, b, d.heroFocus);
+    cover(ctx, d.hero, m, m, photoW, mainH, 0, b, d.heroFocus, d.heroFilter);
     badge(ctx, m + 22, m + 22, d.badgeText, b.accent, onColor(b.accent), kind === 'story' ? 26 : 22, 4);
     let y = m + mainH;
     if (thumbs) {
       const tw = (photoW - 14) / 2, th = kind === 'story' ? 240 : 168;
-      cover(ctx, d.photos[1] && d.photos[1].img, m, y + 14, tw, th, 0, b, d.photos[1] && d.photos[1].focus);
-      cover(ctx, d.photos[2] && d.photos[2].img, m + tw + 14, y + 14, tw, th, 0, b, d.photos[2] && d.photos[2].focus);
+      cover(ctx, d.photos[1] && d.photos[1].img, m, y + 14, tw, th, 0, b, d.photos[1] && d.photos[1].focus, d.photos[1] && d.photos[1].fcss);
+      cover(ctx, d.photos[2] && d.photos[2].img, m + tw + 14, y + 14, tw, th, 0, b, d.photos[2] && d.photos[2].focus, d.photos[2] && d.photos[2].fcss);
       y += 14 + th;
     }
 
@@ -303,7 +305,7 @@ const Visuals = (() => {
     let y;
 
     if (kind === 'wide') {
-      cover(ctx, d.hero, W - 560 - m, m, 560, H - m * 2, 26, b, d.heroFocus);
+      cover(ctx, d.hero, W - 560 - m, m, 560, H - m * 2, 26, b, d.heroFocus, d.heroFilter);
       contentX = m + 12; contentW = W - 560 - m * 2 - 40;
       badge(ctx, contentX, 72, d.badgeText, b.accent, onColor(b.accent), 21);
       if (d.ohLine) { ctx.font = font(600, 20); ctx.fillStyle = alpha('#ffffff', 0.9); ctx.fillText(d.ohLine, contentX + 4, 148); }
@@ -323,7 +325,7 @@ const Visuals = (() => {
 
     // square / story
     const photoH = kind === 'story' ? 1100 : 540;
-    cover(ctx, d.hero, m, m, W - m * 2, photoH, 30, b, d.heroFocus);
+    cover(ctx, d.hero, m, m, W - m * 2, photoH, 30, b, d.heroFocus, d.heroFilter);
     // angled badge overlapping the photo's bottom edge
     ctx.save();
     ctx.translate(m + 16, m + photoH - 26);
@@ -377,7 +379,7 @@ const Visuals = (() => {
     const W = 1080, H = 1080;
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
-    cover(ctx, photo && photo.img, 0, 0, W, H, 0, brand, photo && photo.focus);
+    cover(ctx, photo && photo.img, 0, 0, W, H, 0, brand, photo && photo.focus, photo && photo.fcss);
 
     const g = ctx.createLinearGradient(0, H * 0.55, 0, H);
     g.addColorStop(0, 'rgba(8,14,18,0)');

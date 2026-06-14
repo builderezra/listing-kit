@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v14';
+  const APP_VERSION = 'v15';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -201,7 +201,7 @@
       const img = new Image();
       img.onload = () => { renderPhotoGrid(); rerenderVisuals(); };
       img.src = url;
-      photos.push({ url, img, name: f.name, inCarousel: true });
+      photos.push({ url, img, name: f.name, inCarousel: true, filter: { b: 100, c: 100, s: 100, w: 0 } });
     });
     renderPhotoGrid();
   };
@@ -211,7 +211,7 @@
     const img = new Image();
     img.onload = () => { renderPhotoGrid(); rerenderVisuals(); };
     img.src = dataURL;
-    photos.push({ url: dataURL, img, name, inCarousel: true });
+    photos.push({ url: dataURL, img, name, inCarousel: true, filter: { b: 100, c: 100, s: 100, w: 0 } });
     renderPhotoGrid();
   };
 
@@ -220,7 +220,7 @@
     new Promise((resolve) => {
       const url = URL.createObjectURL(blob);
       const img = new Image();
-      img.onload = () => { photos.push({ url, img, name, inCarousel: true }); renderPhotoGrid(); resolve(true); };
+      img.onload = () => { photos.push({ url, img, name, inCarousel: true, filter: { b: 100, c: 100, s: 100, w: 0 } }); renderPhotoGrid(); resolve(true); };
       img.onerror = () => { URL.revokeObjectURL(url); resolve(false); };
       img.src = url;
     });
@@ -232,6 +232,18 @@
 
   const FOCUS_ORDER = ['center', 'top', 'bottom'];
   const FOCUS_ICON = { center: '⊙', top: '⬆', bottom: '⬇' };
+  // photo filters → CSS/canvas filter string (honest adjustments only)
+  const NEUTRAL = { b: 100, c: 100, s: 100, w: 0 };
+  const filterCSS = (f) => {
+    if (!f) return '';
+    const p = [];
+    if (f.b !== 100) p.push(`brightness(${f.b}%)`);
+    if (f.c !== 100) p.push(`contrast(${f.c}%)`);
+    if (f.s !== 100) p.push(`saturate(${f.s}%)`);
+    if (f.w) p.push(`sepia(${Math.round(f.w * 0.6)}%)`);
+    return p.join(' ');
+  };
+  const syncFcss = () => photos.forEach((p) => { p.fcss = filterCSS(p.filter); });
   let dragFrom = null;   // index being dragged for reorder
   const movePhoto = (from, to) => {
     if (from === to || from == null || to == null) return;
@@ -265,11 +277,14 @@
         movePhoto(dragFrom, i);
       });
       const focus = p.focus || 'center';
-      cell.innerHTML = `<img src="${p.url}" alt="">` +
+      const edited = filterCSS(p.filter) ? ' edited' : '';
+      cell.innerHTML = `<img src="${p.url}" alt="" style="filter:${filterCSS(p.filter)}">` +
         (i === heroIndex ? '<span class="hero-tag">★ hero</span>' : '') +
         `<button type="button" class="photo-x" title="Remove">×</button>` +
+        `<button type="button" class="photo-edit${edited}" title="Edit photo (filters &amp; crop)">✎</button>` +
         `<button type="button" class="photo-focus${focus !== 'center' ? ' on' : ''}" title="Crop focus: ${focus} (click to change)">${FOCUS_ICON[focus]}</button>`;
       cell.querySelector('img').addEventListener('click', () => { heroIndex = i; renderPhotoGrid(); rerenderVisuals(); });
+      cell.querySelector('.photo-edit').addEventListener('click', () => openPhotoEditor(i));
       cell.querySelector('.photo-focus').addEventListener('click', () => {
         p.focus = FOCUS_ORDER[(FOCUS_ORDER.indexOf(focus) + 1) % FOCUS_ORDER.length];
         renderPhotoGrid(); rerenderVisuals();
@@ -283,6 +298,59 @@
       });
       grid.appendChild(cell);
     });
+  };
+
+  // ---------------- photo editor (filters + crop focus) ----------------
+  const PRESETS = {
+    none: { b: 100, c: 100, s: 100, w: 0 },
+    airy: { b: 110, c: 95, s: 105, w: 6 },
+    crisp: { b: 103, c: 112, s: 108, w: 0 },
+    warm: { b: 104, c: 102, s: 110, w: 38 },
+    mono: { b: 102, c: 106, s: 0, w: 0 },
+  };
+  let editIdx = -1;
+  const pePreviewUpdate = () => {
+    const p = photos[editIdx]; if (!p) return;
+    $('pePreview').style.filter = filterCSS(p.filter);
+    $('pePreview').style.objectPosition = `center ${{ top: '0%', center: '50%', bottom: '100%' }[p.focus || 'center']}`;
+  };
+  const peSyncControls = () => {
+    const p = photos[editIdx]; if (!p) return;
+    $('peB').value = p.filter.b; $('peC').value = p.filter.c; $('peS').value = p.filter.s; $('peW').value = p.filter.w;
+    document.querySelectorAll('#peFocus button').forEach((b) => b.classList.toggle('active', b.dataset.focus === (p.focus || 'center')));
+    document.querySelectorAll('#pePresets button').forEach((b) => {
+      const pr = PRESETS[b.dataset.preset];
+      b.classList.toggle('active', pr && ['b', 'c', 's', 'w'].every((k) => pr[k] === p.filter[k]));
+    });
+  };
+  const openPhotoEditor = (i) => {
+    editIdx = i;
+    const p = photos[i]; if (!p) return;
+    $('pePreview').src = p.url;
+    peSyncControls();
+    pePreviewUpdate();
+    $('photoEditor').hidden = false;
+    document.body.style.overflow = 'hidden';
+  };
+  const closePhotoEditor = () => { $('photoEditor').hidden = true; document.body.style.overflow = ''; renderPhotoGrid(); rerenderVisuals(); };
+  const wirePhotoEditor = () => {
+    [['peB', 'b'], ['peC', 'c'], ['peS', 's'], ['peW', 'w']].forEach(([id, key]) => {
+      $(id).addEventListener('input', () => { if (photos[editIdx]) { photos[editIdx].filter[key] = Number($(id).value); pePreviewUpdate(); peSyncControls(); } });
+    });
+    document.querySelectorAll('#pePresets button').forEach((b) => b.addEventListener('click', () => {
+      if (!photos[editIdx]) return;
+      photos[editIdx].filter = { ...PRESETS[b.dataset.preset] };
+      peSyncControls(); pePreviewUpdate();
+    }));
+    document.querySelectorAll('#peFocus button').forEach((b) => b.addEventListener('click', () => {
+      if (!photos[editIdx]) return;
+      photos[editIdx].focus = b.dataset.focus;
+      peSyncControls(); pePreviewUpdate();
+    }));
+    $('peReset').addEventListener('click', () => { if (photos[editIdx]) { photos[editIdx].filter = { ...PRESETS.none }; photos[editIdx].focus = 'center'; peSyncControls(); pePreviewUpdate(); } });
+    $('peDone').addEventListener('click', closePhotoEditor);
+    $('peClose').addEventListener('click', closePhotoEditor);
+    $('photoEditor').addEventListener('click', (e) => { if (e.target === $('photoEditor')) closePhotoEditor(); });
   };
 
   const wireDropZone = () => {
@@ -368,6 +436,7 @@
     const d = readForm();
     const inspectLine = (d.badge === 'openhouse' || d.badge === 'inspection') && d.openhouse
       ? (d.mode === 'rent' ? 'Inspect ' : '') + d.openhouse : '';
+    syncFcss();
     return {
       badgeText: Generator.badgeText(d),
       ohLine: inspectLine,
@@ -378,6 +447,7 @@
       brand,
       hero: photos[heroIndex] ? photos[heroIndex].img : null,
       heroFocus: photos[heroIndex] ? photos[heroIndex].focus : 'center',
+      heroFilter: photos[heroIndex] ? filterCSS(photos[heroIndex].filter) : '',
       photos: orderedPhotos(),
       raw: d,
     };
@@ -966,6 +1036,31 @@
     $('aiInstruction').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); const i = e.target.value.trim(); if (i) runAI('instruct', i); } });
   };
 
+  // AI design styler — a vibe → template + colours + font
+  const runDesignStyle = async () => {
+    const note = (msg, kind) => { $('styleStatus').textContent = msg; $('styleStatus').className = 'parse-note' + (kind ? ' ' + kind : ''); };
+    const vibe = $('styleVibe').value.trim();
+    if (!vibe) { $('styleVibe').focus(); return; }
+    if (!AI.available()) { setTimeout(() => $('aiKey').focus(), 50); note('Add your API key above to enable AI.', 'err'); return; }
+    $('styleApply').disabled = true;
+    note('Designing a look…');
+    try {
+      const st = await AI.designStyle(vibe);
+      if (st.templateId) { brand.templateId = st.templateId; markTemplate(); }
+      if (st.primary) { brand.primary = st.primary; $('brandPrimary').value = st.primary; }
+      if (st.accent) { brand.accent = st.accent; $('brandAccent').value = st.accent; }
+      if (st.font) { brand.font = st.font; $('brandFont').value = st.font; }
+      saveBrand();
+      rerenderVisuals();
+      const bits = [st.templateId && st.templateId, st.font && st.font + ' font', (st.primary || st.accent) && 'new colours'].filter(Boolean);
+      note('✓ Applied ' + (bits.join(', ') || 'style') + ' — tweak the colours/template if you like.', 'ok');
+    } catch (e) {
+      note(AI.explain(e), 'err');
+    } finally {
+      $('styleApply').disabled = false;
+    }
+  };
+
   // AI + live web search → real nearby amenities into Location highlights
   const researchLocation = async () => {
     const note = (msg, kind) => { $('researchStatus').textContent = msg; $('researchStatus').className = 'parse-note' + (kind ? ' ' + kind : ''); };
@@ -1007,6 +1102,8 @@
     aiBusy(false, '↩ Reverted to the previous version', 'ok');
   });
   $('researchBtn').addEventListener('click', researchLocation);
+  $('styleApply').addEventListener('click', runDesignStyle);
+  $('styleVibe').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runDesignStyle(); } });
   $('clearBtn').addEventListener('click', clearListing);
 
   // import + paste UX
@@ -1149,6 +1246,7 @@
   wireDownloads();
   wireEditableOutput();
   wireAI();
+  wirePhotoEditor();
   renderPalettes();
   window.addEventListener('resize', () => { if (activeTab === 'flyer' && outputs) scaleFlyer(); });
 

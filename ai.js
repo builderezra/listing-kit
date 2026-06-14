@@ -104,6 +104,31 @@ const AI = (() => {
     );
   };
 
+  // ---- AI design styling (text-only → template + colours + font) ------------
+  const STYLE_SYSTEM = [
+    'You are a brand designer for real estate marketing. Given a vibe, choose a cohesive visual identity.',
+    'Respond with ONLY a compact JSON object — no prose, no markdown fences:',
+    '{"template":"modern|classic|bold","primary":"#RRGGBB","accent":"#RRGGBB","font":"serif|sans"}',
+    'primary = a deep, rich brand colour for bars/backgrounds; accent = a complementary highlight. White or near-white text must be clearly readable on primary, so keep primary dark/saturated.',
+    'template: modern = full-bleed photo with a gradient; classic = framed editorial with serif; bold = colour-block panels.',
+    'font: serif for elegant/luxury/editorial vibes, sans for modern/clean/minimal.',
+  ].join('\n');
+  const HEX = /^#[0-9a-f]{6}$/i;
+  const designStyle = async (description) => {
+    const raw = await call(STYLE_SYSTEM, `Vibe: ${description}`, 200);
+    const m = raw.match(/\{[\s\S]*\}/);
+    if (!m) throw new Error('Could not read a style from the AI.');
+    let o;
+    try { o = JSON.parse(m[0]); } catch (e) { throw new Error('Could not read a style from the AI.'); }
+    const out = {};
+    if (['modern', 'classic', 'bold'].includes(o.template)) out.templateId = o.template;
+    if (HEX.test(o.primary)) out.primary = o.primary;
+    if (HEX.test(o.accent)) out.accent = o.accent;
+    if (['serif', 'sans'].includes(o.font)) out.font = o.font;
+    if (!out.primary && !out.accent && !out.templateId) throw new Error('The AI didn’t return a usable style.');
+    return out;
+  };
+
   // quick validation ping — cheapest model, tiny output
   const test = async () => {
     const key = getKey();
@@ -139,5 +164,5 @@ const AI = (() => {
     return e && e.message ? e.message : 'Something went wrong.';
   };
 
-  return { MODELS, available, getKey, setKey, getModel, setModel, modelLabel, polish, instruct, research, test, explain };
+  return { MODELS, available, getKey, setKey, getModel, setModel, modelLabel, polish, instruct, research, designStyle, test, explain };
 })();
