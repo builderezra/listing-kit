@@ -34,7 +34,9 @@ const AI = (() => {
   const modelLabel = () => (MODELS.find((m) => m.id === getModel()) || MODELS[0]).label.split(' —')[0];
 
   // ---- low-level call --------------------------------------------------------
-  const call = async (system, user, maxTokens = 1500, tools = null) => {
+  // lastTextOnly: with web search the model emits a "let me look…" text block
+  // before the tool runs; the real answer is the FINAL text block.
+  const call = async (system, user, maxTokens = 1500, tools = null, lastTextOnly = false) => {
     const key = getKey();
     if (!key) { const e = new Error('no-key'); e.status = 0; throw e; }
     const body = { model: getModel(), max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] };
@@ -60,8 +62,9 @@ const AI = (() => {
       const err = new Error(msg || ('HTTP ' + res.status)); err.status = res.status; throw err;
     }
     const data = await res.json();
+    const texts = (data.content || []).filter((b) => b.type === 'text').map((b) => b.text.trim()).filter(Boolean);
     // final answer is the text blocks (web-search tool results are server-side)
-    return (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
+    return (lastTextOnly ? (texts[texts.length - 1] || '') : texts.join('')).trim();
   };
 
   // ---- system prompt: an expert copywriter that can't invent or discriminate -
@@ -101,7 +104,8 @@ const AI = (() => {
       `Research the immediate area around this property and return the single location-highlights phrase:\n${where}`,
       600,
       [{ type: 'web_search_20260209', name: 'web_search', max_uses: 4 }],
-    );
+      true, // only the final text block — skip the "let me search…" narration
+    ).then((t) => t.replace(/^(here(?:'s| is)[^:]*:\s*|sure[,!]?\s*|location highlights:\s*)/i, '').trim());
   };
 
   // ---- AI design styling (text-only → template + colours + font) ------------

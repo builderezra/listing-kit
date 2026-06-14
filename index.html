@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=15" />
+  <link rel="stylesheet" href="styles.css?v=16" />
 </head>
 <body>
   <header class="topbar">
@@ -19,7 +19,10 @@
         <p class="tag">Photos + details in → branded graphics, flyer &amp; copy out.</p>
       </div>
     </div>
-    <span class="badge" title="Every output is scanned for discrimination-risk language.">⚖️ Compliance-Aware</span>
+    <div class="topbar-right">
+      <span class="badge" title="Every output is scanned for discrimination-risk language.">⚖️ Compliance-Aware</span>
+      <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle light / dark">🌙</button>
+    </div>
   </header>
 
   <main class="layout">
@@ -430,18 +433,18 @@
 
         <article class="panel-content" id="graphicsContent" hidden>
           <div class="gfx-grid">
-            <div class="gfx-card">
-              <canvas id="cvSquare"></canvas>
-              <div class="gfx-foot">
-                <span>Instagram post · 1080×1080</span>
-                <button type="button" class="copy-btn dl" data-dl="cvSquare">Download</button>
-              </div>
-            </div>
             <div class="gfx-card story">
               <canvas id="cvStory"></canvas>
               <div class="gfx-foot">
                 <span>Story / Reel cover · 1080×1920</span>
                 <button type="button" class="copy-btn dl" data-dl="cvStory">Download</button>
+              </div>
+            </div>
+            <div class="gfx-card">
+              <canvas id="cvSquare"></canvas>
+              <div class="gfx-foot">
+                <span>Instagram post · 1080×1080</span>
+                <button type="button" class="copy-btn dl" data-dl="cvSquare">Download</button>
               </div>
             </div>
             <div class="gfx-card">
@@ -539,13 +542,13 @@
     </div>
   </div>
 
-  <script src="generator.js?v=15"></script>
-  <script src="fairhousing.js?v=15"></script>
-  <script src="parser.js?v=15"></script>
-  <script src="importer.js?v=15"></script>
-  <script src="visuals.js?v=15"></script>
-  <script src="flyer.js?v=15"></script>
-  <script src="ai.js?v=15"></script>
-  <script src="app.js?v=15"></script>
+  <script src="generator.js?v=16"></script>
+  <script src="fairhousing.js?v=16"></script>
+  <script src="parser.js?v=16"></script>
+  <script src="importer.js?v=16"></script>
+  <script src="visuals.js?v=16"></script>
+  <script src="flyer.js?v=16"></script>
+  <script src="ai.js?v=16"></script>
+  <script src="app.js?v=16"></script>
 </body>
 </html>

@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v15';
+  const APP_VERSION = 'v16';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -1249,6 +1249,23 @@
   wirePhotoEditor();
   renderPalettes();
   window.addEventListener('resize', () => { if (activeTab === 'flyer' && outputs) scaleFlyer(); });
+
+  // ---------------- theme (light / dark) ----------------
+  const applyTheme = (t) => {
+    document.body.classList.toggle('dark', t === 'dark');
+    $('themeToggle').textContent = t === 'dark' ? '☀️' : '🌙';
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', t === 'dark' ? '#14171b' : '#0f2e3d');
+  };
+  let theme;
+  try { theme = localStorage.getItem('lk_theme'); } catch (e) {}
+  if (!theme) theme = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  applyTheme(theme);
+  $('themeToggle').addEventListener('click', () => {
+    theme = theme === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem('lk_theme', theme); } catch (e) {}
+    applyTheme(theme);
+  });
 
   loadBrand();
   restoreDraft();

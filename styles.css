@@ -48,6 +48,13 @@ body {
   color: #fff; font-size: 13px; font-weight: 600; padding: 7px 13px; border-radius: 999px;
   white-space: nowrap;
 }
+.topbar-right { display: flex; align-items: center; gap: 12px; }
+.theme-toggle {
+  background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22); color: #fff;
+  width: 34px; height: 34px; border-radius: 50%; cursor: pointer; font-size: 15px; line-height: 1;
+  display: flex; align-items: center; justify-content: center; flex: 0 0 auto;
+}
+.theme-toggle:hover { background: rgba(255,255,255,.18); }
 
 /* ---------- layout ---------- */
 .layout {
@@ -440,3 +447,31 @@ input.missing, textarea.missing {
   .topbar { flex-wrap: wrap; }
   .photo-grid { grid-template-columns: repeat(3, 1fr); }
 }
+
+/* ============ dark mode ============ */
+body.dark {
+  --bg: #14171b; --card: #1d2127; --ink: #e7e5df; --muted: #9aa1a7;
+  --line: #333a41; --line-2: #2a3038; --hi: #23282e;
+}
+body.dark input, body.dark select, body.dark textarea { background: #23282e; color: var(--ink); border-color: var(--line); }
+body.dark input[type="color"] { background: #23282e; }
+body.dark .section { background: #191d22; }
+body.dark .copytext { background: #191d22; color: var(--ink); border-color: var(--line-2); }
+body.dark .gfx-card { background: #191d22; }
+body.dark .gfx-card canvas { background: #2a2f35; }
+body.dark .gfx-foot { background: #1d2127; border-color: var(--line-2); }
+body.dark .car-slide canvas { background: #2a2f35; border-color: var(--line); }
+body.dark .dropzone { background: #1d2127; }
+body.dark .mode-btn { background: #1d2127; color: var(--muted); }
+body.dark .mode-btn.active { background: var(--teal); color: #fff; }
+body.dark .chip, body.dark .filebtn, body.dark .copy-btn, body.dark .pe-presets button { color: var(--ink); }
+body.dark .copy-btn.ai { color: #3a2a12; }
+body.dark .pe-focus-btns button { background: #1d2127; color: var(--ink); }
+body.dark .finding { background: #1d2127; }
+body.dark .import-status:not(.ok):not(.err) { background: #23282e; color: var(--ink); }
+body.dark .howto kbd, body.dark .paste-hint kbd { background: #23282e; }
+body.dark .empty-art { filter: grayscale(.2); }
+body.dark .flyer-wrap { background: #3a3f45; }
+body.dark .tpl { background: #1d2127; color: var(--ink); }
+body.dark .mini-btn.ghost { background: #23282e; }
+body.dark .flag-phrase { color: #3a2f12; }
