@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v26';
+  const APP_VERSION = 'v27';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -771,6 +771,18 @@
   };
 
   // ---------------- compliance ----------------
+  // jump from a finding to the offending phrase in its copy tab and highlight it
+  const jumpToFinding = (f, copyCh) => {
+    renderTab(copyCh);
+    const text = (outputs && outputs[copyCh]) || '';
+    const idx = text.toLowerCase().indexOf(String(f.match).toLowerCase());
+    const pre = $('copytext');
+    if (idx < 0) { toast('Phrase not found (it may have been edited)'); return; }
+    pre.innerHTML = escapeHtml(text.slice(0, idx)) + '<mark class="cx-hit">' + escapeHtml(text.slice(idx, idx + f.match.length)) + '</mark>' + escapeHtml(text.slice(idx + f.match.length));
+    const m = pre.querySelector('mark'); if (m && m.scrollIntoView) m.scrollIntoView({ block: 'center' });
+    clearTimeout(jumpToFinding._t);
+    jumpToFinding._t = setTimeout(() => { if (activeTab === copyCh && outputs) pre.textContent = outputs[copyCh] || ''; }, 4500);
+  };
   const renderCompliance = () => {
     const body = $('complianceBody');
     body.innerHTML = '';
@@ -794,15 +806,17 @@
       const el = document.createElement('div');
       el.className = 'finding ' + f.sev;
       const where = f.channels.map((c) => CHANNEL_LABEL[c] || c).join(', ');
+      const copyCh = (f.channels || []).find((c) => ['mls', 'instagram', 'facebook', 'email'].includes(c));
       el.innerHTML = `
         <div class="finding-top">
           <span class="flag-phrase">“${escapeHtml(f.match)}”</span>
           <span class="sev ${f.sev}">${f.sev}</span>
           <span class="flag-class">${escapeHtml(f.cls)}</span>
-          <span class="flag-where">in ${escapeHtml(where)}</span>
+          <span class="flag-where">in ${escapeHtml(where)}${copyCh ? ' ›' : ''}</span>
         </div>
         <div class="finding-why">${escapeHtml(f.why)}</div>
         <div class="finding-fix"><b>Try instead:</b> ${escapeHtml(f.fix)}</div>`;
+      if (copyCh) { el.classList.add('finding-jump'); el.title = 'Click to find this phrase in the ' + (CHANNEL_LABEL[copyCh] || copyCh); el.addEventListener('click', () => jumpToFinding(f, copyCh)); }
       body.appendChild(el);
     });
 

@@ -507,6 +507,9 @@ input.missing, textarea.missing {
 .compliance-summary.alert h3 { color: #4a1a14; } .compliance-summary.alert p { color: #5a352e; }
 
 .finding { border: 1px solid var(--line); border-left-width: 4px; border-radius: 9px; padding: 12px 14px; margin-bottom: 10px; background: #fff; }
+.finding-jump { cursor: pointer; }
+.finding-jump:hover { border-color: var(--teal); box-shadow: 0 2px 10px rgba(0,0,0,.08); }
+mark.cx-hit { background: #ffd34d; color: #1c2b30; border-radius: 3px; padding: 0 2px; }
 .finding.high { border-left-color: var(--red); }
 .finding.medium { border-left-color: var(--amber); }
 .finding.low { border-left-color: var(--muted); }
