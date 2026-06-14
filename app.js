@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v19';
+  const APP_VERSION = 'v20';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -522,11 +522,14 @@
       carouselCanvases.forEach((cv, i) =>
         setTimeout(() => Visuals.download(cv, `${slug()}-carousel-${String(i + 1).padStart(2, '0')}.png`), i * 350));
     });
-    $('openStudio').addEventListener('click', () => {
-      const d = vizData();
-      const stats = [d.beds && d.beds + ' BD', d.baths && d.baths + ' BA', d.cars && d.cars + ' CAR', d.sqft && d.sqft + ' ' + (d.areaUnit === 'sqm' ? 'M²' : 'SQ FT')].filter(Boolean).join('  ·  ');
-      Studio.open({ photos: d.photos, brand, fields: { price: d.price, address: d.address, stats, badge: d.badgeText } }, 'square');
-    });
+    $('openStudio').addEventListener('click', openStudio);
+  };
+
+  // open the design studio from anywhere (works before a kit is generated too)
+  const openStudio = () => {
+    const d = vizData();
+    const stats = [d.beds && d.beds + ' BD', d.baths && d.baths + ' BA', d.cars && d.cars + ' CAR', d.sqft && d.sqft + ' ' + (d.areaUnit === 'sqm' ? 'M²' : 'SQ FT')].filter(Boolean).join('  ·  ');
+    Studio.open({ photos: d.photos, brand, fields: { price: d.price, address: d.address, stats, badge: d.badgeText } }, 'square');
   };
 
   // ---------------- flyer tab ----------------
@@ -1071,7 +1074,10 @@
     if (e.target && e.target.classList) e.target.classList.remove('missing');
     saveDraft();
   });
-  document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => renderTab(t.dataset.tab)));
+  document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
+    if (t.dataset.tab === 'studio') { openStudio(); return; } // opens the overlay, not a panel
+    renderTab(t.dataset.tab);
+  }));
   $('copyBtn').addEventListener('click', doCopy);
   $('rewordBtn').addEventListener('click', () => { if (outputs) generate(); });
   $('undoBtn').addEventListener('click', () => {
