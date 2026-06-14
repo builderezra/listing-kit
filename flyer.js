@@ -25,14 +25,23 @@ const Flyer = (() => {
     const hero = photos[0] ? photos[0].url : '';
     const strip = photos.slice(1, 4);
 
-    const stats = [
+    const rent = d.mode === 'rent';
+    const stats = (rent ? [
+      d.beds && [d.beds, d.beds == 1 ? 'Bedroom' : 'Bedrooms'],
+      d.baths && [d.baths, d.baths == 1 ? 'Bath' : 'Baths'],
+      d.cars && [d.cars, d.cars == 1 ? 'Car' : 'Cars'],
+      d.sqft && [d.sqft, d.areaUnit === 'sqm' ? 'm²' : 'Sq Ft'],
+      d.available && [d.available, 'Available'],
+      d.leaseTerm && [d.leaseTerm, 'Lease'],
+      d.furnished === 'furnished' && ['Yes', 'Furnished'],
+    ] : [
       d.beds && [d.beds, d.beds == 1 ? 'Bedroom' : 'Bedrooms'],
       d.baths && [d.baths, d.baths == 1 ? 'Bath' : 'Baths'],
       d.cars && [d.cars, d.cars == 1 ? 'Car' : 'Cars'],
       d.sqft && [d.sqft, d.areaUnit === 'sqm' ? 'm²' : 'Sq Ft'],
       d.lot && [d.lot, 'Lot'],
       d.year && [d.year, 'Built'],
-    ].filter(Boolean);
+    ]).filter(Boolean);
     const headlineFont = brand.font === 'sans'
       ? `-apple-system, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif`
       : `Georgia, 'Times New Roman', serif`;

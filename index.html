@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=13" />
+  <link rel="stylesheet" href="styles.css?v=14" />
 </head>
 <body>
   <header class="topbar">
@@ -188,6 +188,13 @@
             </div>
 
             <div class="field">
+              <label>Listing type</label>
+              <div class="mode-toggle" id="modeToggle">
+                <button type="button" class="mode-btn active" data-mode="sale">🏷️ For Sale</button>
+                <button type="button" class="mode-btn" data-mode="rent">🔑 For Rent</button>
+              </div>
+            </div>
+            <div class="field">
               <label for="address">Address</label>
               <input type="text" id="address" />
             </div>
@@ -197,7 +204,7 @@
                 <input type="text" id="city" />
               </div>
               <div class="field">
-                <label for="price">Price</label>
+                <label for="price" id="priceLabel">Price</label>
                 <div class="pricewrap">
                   <select id="currency" aria-label="Currency">
                     <option value="$">$</option>
@@ -214,6 +221,10 @@
                   </select>
                   <input type="text" id="currencyCustom" hidden />
                   <input type="text" id="price" inputmode="numeric" />
+                  <select id="rentPeriod" aria-label="Rent period" hidden>
+                    <option value="pw">/wk</option>
+                    <option value="pm">/mo</option>
+                  </select>
                 </div>
               </div>
             </div>
@@ -304,6 +315,47 @@
               <div class="field">
                 <label for="year">Year built</label>
                 <input type="text" id="year" inputmode="numeric" />
+              </div>
+            </div>
+            <div id="rentFields" hidden>
+              <div class="row">
+                <div class="field">
+                  <label for="available">Available from</label>
+                  <input type="text" id="available" placeholder="e.g. Now, or 1 July" />
+                </div>
+                <div class="field">
+                  <label for="bond">Bond</label>
+                  <input type="text" id="bond" inputmode="numeric" placeholder="e.g. 2,600" />
+                </div>
+              </div>
+              <div class="row three">
+                <div class="field">
+                  <label for="leaseTerm">Lease term</label>
+                  <select id="leaseTerm">
+                    <option value="">—</option>
+                    <option value="6-month">6 months</option>
+                    <option value="12-month">12 months</option>
+                    <option value="6–12 month">6–12 months</option>
+                    <option value="flexible">Flexible</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="furnished">Furnishing</label>
+                  <select id="furnished">
+                    <option value="unfurnished">Unfurnished</option>
+                    <option value="part">Part-furnished</option>
+                    <option value="furnished">Fully furnished</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="pets">Pets</label>
+                  <select id="pets">
+                    <option value="">Not stated</option>
+                    <option value="considered">Considered</option>
+                    <option value="yes">Allowed</option>
+                    <option value="negotiable">By negotiation</option>
+                  </select>
+                </div>
               </div>
             </div>
             <div class="field">
@@ -447,13 +499,13 @@
     <p>Runs in your browser — photos and details are never uploaded (link import fetches via public read proxies). The compliance check is decision support, not legal advice; always defer to your agency’s compliance guidance. <span id="verTag"></span></p>
   </footer>
 
-  <script src="generator.js?v=13"></script>
-  <script src="fairhousing.js?v=13"></script>
-  <script src="parser.js?v=13"></script>
-  <script src="importer.js?v=13"></script>
-  <script src="visuals.js?v=13"></script>
-  <script src="flyer.js?v=13"></script>
-  <script src="ai.js?v=13"></script>
-  <script src="app.js?v=13"></script>
+  <script src="generator.js?v=14"></script>
+  <script src="fairhousing.js?v=14"></script>
+  <script src="parser.js?v=14"></script>
+  <script src="importer.js?v=14"></script>
+  <script src="visuals.js?v=14"></script>
+  <script src="flyer.js?v=14"></script>
+  <script src="ai.js?v=14"></script>
+  <script src="app.js?v=14"></script>
 </body>
 </html>

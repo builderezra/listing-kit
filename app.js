@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v13';
+  const APP_VERSION = 'v14';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -15,6 +15,11 @@
   let outputs = null;     // { mls, instagram, facebook, email }
   let report = null;      // fair-housing scan result
   let activeTab = 'graphics';
+  let mode = 'sale';      // 'sale' | 'rent' — the listing type
+
+  // status options per listing type
+  const SALE_STATUS = [['justlisted', 'Just Listed'], ['openhouse', 'Home Open / Open House'], ['forsale', 'For Sale'], ['newprice', 'New Price'], ['sold', 'Just Sold'], ['custom', 'Custom…']];
+  const RENT_STATUS = [['forlease', 'For Lease'], ['inspection', 'Home Open / Inspection'], ['newprice', 'Price Reduced'], ['leased', 'Leased'], ['custom', 'Custom…']];
   let brand = {
     agentName: '', brokerage: '', phone: '', email: '',
     primary: '#0f2e3d', accent: '#c08a3e',
@@ -298,10 +303,12 @@
 
   // ---------------- form ----------------
   const readForm = () => ({
+    mode,
     address: $('address').value.trim(),
     city: $('city').value.trim(),
     price: $('price').value.trim(),
     currency: $('currency').value === 'custom' ? ($('currencyCustom').value.trim() || '$') : $('currency').value,
+    rentPeriod: $('rentPeriod').value,
     badge: $('badge').value,
     badgeCustom: $('badgeCustom').value.trim(),
     openhouse: $('openhouse').value.trim(),
@@ -315,6 +322,12 @@
     areaUnit: $('areaUnit').value === 'customunit' ? ($('areaUnitCustom').value.trim() || 'm²') : $('areaUnit').value,
     year: $('year').value.trim(),
     lot: $('lot').value.trim(),
+    // rent-only fields
+    available: $('available').value.trim(),
+    bond: $('bond').value.trim(),
+    leaseTerm: $('leaseTerm').value,
+    furnished: $('furnished').value,
+    pets: $('pets').value,
     features: $('features').value.split(/[,\n]/).map((s) => s.trim()).filter(Boolean),
     neighborhood: $('neighborhood').value.trim(),
     agentName: brand.agentName, brokerage: brand.brokerage, phone: brand.phone, email: brand.email,
@@ -353,10 +366,12 @@
 
   const vizData = () => {
     const d = readForm();
+    const inspectLine = (d.badge === 'openhouse' || d.badge === 'inspection') && d.openhouse
+      ? (d.mode === 'rent' ? 'Inspect ' : '') + d.openhouse : '';
     return {
       badgeText: Generator.badgeText(d),
-      ohLine: d.badge === 'openhouse' && d.openhouse ? d.openhouse : '',
-      price: Generator.money(d.price, d.currency),
+      ohLine: inspectLine,
+      price: Generator.priceShort(d),
       address: [d.address, d.city].filter(Boolean).join(', '),
       beds: d.beds, baths: d.baths, cars: d.cars,
       sqft: Generator.num(d.sqft), areaUnit: d.areaUnit,
@@ -447,7 +462,7 @@
       brand,
       photos: orderedPhotos(),
       // the flyer has its own Highlights sidebar — drop the bullet block
-      mls: outputs ? outputs.mls.split('\n\n').filter((p) => !p.startsWith('Features at a glance')).join('\n\n') : '',
+      mls: outputs ? outputs.mls.split('\n\n').filter((p) => !p.startsWith('At a glance') && !p.startsWith('Features at a glance')).join('\n\n') : '',
       features: Generator.flyerFeatures(d.raw, 7),
     };
   };
@@ -760,12 +775,12 @@
 
   // ---------------- draft autosave (listing fields survive a refresh) ----------------
   const DRAFT_KEY = 'lk_draft_v1';
-  const LISTING_FIELDS = ['address', 'city', 'price', 'currency', 'currencyCustom', 'badge', 'badgeCustom', 'openhouse', 'type', 'typeCustom', 'tone', 'beds', 'baths', 'cars', 'sqft', 'areaUnit', 'areaUnitCustom', 'year', 'lot', 'features', 'neighborhood'];
+  const LISTING_FIELDS = ['address', 'city', 'price', 'currency', 'currencyCustom', 'rentPeriod', 'badge', 'badgeCustom', 'openhouse', 'type', 'typeCustom', 'tone', 'beds', 'baths', 'cars', 'sqft', 'areaUnit', 'areaUnitCustom', 'year', 'lot', 'available', 'bond', 'leaseTerm', 'furnished', 'pets', 'features', 'neighborhood'];
   let draftTimer = null;
   const saveDraft = () => {
     clearTimeout(draftTimer);
     draftTimer = setTimeout(() => {
-      const draft = {};
+      const draft = { __mode: mode };
       LISTING_FIELDS.forEach((id) => (draft[id] = $(id).value));
       try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch (e) {}
     }, 400);
@@ -774,11 +789,13 @@
     try {
       const draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null');
       if (!draft) return;
+      if (draft.__mode) applyMode(draft.__mode, false); // rebuild status options before setting badge
       LISTING_FIELDS.forEach((id) => { if (draft[id] != null && draft[id] !== '') $(id).value = draft[id]; });
       syncCustomWraps();
     } catch (e) {}
   };
   const clearListing = () => {
+    applyMode('sale', false);
     LISTING_FIELDS.forEach((id) => {
       const el = $(id);
       if (el.tagName === 'SELECT') el.selectedIndex = 0;
@@ -846,17 +863,25 @@
   const aiFacts = () => {
     const d = readForm();
     const L = [];
+    L.push(`Listing type: ${d.mode === 'rent' ? 'FOR RENT / lease' : 'FOR SALE'}`);
     if (d.address) L.push(`Address: ${d.address}${d.city ? ', ' + d.city : ''}`);
-    if (Generator.money(d.price)) L.push(`Price: ${Generator.money(d.price, d.currency)}`);
+    if (Generator.money(d.price)) L.push(d.mode === 'rent' ? `Rent: ${Generator.priceLong(d)}` : `Price: ${Generator.money(d.price, d.currency)}`);
     L.push(`Property type: ${d.type === 'customtype' && d.typeCustom ? d.typeCustom : (TYPE_WORD[d.type] || 'home')}`);
     const bb = [d.beds && `${d.beds} bed`, d.baths && `${d.baths} bath`, d.cars && `${d.cars} car`].filter(Boolean);
     if (bb.length) L.push(`Configuration: ${bb.join(', ')}`);
     if (Generator.num(d.sqft)) L.push(`Internal size: ${Generator.num(d.sqft)} ${d.areaUnit === 'sqm' ? 'm²' : d.areaUnit === 'sqft' ? 'sq ft' : d.areaUnit}`);
     if (d.lot) L.push(`Land / block: ${d.lot}`);
     if (d.year) L.push(`Year built: ${d.year}`);
+    if (d.mode === 'rent') {
+      if (d.available) L.push(`Available from: ${d.available}`);
+      if (d.bond) L.push(`Bond: ${Generator.money(d.bond, d.currency) || d.bond}`);
+      if (d.leaseTerm) L.push(`Lease term: ${d.leaseTerm}`);
+      if (d.furnished) L.push(`Furnishing: ${d.furnished === 'part' ? 'part-furnished' : d.furnished}`);
+      if (Generator.petPhrase(d.pets)) L.push(`Pets: ${Generator.petPhrase(d.pets)}`);
+    }
     if (d.features.length) L.push(`Features (use only these): ${d.features.join(', ')}`);
     if (d.neighborhood) L.push(`Location highlights: ${d.neighborhood}`);
-    if (d.badge === 'openhouse' && d.openhouse) L.push(`Home open: ${d.openhouse}`);
+    if ((d.badge === 'openhouse' || d.badge === 'inspection') && d.openhouse) L.push(`${d.mode === 'rent' ? 'Inspection' : 'Home open'}: ${d.openhouse}`);
     L.push(`Status: ${Generator.badgeText(d)}`);
     const contact = [d.agentName, d.brokerage, d.phone, d.email].filter(Boolean).join(', ');
     if (contact) L.push(`Agent (for sign-off): ${contact}`);
@@ -1016,9 +1041,10 @@
   });
   $('flyerOpen').addEventListener('click', () => { if (outputs) Flyer.openPrint(flyerOpts()); });
   // selects with a Custom… option reveal their own text input
+  const isInspectBadge = () => $('badge').value === 'openhouse' || $('badge').value === 'inspection';
   const wireCustomToggles = () => {
     $('badge').addEventListener('change', () => {
-      $('openhouseWrap').hidden = $('badge').value !== 'openhouse';
+      $('openhouseWrap').hidden = !isInspectBadge();
       $('badgeCustomWrap').hidden = $('badge').value !== 'custom';
       if ($('badge').value === 'custom') $('badgeCustom').focus();
       rerenderVisuals();
@@ -1042,11 +1068,29 @@
     syncCustomWraps();
   };
   const syncCustomWraps = () => {
-    $('openhouseWrap').hidden = $('badge').value !== 'openhouse';
+    $('openhouseWrap').hidden = !isInspectBadge();
     $('badgeCustomWrap').hidden = $('badge').value !== 'custom';
     $('typeCustomWrap').hidden = $('type').value !== 'customtype';
     $('currencyCustom').hidden = $('currency').value !== 'custom';
     $('areaUnitCustom').hidden = $('areaUnit').value !== 'customunit';
+  };
+
+  // ---------------- listing type (sale / rent) ----------------
+  const applyMode = (m, keepStatus) => {
+    mode = m === 'rent' ? 'rent' : 'sale';
+    document.querySelectorAll('.mode-btn').forEach((b) => b.classList.toggle('active', b.dataset.mode === mode));
+    // rebuild status options, preserving the selection if it still exists
+    const prev = $('badge').value;
+    const opts = mode === 'rent' ? RENT_STATUS : SALE_STATUS;
+    $('badge').innerHTML = opts.map(([v, l]) => `<option value="${v}">${l}</option>`).join('');
+    if (keepStatus && opts.some(([v]) => v === prev)) $('badge').value = prev;
+    // show/hide + relabel
+    $('rentFields').hidden = mode !== 'rent';
+    $('rentPeriod').hidden = mode !== 'rent';
+    $('priceLabel').textContent = mode === 'rent' ? 'Rent' : 'Price';
+    $('price').placeholder = mode === 'rent' ? 'e.g. 650' : '';
+    $('openhouseWrap').querySelector('label').textContent = mode === 'rent' ? 'Inspection date/time' : 'Home open date/time';
+    syncCustomWraps();
   };
   ['badgeCustom', 'openhouse', 'cars', 'currency', 'areaUnit', 'typeCustom', 'currencyCustom', 'areaUnitCustom'].forEach((id) =>
     $(id).addEventListener('input', rerenderVisuals));
@@ -1055,6 +1099,14 @@
   ['badgeCustom', 'typeCustom'].forEach((id) =>
     $(id).addEventListener('change', () => { if (outputs) generate(); }));
   wireCustomToggles();
+  document.querySelectorAll('.mode-btn').forEach((b) => b.addEventListener('click', () => {
+    if (b.dataset.mode === mode) return;
+    applyMode(b.dataset.mode, false);
+    saveDraft();
+    if (outputs) generate(); else rerenderVisuals();
+  }));
+  ['available', 'bond', 'leaseTerm', 'furnished', 'pets', 'rentPeriod'].forEach((id) =>
+    $(id).addEventListener('input', () => { rerenderVisuals(); saveDraft(); }));
   document.querySelectorAll('.tpl').forEach((t) => t.addEventListener('click', () => {
     brand.templateId = t.dataset.tpl;
     saveBrand(); markTemplate(); rerenderVisuals();

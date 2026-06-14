@@ -57,6 +57,14 @@ const FairHousing = (() => {
     { re: /\b(desirable|prestigious|prime|sought[- ]after) (neighbou?rhood|area|community)\b/i, cls: 'Steering', sev: 'low', why: 'Vague desirability language can edge into steering.', fix: 'Be specific: name the park, the trail, the coffee shop.' },
     { re: /\bquiet (neighbou?rhood|area|street|community)\b/i, cls: 'Steering', sev: 'low', why: 'Subjective claims about an area can be read as coded.', fix: 'Describe the street factually (“tree-lined,” “low-traffic cul-de-sac”).' },
     { re: /\bgated community\b/i, cls: 'Steering', sev: 'low', why: 'Usually fine as a factual feature; just avoid “exclusive” framing.', fix: 'Keep factual: “gated community with controlled access.”' },
+
+    // ---- Rental-specific tenant restrictions --------------------------------
+    { re: /\b(professionals?\s+only|suit(?:s|able for)?\s+(?:a\s+)?(?:young\s+)?professionals?(?:\s+couple)?|working\s+professionals?\s+only)\b/i, cls: 'Tenant selection', sev: 'medium', why: 'Targeting tenants by occupation/household type can be discriminatory.', fix: 'Describe the property, not the ideal tenant.' },
+    { re: /\bno\s+students?\b|\bstudents?\s+need\s+not\s+apply\b/i, cls: 'Tenant selection', sev: 'medium', why: 'Excluding students can be discriminatory and is restricted in some areas.', fix: 'Remove; assess every application on its merits.' },
+    { re: /\b(no\s+dss|no\s+benefits?|no\s+centrelink|must\s+be\s+employed|employed\s+only|no\s+unemployed)\b/i, cls: 'Source of income', sev: 'high', why: 'Refusing tenants on income source (benefits/Centrelink/DSS) is unlawful in many jurisdictions.', fix: 'Remove entirely — assess affordability individually, not by income source.' },
+    { re: /\bsingle\s+(person|professional|occupant)\b/i, cls: 'Tenant selection', sev: 'medium', why: 'Specifying household size/type can be discriminatory.', fix: 'State the bedroom count; let applicants decide if it suits them.' },
+    { re: /\bmature\s+(tenant|couple|person|applicant)s?\b/i, cls: 'Age', sev: 'medium', why: '“Mature” signals an age preference.', fix: 'Describe the home (e.g. “low-maintenance, single-level”), not the tenant’s age.' },
+    { re: /\bno\s+pets\b/i, cls: 'Tenant selection (pets)', sev: 'low', why: 'Many jurisdictions (incl. parts of Australia) now restrict blanket no-pet clauses.', fix: 'Check current tenancy law; consider “pets considered on application”.' },
   ];
 
   // Scan a single string; returns [{match, cls, sev, why, fix, index}]

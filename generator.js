@@ -46,6 +46,16 @@ const Generator = (() => {
   const areaLong = (u) => (u === 'sqm' ? 'square metres' : u === 'sqft' ? 'square feet' : u || 'square metres');
   const areaShort = (u) => (u === 'sqm' ? 'm²' : u === 'sqft' ? 'sq ft' : u || 'm²');
 
+  // rent: "$650 per week" / "$650/wk"; sale: "$985,000". `mode` from the form.
+  const RENT_LONG = { pw: 'per week', pm: 'per month' };
+  const RENT_SHORT = { pw: '/wk', pm: '/mo' };
+  const rentLong = (n, cur, period) => { const m = money(n, cur); return m ? `${m} ${RENT_LONG[period] || RENT_LONG.pw}` : ''; };
+  const rentShort = (n, cur, period) => { const m = money(n, cur); return m ? `${m}${RENT_SHORT[period] || RENT_SHORT.pw}` : ''; };
+  // headline price string for either mode (long form, used in prose)
+  const priceLong = (d) => (d.mode === 'rent' ? rentLong(d.price, d.currency, d.rentPeriod) : money(d.price, d.currency));
+  // compact price string (used on graphics / flyer tag)
+  const priceShort = (d) => (d.mode === 'rent' ? rentShort(d.price, d.currency, d.rentPeriod) : money(d.price, d.currency));
+
   const priceTier = (price) => {
     const v = Number(String(price || '').replace(/[^0-9.]/g, ''));
     if (!v) return 'mid';
@@ -194,6 +204,20 @@ const Generator = (() => {
     classic: ['Call today to schedule your private showing.', 'Don’t miss this one — schedule a tour today.', 'Contact us today for a showing.'],
   };
 
+  // rent-mode closers steer to inspections + applications, not a sale
+  const RENT_CLOSERS = [
+    'Register your interest today and we’ll be in touch with inspection times.',
+    'Book an inspection and bring your application — quality rentals move fast.',
+    'Keen to make it home? Register for the next inspection today.',
+    'Inspect, apply, move in — register your interest to get started.',
+  ];
+
+  // pet policy → prose (never auto-write "no pets" — many jurisdictions now
+  // restrict blanket bans, and it reads as exclusionary; leave it to the agent)
+  const petPhrase = (pets) => ({
+    yes: 'pet-friendly', considered: 'pets considered on application', negotiable: 'pets by negotiation',
+  }[pets] || '');
+
   // Normalize a location blurb into a "...you're <x>" tail without landmines.
   const cleanLocation = (text) => {
     let t = String(text).trim().replace(/\.$/, '');
@@ -211,9 +235,12 @@ const Generator = (() => {
     investor: ['An Opportunity That Stacks Up in {sub}', 'Solid Returns, Smart Address', 'Set, Forget and Watch {sub} Work', 'The Numbers Make Sense Here'],
     classic: ['Space, Comfort and Convenience in {sub}', 'Your Next Chapter Starts in {sub}', 'Position, Potential and Polish', 'All the Right Boxes in {sub}'],
   };
-  const headline = (tone, sub) => {
-    const opts = (HEADLINES[tone] || HEADLINES.classic).filter((h) => sub || !h.includes('{sub}'));
-    return pick(opts.length ? opts : HEADLINES.classic.slice(2, 3)).replace('{sub}', sub || '');
+  // rent headlines focus on availability + lifestyle, not ownership
+  const RENT_HEADLINES = ['Your Next Home Awaits in {sub}', 'Move-In Ready in {sub}', 'Lease This {sub} Lifestyle', 'Available Now in {sub}', 'The Rental You’ve Been Hunting For'];
+  const headline = (tone, sub, mode) => {
+    const bank = mode === 'rent' ? RENT_HEADLINES : (HEADLINES[tone] || HEADLINES.classic);
+    const opts = bank.filter((h) => sub || !h.includes('{sub}'));
+    return pick(opts.length ? opts : (mode === 'rent' ? ['The Rental You’ve Been Hunting For'] : HEADLINES.classic.slice(2, 3))).replace('{sub}', sub || '');
   };
 
   const LIFESTYLE = {
@@ -249,6 +276,18 @@ const Generator = (() => {
       s += sq ? ` span${statBits.length === 1 ? 's' : ''} ${sq} ${areaLong(d.areaUnit)}` : ' fill the home';
       s += `, ${pick(STAT_TAILS[tone] || STAT_TAILS.classic)}.`;
       p1.push(s);
+    }
+
+    // rent: an availability/terms beat right up front (what renters scan for)
+    if (d.mode === 'rent') {
+      const r = [];
+      if (d.furnished === 'furnished') r.push('offered fully furnished');
+      else if (d.furnished === 'part') r.push('part-furnished');
+      if (d.available) r.push(/now|immediate|avail/i.test(d.available) ? 'available now' : `available from ${d.available}`);
+      if (d.leaseTerm) r.push(`on a ${d.leaseTerm} lease`);
+      const pet = petPhrase(d.pets);
+      if (pet) r.push(pet);
+      if (r.length) p1.push(cap(oxford(r)) + '.');
     }
 
     // interior walk-through — use EVERYTHING the agent gave us, split over
@@ -331,18 +370,31 @@ const Generator = (() => {
     if (d.lot) bullets.push(`${d.lot} ${d.region === 'au' ? 'block' : 'lot'}`);
     if (d.year) bullets.push(`Built in ${d.year}`);
     if (d.cars) bullets.push(`Parking for ${d.cars} car${d.cars == 1 ? '' : 's'}`);
+    if (d.mode === 'rent') {
+      if (priceLong(d)) bullets.unshift(`Rent: ${priceLong(d)}`);
+      if (d.bond) bullets.push(`Bond: ${money(d.bond, d.currency) || d.bond}`);
+      if (d.available) bullets.push(`Available: ${d.available}`);
+      if (d.leaseTerm) bullets.push(`Lease: ${d.leaseTerm}`);
+      if (d.furnished === 'furnished') bullets.push('Fully furnished');
+      else if (d.furnished === 'part') bullets.push('Part-furnished');
+      if (petPhrase(d.pets)) bullets.push(cap(petPhrase(d.pets)));
+    }
     const bulletBlock = bullets.length >= 3
-      ? 'Features at a glance:\n' + bullets.slice(0, 12).map((b) => `• ${b}`).join('\n')
+      ? 'At a glance:\n' + bullets.slice(0, 14).map((b) => `• ${b}`).join('\n')
       : '';
 
-    // closing CTA — personal when we know who's selling it
+    // closing CTA — register/inspect/apply for rent; arrange a viewing for sale
     const cta = [];
-    if (d.badge === 'openhouse' && d.openhouse) {
-      cta.push(pick([
-        `${ohLabel(d)} ${d.openhouse} — come and walk it yourself.`,
-        `See it in person: ${ohLabel(d).toLowerCase()} ${d.openhouse}.`,
-      ]));
-      if (d.agentName) cta.push(`Can’t make it? Call ${d.agentName}${d.phone ? ' on ' + d.phone : ''} to arrange a private viewing.`);
+    const inspectLabel = d.mode === 'rent' ? 'Inspection' : ohLabel(d);
+    const inspectBadge = d.mode === 'rent' ? (d.badge === 'inspection') : (d.badge === 'openhouse');
+    if (inspectBadge && d.openhouse) {
+      cta.push(d.mode === 'rent'
+        ? `Inspection ${d.openhouse} — register your interest to confirm a spot.`
+        : pick([`${inspectLabel} ${d.openhouse} — come and walk it yourself.`, `See it in person: ${inspectLabel.toLowerCase()} ${d.openhouse}.`]));
+      if (d.agentName) cta.push(`Questions? Contact ${d.agentName}${d.phone ? ' on ' + d.phone : ''}.`);
+    } else if (d.mode === 'rent') {
+      cta.push(pick(RENT_CLOSERS));
+      if (d.agentName) cta.push(`Contact ${d.agentName}${d.phone ? ' on ' + d.phone : ''} to register your interest.`);
     } else if (d.agentName) {
       cta.push(pick([
         `To arrange a viewing, call ${d.agentName}${d.phone ? ' on ' + d.phone : ''} today.`,
@@ -353,7 +405,7 @@ const Generator = (() => {
     }
 
     return [
-      headline(tone, d.city),
+      headline(tone, d.city, d.mode),
       p1.join(' '),
       p2.join(' '),
       p3.join(' '),
@@ -370,11 +422,15 @@ const Generator = (() => {
     forsale: 'FOR SALE',
     newprice: 'NEW PRICE',
     sold: 'JUST SOLD',
+    // rent statuses
+    forlease: 'FOR LEASE',
+    inspection: 'INSPECTION',
+    leased: 'LEASED',
   };
   const badgeText = (d) => {
     if (d.badge === 'custom' && d.badgeCustom) return d.badgeCustom.toUpperCase();
     if (d.badge === 'openhouse' && d.region === 'au') return 'HOME OPEN';   // WA-speak
-    return BADGE_HOOK[d.badge] || 'JUST LISTED';
+    return BADGE_HOOK[d.badge] || (d.mode === 'rent' ? 'FOR LEASE' : 'JUST LISTED');
   };
   const ohLabel = (d) => (d.region === 'au' ? 'Home open' : 'Open house');
 
@@ -382,8 +438,13 @@ const Generator = (() => {
     const lines = [];
     const noun = typeNoun(d.type, d.typeCustom);
     lines.push(`${pick(HOOK_EMOJI)} ${badgeText(d)} ${pick(HOOK_EMOJI)}`);
-    if (d.badge === 'openhouse' && d.openhouse) lines.push(`🗓️ ${d.openhouse}`);
-    lines.push(pick([
+    if (d.openhouse && (d.badge === 'openhouse' || d.badge === 'inspection')) lines.push(`🗓️ ${d.mode === 'rent' ? 'Inspection' : ohLabel(d)}: ${d.openhouse}`);
+    lines.push(pick(d.mode === 'rent' ? [
+      `Your next ${noun}, ready to lease.`,
+      `This ${noun} is available now.`,
+      `Move-in-ready and waiting for you.`,
+      `The rental you’ve been hunting for.`,
+    ] : [
       `Say hello to your next ${noun}.`,
       `This ${noun} checks all the boxes.`,
       `New on the market and ready to tour.`,
@@ -396,7 +457,7 @@ const Generator = (() => {
     if (d.baths) stat.push(`🛁 ${d.baths} ba`);
     if (d.cars) stat.push(`🚗 ${d.cars} car`);
     if (num(d.sqft)) stat.push(`📐 ${num(d.sqft)} ${d.areaUnit === 'sqm' ? 'm²' : 'sqft'}`);
-    if (money(d.price)) stat.push(`💰 ${money(d.price, d.currency)}`);
+    if (priceShort(d)) stat.push(`💰 ${priceShort(d)}`);
     if (stat.length) lines.push(stat.join('  •  '));
 
     const feats = polishFeatures(d.features);
@@ -407,7 +468,9 @@ const Generator = (() => {
     if ((d.photoCount || 0) > 1) { lines.push(''); lines.push('📸 Swipe through — then come see it in person.'); }
 
     lines.push('');
-    lines.push(pick(['DM me for a private tour 📩', 'Link in bio to book a showing.', 'Comment TOUR and I’ll send the details 👇', 'Ready to see it? Send me a message.']));
+    lines.push(pick(d.mode === 'rent'
+      ? ['DM me to book an inspection 📩', 'Comment INSPECT and I’ll send the times 👇', 'Register your interest — link in bio.', 'Keen? Send me a message to apply.']
+      : ['DM me for a private tour 📩', 'Link in bio to book a showing.', 'Comment TOUR and I’ll send the details 👇', 'Ready to see it? Send me a message.']));
     if (d.agentName) lines.push(`— ${d.agentName}${d.brokerage ? ', ' + d.brokerage : ''}`);
     lines.push('');
     lines.push(hashtags(d));
@@ -415,12 +478,13 @@ const Generator = (() => {
   };
 
   const hashtags = (d) => {
-    const tags = ['#justlisted', '#realestate', '#forsale', '#newlisting', '#homeforsale', '#dreamhome', '#realtor', '#housetour', '#hometour'];
+    const tags = d.mode === 'rent'
+      ? ['#forlease', '#forrent', '#rental', '#rentals', '#propertyforrent', '#newlisting', '#realestate', '#renting']
+      : ['#justlisted', '#realestate', '#forsale', '#newlisting', '#homeforsale', '#dreamhome', '#realtor', '#housetour', '#hometour'];
     const typeTag = { single: '#familyhome', apartment: '#apartmentliving', villa: '#villaliving', condo: '#condoliving', townhouse: '#townhome', multi: '#investmentproperty', land: '#landforsale', luxury: '#luxuryrealestate' }[d.type];
     if (typeTag) tags.push(typeTag);
-    if (priceTier(d.price) === 'luxury') tags.push('#luxuryhomes', '#luxurylisting');
-    if (d.badge === 'openhouse') tags.push('#openhouse');
-    if (d.city) tags.push('#' + d.city.toLowerCase().replace(/[^a-z0-9]/g, '') + 'realestate');
+    if (d.mode !== 'rent' && priceTier(d.price) === 'luxury') tags.push('#luxuryhomes', '#luxurylisting');
+    if (d.city) tags.push('#' + d.city.toLowerCase().replace(/[^a-z0-9]/g, '') + (d.mode === 'rent' ? 'rentals' : 'realestate'));
     return pickN(tags, Math.min(tags.length, 9)).join(' ');
   };
 
@@ -436,13 +500,18 @@ const Generator = (() => {
 
   const buildFacebook = (d) => {
     const noun = typeNoun(d.type, d.typeCustom);
+    const rent = d.mode === 'rent';
     const parts = [];
-    parts.push(pick([
+    parts.push(pick(rent ? [
+      `🏡 NEW RENTAL — now available for lease!`,
+      `Just listed for lease 👇`,
+      `New on the rental market and ready to inspect!`,
+    ] : [
       `🏡 NEW LISTING — just hit the market!`,
       `Excited to share my newest listing! 🎉`,
       `Just listed and I can’t wait to show it off 👇`,
     ]));
-    if (d.badge === 'openhouse' && d.openhouse) parts.push(`🗓️ ${ohLabel(d)}: ${d.openhouse}`);
+    if (d.openhouse && (d.badge === 'openhouse' || d.badge === 'inspection')) parts.push(`🗓️ ${rent ? 'Inspection' : ohLabel(d)}: ${d.openhouse}`);
     parts.push('');
 
     const sentence = [];
@@ -450,13 +519,16 @@ const Generator = (() => {
     sentence.push(`${addr ? addr + 'is a' : 'This'} ${noun}${statBlurb(d)}.`);
     const feats = polishFeatures(d.features);
     if (feats.length) sentence.push(`Inside, you’ll find ${oxford(pickN(feats, Math.min(feats.length, 3)).map((f) => f.text))}.`);
+    if (rent && (d.available || d.furnished === 'furnished')) sentence.push(`${d.furnished === 'furnished' ? 'Fully furnished and ' : ''}${d.available ? (/now|immediate|avail/i.test(d.available) ? 'available now' : 'available from ' + d.available) : 'ready to move into'}.`);
     if (d.neighborhood) sentence.push(`It’s ${cleanLocation(d.neighborhood)}.`);
     parts.push(sentence.join(' '));
 
-    if (money(d.price)) { parts.push(''); parts.push(`Offered at ${money(d.price, d.currency)}.`); }
+    if (priceLong(d)) { parts.push(''); parts.push(rent ? `Available to lease at ${priceLong(d)}.` : `Offered at ${priceLong(d)}.`); }
 
     parts.push('');
-    parts.push(pick(['Want a private tour? Send me a message or comment below 👇', 'Message me to schedule a showing — this one won’t last!', 'Tag someone who needs to see this, and DM me to tour.']));
+    parts.push(pick(rent
+      ? ['Want to inspect? Send me a message or comment below 👇', 'Message me to register for an inspection — quality rentals go fast!', 'Tag someone who’s house-hunting, and DM me to book a viewing.']
+      : ['Want a private tour? Send me a message or comment below 👇', 'Message me to schedule a showing — this one won’t last!', 'Tag someone who needs to see this, and DM me to tour.']));
     if (d.agentName) {
       const contact = [d.agentName, d.brokerage, d.phone].filter(Boolean).join(' • ');
       parts.push(`📞 ${contact}`);
@@ -470,6 +542,10 @@ const Generator = (() => {
     const feats = polishFeatures(d.features);
     const where = d.city || 'the area';
     const bedBit = d.beds ? `${d.beds}-bed ` : '';
+
+    const rent = d.mode === 'rent';
+    const done = d.badge === 'sold' || d.badge === 'leased'; // the deal's done → pivot to prospecting
+    const inspectWord = rent ? 'inspection' : ohLabel(d).toLowerCase();
 
     // badge-aware subject + an alternate, plus inbox preview text
     const SUBJECTS = {
@@ -491,13 +567,27 @@ const Generator = (() => {
         `Another one sold in ${where} — thinking of selling?`,
       ],
       forsale: [`For sale in ${where}: ${bedBit}${noun}`, d.address ? `Have you seen ${d.address}?` : `A ${noun} worth your weekend in ${where}`],
+      // rent
+      forlease: [
+        `For lease in ${where}: ${bedBit}${noun}${priceShort(d) ? ' — ' + priceShort(d) : ''}`,
+        d.address ? `${d.address} is available to lease` : `Now leasing in ${where}`,
+      ],
+      inspection: [
+        d.openhouse ? `Inspection ${d.openhouse} — ${d.address || where}` : `Inspect this ${bedBit}${noun} in ${where}`,
+        `Open for inspection: ${bedBit}${noun} in ${where}`,
+      ],
+      leased: [
+        d.address ? `LEASED: ${d.address}` : `Just leased in ${where}`,
+        `Another one leased in ${where} — got a property to rent out?`,
+      ],
     };
-    const subs = (SUBJECTS[d.badge] || SUBJECTS.justlisted).filter(Boolean);
+    const subs = (SUBJECTS[d.badge] || (rent ? SUBJECTS.forlease : SUBJECTS.justlisted)).filter(Boolean);
     const subject = subs[0];
     const altSubject = subs[1] || '';
     const preheader = [
       [d.beds && `${d.beds} bed`, d.baths && `${d.baths} bath`, d.cars && `${d.cars} car`].filter(Boolean).join(' · '),
-      money(d.price, d.currency) || (d.badge === 'sold' ? '' : 'price on application'),
+      priceShort(d) || (done ? '' : (rent ? 'rent on application' : 'price on application')),
+      rent && d.available ? `avail ${d.available}` : '',
       'photos inside',
     ].filter(Boolean).join(' — ');
 
@@ -510,15 +600,21 @@ const Generator = (() => {
     body.push('');
 
     // hook
-    if (d.badge === 'sold') {
-      body.push(`${d.address ? d.address + ' has' : 'One of my listings has'} just sold${d.city ? ' in ' + d.city : ''} — and the buyer interest along the way tells me ${where} is in demand. If you’ve been wondering what your own place might be worth, this is a good moment to ask.`);
+    if (done) {
+      body.push(rent
+        ? `${d.address ? d.address + ' has' : 'One of my rentals has'} just leased${d.city ? ' in ' + d.city : ''} — and the enquiry it drew shows how tight ${where} is right now. If you’ve got a property sitting empty, I’d be glad to help you lease it quickly.`
+        : `${d.address ? d.address + ' has' : 'One of my listings has'} just sold${d.city ? ' in ' + d.city : ''} — and the buyer interest along the way tells me ${where} is in demand. If you’ve been wondering what your own place might be worth, this is a good moment to ask.`);
     } else {
-      body.push(pick([
-        `Before this one gets busy, I wanted you to see it first${d.address ? ': ' + d.address + (d.city ? ', ' + d.city : '') : ''}.`,
-        `Some homes I send to everyone — this one I wanted my list to see first${d.address ? ': ' + d.address + (d.city ? ', ' + d.city : '') : ''}.`,
-      ]));
+      body.push(rent
+        ? pick([
+          `A rental I think you’ll want to see just came up${d.address ? ': ' + d.address + (d.city ? ', ' + d.city : '') : ''}.`,
+          `Quality rentals move fast — here’s a new one before it gets busy${d.address ? ': ' + d.address + (d.city ? ', ' + d.city : '') : ''}.`,
+        ])
+        : pick([
+          `Before this one gets busy, I wanted you to see it first${d.address ? ': ' + d.address + (d.city ? ', ' + d.city : '') : ''}.`,
+          `Some homes I send to everyone — this one I wanted my list to see first${d.address ? ': ' + d.address + (d.city ? ', ' + d.city : '') : ''}.`,
+        ]));
       body.push('');
-      // beds/baths/size live in the bullets below — keep the prose about feel
       let para = `It’s a ${noun}`;
       para += feats.length ? ` with ${oxford(pickN(feats, Math.min(feats.length, 3)).map((f) => f.text))}.` : ' worth a closer look.';
       if (d.neighborhood) para += ` And it’s ${cleanLocation(d.neighborhood)}.`;
@@ -526,25 +622,36 @@ const Generator = (() => {
     }
     body.push('');
 
-    if (d.badge !== 'sold') {
+    if (!done) {
       const bullets = [];
-      if (money(d.price)) bullets.push(`Price: ${money(d.price, d.currency)}`);
+      if (rent) { if (priceLong(d)) bullets.push(`Rent: ${priceLong(d)}`); }
+      else if (money(d.price)) bullets.push(`Price: ${money(d.price, d.currency)}`);
       const bb = [d.beds && d.beds + ' bed', d.baths && d.baths + ' bath', d.cars && d.cars + ' car', num(d.sqft) && num(d.sqft) + ' ' + areaShort(d.areaUnit)].filter(Boolean);
       if (bb.length) bullets.push(bb.join(' / '));
-      if (d.badge === 'openhouse' && d.openhouse) bullets.push(`${ohLabel(d)}: ${d.openhouse}`);
+      if (rent) {
+        if (d.available) bullets.push(`Available: ${d.available}`);
+        if (d.leaseTerm) bullets.push(`Lease: ${d.leaseTerm}`);
+        if (d.bond) bullets.push(`Bond: ${money(d.bond, d.currency) || d.bond}`);
+        if (d.furnished === 'furnished') bullets.push('Fully furnished');
+        else if (d.furnished === 'part') bullets.push('Part-furnished');
+        if (petPhrase(d.pets)) bullets.push(cap(petPhrase(d.pets)));
+      }
+      if (d.openhouse && (d.badge === 'openhouse' || d.badge === 'inspection')) bullets.push(`${rent ? 'Inspection' : ohLabel(d)}: ${d.openhouse}`);
       pickN(feats, Math.min(feats.length, 5)).forEach((f) => bullets.push(cap(f.text.replace(/^a |^an /, ''))));
       if (bullets.length) { body.push('At a glance:'); bullets.forEach((b) => body.push(`• ${b}`)); body.push(''); }
 
-      body.push(d.badge === 'openhouse' && d.openhouse
-        ? `Come through the ${ohLabel(d).toLowerCase()} (${d.openhouse}), or reply and I’ll arrange a private viewing that suits you.`
-        : pick([
-          'Want to see it before the first home open? Reply to this email or give me a call.',
-          'I’d love to walk you through. Reply here or call me and we’ll find a time.',
-          'Reply to this email and I’ll get you through this week.',
-        ]));
+      if (d.openhouse && (d.badge === 'openhouse' || d.badge === 'inspection')) {
+        body.push(`Come through the ${inspectWord} (${d.openhouse}), or reply and I’ll ${rent ? 'add you to the inspection list' : 'arrange a private viewing that suits you'}.`);
+      } else {
+        body.push(rent
+          ? pick(['Reply to register your interest and I’ll send through inspection times.', 'Keen? Reply or call and I’ll get you in for an inspection this week.', 'Reply to this email and I’ll send the application details.'])
+          : pick(['Want to see it before the first home open? Reply to this email or give me a call.', 'I’d love to walk you through. Reply here or call me and we’ll find a time.', 'Reply to this email and I’ll get you through this week.']));
+      }
       body.push('');
     } else {
-      body.push('Reply to this email or give me a call for a no-obligation chat about your property.');
+      body.push(rent
+        ? 'Reply or give me a call for a no-obligation chat about leasing your property.'
+        : 'Reply to this email or give me a call for a no-obligation chat about your property.');
       body.push('');
     }
 
@@ -552,9 +659,11 @@ const Generator = (() => {
     [d.agentName, d.brokerage, d.phone, d.email].filter(Boolean).forEach((l) => body.push(l));
 
     // referral ask — the cheapest lead source there is
-    if (d.badge !== 'sold') {
+    if (!done) {
       body.push('');
-      body.push(`P.S. Know someone house-hunting in ${where}? Forward this on — good homes tend to find their buyers through friends.`);
+      body.push(rent
+        ? `P.S. Know someone hunting for a rental in ${where}? Forward this on — the good ones go through word of mouth.`
+        : `P.S. Know someone house-hunting in ${where}? Forward this on — good homes tend to find their buyers through friends.`);
     }
     return body.join('\n');
   };
@@ -633,5 +742,5 @@ const Generator = (() => {
     email: buildEmail(data),
   });
 
-  return { generate, priceTier, money, num, flyerFeatures, BADGE_HOOK, badgeText, parsePrefs, applyPrefs };
+  return { generate, priceTier, money, num, priceShort, priceLong, petPhrase, flyerFeatures, BADGE_HOOK, badgeText, parsePrefs, applyPrefs };
 })();
