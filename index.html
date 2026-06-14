@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=18" />
+  <link rel="stylesheet" href="styles.css?v=19" />
 </head>
 <body>
   <header class="topbar">
@@ -527,6 +527,9 @@
             <button type="button" data-add="address">+ Address</button>
             <button type="button" data-add="stats">+ Beds/baths</button>
             <button type="button" data-add="badge">+ Badge</button>
+            <button type="button" data-add="logo" id="stAddLogo">+ Logo</button>
+            <button type="button" data-add="head" id="stAddHead">+ Headshot</button>
+            <button type="button" data-add="rect">+ Bar</button>
           </div>
         </div>
         <div class="st-group">
@@ -536,14 +539,14 @@
         <div class="st-group" id="stLayerCtl" hidden>
           <div class="st-group-title">Selected layer <span class="hint">— drag it on the canvas to move</span></div>
           <textarea id="stText" rows="2"></textarea>
-          <label class="st-slider">Size <input type="range" id="stSize" min="16" max="220" step="1" /></label>
+          <label class="st-slider" id="stSizeRow">Size <input type="range" id="stSize" min="16" max="220" step="1" /></label>
           <div class="st-colors" id="stColors"></div>
-          <div class="st-row">
+          <div class="st-row" id="stRowStyle">
             <button type="button" id="stFont">Serif</button>
             <button type="button" id="stBold">Bold</button>
             <button type="button" id="stShadow">Shadow</button>
           </div>
-          <div class="st-row">
+          <div class="st-row" id="stRowAlign">
             <button type="button" id="stAlignL">⯇</button>
             <button type="button" id="stAlignC">≡</button>
             <button type="button" id="stAlignR">⯈</button>
@@ -552,6 +555,14 @@
             <button type="button" id="stDup">Duplicate</button>
             <button type="button" id="stDel" class="danger">Delete</button>
           </div>
+        </div>
+        <div class="st-group">
+          <div class="st-group-title">My templates <span class="hint">— save this layout, reuse on any listing</span></div>
+          <div class="st-row">
+            <input type="text" id="stTplName" placeholder="Template name" />
+            <button type="button" id="stTplSave">Save</button>
+          </div>
+          <div class="st-tpl-list" id="stTplList"></div>
         </div>
       </div>
     </div>
@@ -592,14 +603,14 @@
     </div>
   </div>
 
-  <script src="generator.js?v=18"></script>
-  <script src="fairhousing.js?v=18"></script>
-  <script src="parser.js?v=18"></script>
-  <script src="importer.js?v=18"></script>
-  <script src="visuals.js?v=18"></script>
-  <script src="flyer.js?v=18"></script>
-  <script src="ai.js?v=18"></script>
-  <script src="studio.js?v=18"></script>
-  <script src="app.js?v=18"></script>
+  <script src="generator.js?v=19"></script>
+  <script src="fairhousing.js?v=19"></script>
+  <script src="parser.js?v=19"></script>
+  <script src="importer.js?v=19"></script>
+  <script src="visuals.js?v=19"></script>
+  <script src="flyer.js?v=19"></script>
+  <script src="ai.js?v=19"></script>
+  <script src="studio.js?v=19"></script>
+  <script src="app.js?v=19"></script>
 </body>
 </html>

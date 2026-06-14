@@ -74,6 +74,35 @@ const Studio = (() => {
   const drawLayer = (L) => {
     const w = W(), h = H();
     const cx = L.xf * w, cy = L.yf * h;
+
+    if (L.type === 'rect') {
+      const bw = L.wf * w, bh = L.hf * h, bx = cx - bw / 2, by = cy - bh / 2;
+      ctx2d.save();
+      ctx2d.globalAlpha = L.opacity == null ? 1 : L.opacity;
+      ctx2d.fillStyle = resolveColor(L.color);
+      if (L.radius) { roundRect(bx, by, bw, bh, L.radius); ctx2d.fill(); } else ctx2d.fillRect(bx, by, bw, bh);
+      ctx2d.restore();
+      L._box = { x: bx, y: by, w: bw, h: bh };
+      return;
+    }
+    if (L.type === 'image') {
+      const img = L.src === 'logo' ? ctxData.brand.logoImg : ctxData.brand.headImg;
+      if (!img || !img.width) { L._box = { x: cx, y: cy, w: 0, h: 0 }; return; }
+      const dw = L.wf * w;
+      if (L.shape === 'circle') {
+        const d = dw, x = cx - d / 2, y = cy - d / 2, s = Math.max(d / img.width, d / img.height);
+        ctx2d.save(); ctx2d.beginPath(); ctx2d.arc(cx, cy, d / 2, 0, Math.PI * 2); ctx2d.clip();
+        ctx2d.drawImage(img, cx - img.width * s / 2, cy - img.height * s / 2, img.width * s, img.height * s);
+        ctx2d.restore();
+        L._box = { x, y, w: d, h: d };
+      } else {
+        const dh = dw * (img.height / img.width), x = cx - dw / 2, y = cy - dh / 2;
+        ctx2d.drawImage(img, x, y, dw, dh);
+        L._box = { x, y, w: dw, h: dh };
+      }
+      return;
+    }
+
     const m = measure(L);
     const col = resolveColor(L.color);
     ctx2d.textBaseline = 'top';
@@ -120,12 +149,21 @@ const Studio = (() => {
     if (showSel && selId) {
       const L = layers.find((x) => x.id === selId);
       if (L && L._box) {
+        const pad = (L.size || W() * 0.04) * 0.25;
+        const bx = L._box.x - pad, by = L._box.y - pad, bw = L._box.w + pad * 2, bh = L._box.h + pad * 2;
         ctx2d.strokeStyle = '#2c7a7b'; ctx2d.lineWidth = Math.max(2, W() / 360); ctx2d.setLineDash([W() / 90, W() / 120]);
-        const pad = L.size * 0.25;
-        ctx2d.strokeRect(L._box.x - pad, L._box.y - pad, L._box.w + pad * 2, L._box.h + pad * 2);
+        ctx2d.strokeRect(bx, by, bw, bh);
         ctx2d.setLineDash([]);
+        // resize handle (bottom-right)
+        ctx2d.fillStyle = '#2c7a7b'; ctx2d.beginPath(); ctx2d.arc(bx + bw, by + bh, HANDLE(), 0, Math.PI * 2); ctx2d.fill();
+        ctx2d.strokeStyle = '#fff'; ctx2d.lineWidth = Math.max(1.5, W() / 540); ctx2d.stroke();
       }
     }
+  };
+  const HANDLE = () => W() * 0.018;
+  const handlePos = (L) => {
+    const pad = (L.size || W() * 0.04) * 0.25;
+    return { x: L._box.x - pad + L._box.w + pad * 2, y: L._box.y - pad + L._box.h + pad * 2 };
   };
 
   // ---- add layers ------------------------------------------------------------
@@ -133,11 +171,17 @@ const Studio = (() => {
     const f = ctxData.fields;
     const base = { id: uid++, type: 'text', xf: 0.5, yf: 0.5, size: Math.round(W() * 0.06), color: 'white', font: 'sans', weight: 800, align: 'center', shadow: true };
     let L;
-    if (kind === 'price') L = { ...base, text: f.price || '$0', size: Math.round(W() * 0.085), yf: 0.8 };
-    else if (kind === 'address') L = { ...base, text: f.address || 'Address', weight: 400, size: Math.round(W() * 0.04), yf: 0.88 };
-    else if (kind === 'stats') L = { ...base, text: f.stats || '0 BD · 0 BA', weight: 600, size: Math.round(W() * 0.032), yf: 0.93 };
-    else if (kind === 'badge') L = { ...base, type: 'badge', text: f.badge || 'JUST LISTED', color: 'accent', size: Math.round(W() * 0.035), weight: 800, yf: 0.12, xf: 0.22 };
-    else L = { ...base, text: 'Your text' };
+    if (kind === 'price') L = { ...base, field: 'price', text: f.price || '$0', size: Math.round(W() * 0.085), yf: 0.8 };
+    else if (kind === 'address') L = { ...base, field: 'address', text: f.address || 'Address', weight: 400, size: Math.round(W() * 0.04), yf: 0.88 };
+    else if (kind === 'stats') L = { ...base, field: 'stats', text: f.stats || '0 BD · 0 BA', weight: 600, size: Math.round(W() * 0.032), yf: 0.93 };
+    else if (kind === 'badge') L = { ...base, type: 'badge', field: 'badge', text: f.badge || 'JUST LISTED', color: 'accent', size: Math.round(W() * 0.035), weight: 800, yf: 0.12, xf: 0.22 };
+    else if (kind === 'logo' || kind === 'head') {
+      const img = kind === 'logo' ? ctxData.brand.logoImg : ctxData.brand.headImg;
+      if (!img || !img.width) return; // nothing uploaded
+      L = { id: uid++, type: 'image', src: kind, shape: kind === 'head' ? 'circle' : 'rect', xf: kind === 'head' ? 0.82 : 0.5, yf: kind === 'head' ? 0.85 : 0.5, wf: kind === 'head' ? 0.2 : 0.32 };
+    } else if (kind === 'rect') {
+      L = { id: uid++, type: 'rect', color: 'primary', xf: 0.5, yf: 0.88, wf: 1, hf: 0.16, radius: 0, opacity: 1 };
+    } else L = { ...base, text: 'Your text' };
     layers.push(L); selId = L.id; render(); syncPanel();
   };
 
@@ -156,8 +200,25 @@ const Studio = (() => {
     }
     return null;
   };
+  const sizeOf = (L) => (L.type === 'text' || L.type === 'badge') ? L.size : (L.type === 'rect' ? L.hf : L.wf);
+  const setSize = (L, v) => {
+    if (L.type === 'text' || L.type === 'badge') L.size = Math.max(12, Math.round(v));
+    else if (L.type === 'rect') L.hf = Math.min(1, Math.max(0.02, v));
+    else L.wf = Math.min(1.5, Math.max(0.04, v));
+  };
   const onDown = (e) => {
-    const p = pt(e); const L = hit(p.x, p.y);
+    const p = pt(e);
+    // resize handle of the current selection takes priority
+    const cur = layers.find((x) => x.id === selId);
+    if (cur && cur._box) {
+      const hp = handlePos(cur);
+      if (Math.hypot(p.x - hp.x, p.y - hp.y) <= HANDLE() * 1.8) {
+        const cx = cur.xf * W(), cy = cur.yf * H();
+        drag = { id: cur.id, resize: true, startDist: Math.max(8, Math.hypot(p.x - cx, p.y - cy)), startSize: sizeOf(cur) };
+        e.preventDefault(); return;
+      }
+    }
+    const L = hit(p.x, p.y);
     selId = L ? L.id : null;
     if (L) { drag = { id: L.id, dx: p.x - L.xf * W(), dy: p.y - L.yf * H() }; e.preventDefault(); }
     render(); syncPanel();
@@ -165,6 +226,12 @@ const Studio = (() => {
   const onMove = (e) => {
     if (!drag) return;
     const p = pt(e); const L = layers.find((x) => x.id === drag.id); if (!L) return;
+    if (drag.resize) {
+      const cx = L.xf * W(), cy = L.yf * H();
+      const factor = Math.hypot(p.x - cx, p.y - cy) / drag.startDist;
+      setSize(L, drag.startSize * factor);
+      render(); syncPanel(); e.preventDefault(); return;
+    }
     L.xf = Math.min(1, Math.max(0, (p.x - drag.dx) / W()));
     L.yf = Math.min(1, Math.max(0, (p.y - drag.dy) / H()));
     render(); e.preventDefault();
@@ -193,20 +260,73 @@ const Studio = (() => {
     const L = sel();
     $('stLayerCtl').hidden = !L;
     if (!L) return;
-    $('stText').value = L.text;
-    $('stSize').value = L.size;
-    $('stFont').textContent = L.font === 'serif' ? 'Serif' : 'Sans';
-    $('stFont').classList.toggle('on', L.font === 'serif');
-    $('stBold').classList.toggle('on', L.weight >= 700);
-    $('stShadow').classList.toggle('on', !!L.shadow);
-    ['L', 'C', 'R'].forEach((a) => $('stAlign' + a).classList.toggle('on', L.align === { L: 'left', C: 'center', R: 'right' }[a]));
-    const cbox = $('stColors'); cbox.innerHTML = '';
-    COLORS.forEach(([key, hex]) => {
-      const sw = document.createElement('button');
-      sw.className = 'st-sw' + (L.color === key ? ' active' : '');
-      sw.style.background = hex || resolveColor(key);
-      sw.addEventListener('click', () => { L.color = key; render(); syncPanel(); });
-      cbox.appendChild(sw);
+    const isText = L.type === 'text' || L.type === 'badge';
+    const hasColor = isText || L.type === 'rect';
+    $('stText').style.display = isText ? 'block' : 'none';
+    $('stSizeRow').style.display = isText ? 'flex' : 'none';
+    $('stColors').style.display = hasColor ? 'flex' : 'none';
+    $('stRowStyle').style.display = isText ? 'flex' : 'none';
+    $('stRowAlign').style.display = L.type === 'text' ? 'flex' : 'none';
+    if (isText) {
+      $('stText').value = L.text;
+      $('stSize').value = L.size;
+      $('stFont').textContent = L.font === 'serif' ? 'Serif' : 'Sans';
+      $('stFont').classList.toggle('on', L.font === 'serif');
+      $('stBold').classList.toggle('on', L.weight >= 700);
+      $('stShadow').classList.toggle('on', !!L.shadow);
+      ['L', 'C', 'R'].forEach((a) => $('stAlign' + a).classList.toggle('on', L.align === { L: 'left', C: 'center', R: 'right' }[a]));
+    }
+    if (hasColor) {
+      const cbox = $('stColors'); cbox.innerHTML = '';
+      COLORS.forEach(([key, hex]) => {
+        const sw = document.createElement('button');
+        sw.className = 'st-sw' + (L.color === key ? ' active' : '');
+        sw.style.background = hex || resolveColor(key);
+        sw.addEventListener('click', () => { L.color = key; render(); syncPanel(); });
+        cbox.appendChild(sw);
+      });
+    }
+  };
+
+  // ---- my templates (save layout, reuse on any listing) ---------------------
+  const TPL_LS = 'lk_studio_templates';
+  const loadTpls = () => { try { return JSON.parse(localStorage.getItem(TPL_LS) || '[]'); } catch (e) { return []; } };
+  const saveTpls = (list) => { try { localStorage.setItem(TPL_LS, JSON.stringify(list)); } catch (e) {} };
+  const saveTemplate = (name) => {
+    const data = {
+      v: 1, size: sizeKey, bg: { type: bg.type },
+      layers: layers.map((L) => { const { _box, id, ...rest } = L; return rest; }),
+    };
+    const list = loadTpls();
+    const existing = list.findIndex((t) => t.name.toLowerCase() === name.toLowerCase());
+    if (existing >= 0) list[existing] = { name, data }; else list.push({ name, data });
+    saveTpls(list); renderTplList();
+  };
+  const applyTemplate = (i) => {
+    const t = loadTpls()[i]; if (!t) return;
+    sizeKey = SIZES[t.data.size] ? t.data.size : 'square';
+    document.querySelectorAll('#stSizes button').forEach((x) => x.classList.toggle('active', x.dataset.size === sizeKey));
+    bg = (t.data.bg.type === 'photo' && ctxData.photos.length) ? { type: 'photo', photoIndex: 0 } : { type: 'color' };
+    layers = (t.data.layers || []).map((L) => {
+      const n = { ...L, id: uid++ };
+      // token fill: layers tagged with a field re-fill from the current listing
+      if (n.field && ctxData.fields[n.field]) n.text = ctxData.fields[n.field];
+      return n;
+    });
+    selId = null; renderBgPicker(); render(); syncPanel();
+  };
+  const deleteTemplate = (i) => { const list = loadTpls(); list.splice(i, 1); saveTpls(list); renderTplList(); };
+  const renderTplList = () => {
+    const box = $('stTplList'); box.innerHTML = '';
+    const list = loadTpls();
+    if (!list.length) { box.innerHTML = '<div class="st-tpl-empty">No saved templates yet.</div>'; return; }
+    list.forEach((t, i) => {
+      const row = document.createElement('div'); row.className = 'st-tpl-item';
+      const use = document.createElement('button'); use.className = 'st-tpl-use'; use.textContent = t.name;
+      use.addEventListener('click', () => applyTemplate(i));
+      const del = document.createElement('button'); del.className = 'st-tpl-del'; del.textContent = '×'; del.title = 'Delete template';
+      del.addEventListener('click', () => deleteTemplate(i));
+      row.appendChild(use); row.appendChild(del); box.appendChild(row);
     });
   };
 
@@ -247,6 +367,12 @@ const Studio = (() => {
     $('stDel').addEventListener('click', () => { layers = layers.filter((x) => x.id !== selId); selId = null; render(); syncPanel(); });
     $('stExport').addEventListener('click', exportPNG);
     $('stClose').addEventListener('click', close);
+    $('stTplSave').addEventListener('click', () => {
+      const name = ($('stTplName').value || '').trim();
+      if (!name) { $('stTplName').focus(); return; }
+      saveTemplate(name); $('stTplName').value = '';
+    });
+    $('stTplName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('stTplSave').click(); } });
   };
 
   const open = (data, startSize) => {
@@ -262,7 +388,9 @@ const Studio = (() => {
     if (f.price) add('price');
     if (f.address) add('address');
     selId = null;
-    renderBgPicker(); render(); syncPanel();
+    $('stAddLogo').disabled = !(ctxData.brand.logoImg && ctxData.brand.logoImg.width);
+    $('stAddHead').disabled = !(ctxData.brand.headImg && ctxData.brand.headImg.width);
+    renderBgPicker(); renderTplList(); render(); syncPanel();
     $('studio').hidden = false;
     document.body.style.overflow = 'hidden';
   };
