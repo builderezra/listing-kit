@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v17';
+  const APP_VERSION = 'v18';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -521,6 +521,11 @@
     $('dlCarousel').addEventListener('click', () => {
       carouselCanvases.forEach((cv, i) =>
         setTimeout(() => Visuals.download(cv, `${slug()}-carousel-${String(i + 1).padStart(2, '0')}.png`), i * 350));
+    });
+    $('openStudio').addEventListener('click', () => {
+      const d = vizData();
+      const stats = [d.beds && d.beds + ' BD', d.baths && d.baths + ' BA', d.cars && d.cars + ' CAR', d.sqft && d.sqft + ' ' + (d.areaUnit === 'sqm' ? 'M²' : 'SQ FT')].filter(Boolean).join('  ·  ');
+      Studio.open({ photos: d.photos, brand, fields: { price: d.price, address: d.address, stats, badge: d.badgeText } }, 'square');
     });
   };
 

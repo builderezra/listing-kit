@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=17" />
+  <link rel="stylesheet" href="styles.css?v=18" />
 </head>
 <body>
   <header class="topbar">
@@ -451,6 +451,7 @@
             </div>
           </div>
           <button type="button" class="copy-btn dl-all" id="dlAll">⬇️ Download all graphics</button>
+          <button type="button" class="copy-btn dl-all" id="openStudio">🎨 Open in design studio — add text &amp; customise</button>
 
           <div id="carouselSection" hidden>
             <h3 class="gfx-sub">📚 Instagram carousel <span class="hint">— cover, photo highlights, then your CTA card. Post in order.</span></h3>
@@ -502,6 +503,60 @@
     <p>Runs in your browser — photos and details are never uploaded (link import fetches via public read proxies). The compliance check is decision support, not legal advice; always defer to your agency’s compliance guidance. <span id="verTag"></span></p>
   </footer>
 
+  <div class="studio-overlay" id="studio" hidden>
+    <div class="studio-bar">
+      <span class="studio-title">🎨 Design studio</span>
+      <div class="studio-sizes" id="stSizes">
+        <button type="button" data-size="square" class="active">Post</button>
+        <button type="button" data-size="story">Story</button>
+        <button type="button" data-size="wide">Wide</button>
+      </div>
+      <div class="studio-bar-right">
+        <button type="button" class="mini-btn" id="stExport">⬇️ Export PNG</button>
+        <button type="button" class="st-close" id="stClose" aria-label="Close studio">×</button>
+      </div>
+    </div>
+    <div class="studio-body">
+      <div class="studio-stage" id="stStage"><canvas id="stCanvas"></canvas></div>
+      <div class="studio-panel">
+        <div class="st-group">
+          <div class="st-group-title">Add a layer</div>
+          <div class="st-add" id="stAdd">
+            <button type="button" data-add="text">+ Text</button>
+            <button type="button" data-add="price">+ Price</button>
+            <button type="button" data-add="address">+ Address</button>
+            <button type="button" data-add="stats">+ Beds/baths</button>
+            <button type="button" data-add="badge">+ Badge</button>
+          </div>
+        </div>
+        <div class="st-group">
+          <div class="st-group-title">Background</div>
+          <div class="st-bg" id="stBg"></div>
+        </div>
+        <div class="st-group" id="stLayerCtl" hidden>
+          <div class="st-group-title">Selected layer <span class="hint">— drag it on the canvas to move</span></div>
+          <textarea id="stText" rows="2"></textarea>
+          <label class="st-slider">Size <input type="range" id="stSize" min="16" max="220" step="1" /></label>
+          <div class="st-colors" id="stColors"></div>
+          <div class="st-row">
+            <button type="button" id="stFont">Serif</button>
+            <button type="button" id="stBold">Bold</button>
+            <button type="button" id="stShadow">Shadow</button>
+          </div>
+          <div class="st-row">
+            <button type="button" id="stAlignL">⯇</button>
+            <button type="button" id="stAlignC">≡</button>
+            <button type="button" id="stAlignR">⯈</button>
+          </div>
+          <div class="st-row">
+            <button type="button" id="stDup">Duplicate</button>
+            <button type="button" id="stDel" class="danger">Delete</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="modal-overlay" id="photoEditor" hidden>
     <div class="modal photo-editor">
       <div class="pe-head">
@@ -537,13 +592,14 @@
     </div>
   </div>
 
-  <script src="generator.js?v=17"></script>
-  <script src="fairhousing.js?v=17"></script>
-  <script src="parser.js?v=17"></script>
-  <script src="importer.js?v=17"></script>
-  <script src="visuals.js?v=17"></script>
-  <script src="flyer.js?v=17"></script>
-  <script src="ai.js?v=17"></script>
-  <script src="app.js?v=17"></script>
+  <script src="generator.js?v=18"></script>
+  <script src="fairhousing.js?v=18"></script>
+  <script src="parser.js?v=18"></script>
+  <script src="importer.js?v=18"></script>
+  <script src="visuals.js?v=18"></script>
+  <script src="flyer.js?v=18"></script>
+  <script src="ai.js?v=18"></script>
+  <script src="studio.js?v=18"></script>
+  <script src="app.js?v=18"></script>
 </body>
 </html>
