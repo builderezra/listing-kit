@@ -289,6 +289,11 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 }
 .copy-btn:hover { border-color: var(--teal); color: var(--teal); }
 .copy-btn.copied { background: var(--green); border-color: var(--green); color: #fff; }
+.copy-btn:disabled { opacity: .45; cursor: default; border-color: var(--line); color: var(--muted); }
+.copy-btn:disabled:hover { border-color: var(--line); color: var(--muted); }
+.parse-note.err { color: var(--red); }
+.parse-note.ok { color: var(--green); }
+#researchBtn { font-size: 12px; margin-left: 6px; font-weight: 600; }
 
 .copytext {
   font-family: var(--sans); font-size: 14.5px; line-height: 1.62; color: var(--ink);

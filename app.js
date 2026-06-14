@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v12';
+  const APP_VERSION = 'v13';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -344,6 +344,7 @@
 
   const generate = () => {
     const data = readForm();
+    snapshotAll(); // so Undo can revert a Reword/regenerate
     outputs = Generator.applyPrefs(Generator.generate(data), brand.prefs || {});
     runScan();
     $('emptyState').hidden = true;
@@ -493,6 +494,7 @@
     resetCopyBtn();
     $('aiBar').hidden = false;
     $('aiStatus').textContent = '';
+    updateUndo();
   };
 
   const updateCharcount = () => {
@@ -811,11 +813,25 @@
           ta.value = ta.value.trim() ? ta.value.replace(/,?\s*$/, '') + ', ' + val : val;
           chip.classList.add('added');
         }
+        // chips set the value programmatically, so no 'input' event fires —
+        // clear the red "missing" flag and persist the draft ourselves
+        ta.classList.toggle('missing', !ta.value.trim());
+        saveDraft();
       });
     });
   };
 
   const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+  // ---------------- undo history (per text channel) ----------------
+  let history = { mls: [], instagram: [], facebook: [], email: [] };
+  const pushHistory = (tab) => {
+    if (!outputs || outputs[tab] == null || !history[tab]) return;
+    history[tab].push(outputs[tab]);
+    if (history[tab].length > 25) history[tab].shift();
+  };
+  const snapshotAll = () => { if (outputs) ['mls', 'instagram', 'facebook', 'email'].forEach(pushHistory); };
+  const updateUndo = () => { $('undoBtn').disabled = !(history[activeTab] && history[activeTab].length); };
 
   // ---------------- AI polish (bring-your-own-key) ----------------
   const AI_CHANNEL = {
@@ -881,13 +897,15 @@
       const opts = { channelLabel: AI_CHANNEL[activeTab], currentText: outputs[activeTab], facts: aiFacts(), style: aiStyle() };
       const text = mode === 'polish' ? await AI.polish(opts) : await AI.instruct({ ...opts, instruction });
       if (!text) { aiBusy(false, 'No change returned — try again.', 'err'); return; }
+      pushHistory(activeTab); // remember the before-AI version so Undo works
       // mechanical house-style is still enforced, and compliance re-scanned
       const single = Generator.applyPrefs({ [activeTab]: text }, brand.prefs || {});
       outputs[activeTab] = single[activeTab];
       $('copytext').textContent = outputs[activeTab];
       updateCharcount();
       runScan();
-      aiBusy(false, '✓ Updated with ' + AI.modelLabel(), 'ok');
+      updateUndo();
+      aiBusy(false, '✓ Updated with ' + AI.modelLabel() + ' · ↶ Undo to compare', 'ok');
       if (mode === 'instruct') $('aiInstruction').value = '';
     } catch (e) {
       aiBusy(false, AI.explain(e), 'err');
@@ -923,6 +941,30 @@
     $('aiInstruction').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); const i = e.target.value.trim(); if (i) runAI('instruct', i); } });
   };
 
+  // AI + live web search → real nearby amenities into Location highlights
+  const researchLocation = async () => {
+    const note = (msg, kind) => { $('researchStatus').textContent = msg; $('researchStatus').className = 'parse-note' + (kind ? ' ' + kind : ''); };
+    if (!AI.available()) { $('brandSection').open = true; setTimeout(() => $('aiKey').focus(), 50); note('Add your API key in “Your brand” to enable AI.', 'err'); return; }
+    const address = $('address').value.trim(), suburb = $('city').value.trim();
+    if (!address && !suburb) { note('Enter an address or suburb first.', 'err'); return; }
+    $('researchBtn').disabled = true;
+    note('Researching nearby amenities — uses live web search (about 1–2¢)…');
+    try {
+      const phrase = (await AI.research({ address, suburb, region: brand.region }) || '').replace(/^["'“]+|["'”]+$/g, '').trim();
+      if (phrase) {
+        $('neighborhood').value = phrase;
+        $('neighborhood').classList.remove('missing');
+        saveDraft();
+        note('✓ Filled — check it reads right, then Generate (or Reword).', 'ok');
+        if (outputs) generate();
+      } else note('Nothing found — fill it in manually.', 'err');
+    } catch (e) {
+      note(AI.explain(e), 'err');
+    } finally {
+      $('researchBtn').disabled = false;
+    }
+  };
+
   // ---------------- events ----------------
   form.addEventListener('submit', (e) => { e.preventDefault(); generate(); });
   form.addEventListener('input', (e) => {
@@ -932,6 +974,14 @@
   document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => renderTab(t.dataset.tab)));
   $('copyBtn').addEventListener('click', doCopy);
   $('rewordBtn').addEventListener('click', () => { if (outputs) generate(); });
+  $('undoBtn').addEventListener('click', () => {
+    if (!outputs || !(history[activeTab] && history[activeTab].length)) return;
+    outputs[activeTab] = history[activeTab].pop();
+    $('copytext').textContent = outputs[activeTab];
+    updateCharcount(); runScan(); updateUndo();
+    aiBusy(false, '↩ Reverted to the previous version', 'ok');
+  });
+  $('researchBtn').addEventListener('click', researchLocation);
   $('clearBtn').addEventListener('click', clearListing);
 
   // import + paste UX

@@ -34,9 +34,11 @@ const AI = (() => {
   const modelLabel = () => (MODELS.find((m) => m.id === getModel()) || MODELS[0]).label.split(' —')[0];
 
   // ---- low-level call --------------------------------------------------------
-  const call = async (system, user, maxTokens = 1500) => {
+  const call = async (system, user, maxTokens = 1500, tools = null) => {
     const key = getKey();
     if (!key) { const e = new Error('no-key'); e.status = 0; throw e; }
+    const body = { model: getModel(), max_tokens: maxTokens, system, messages: [{ role: 'user', content: user }] };
+    if (tools) body.tools = tools;
     let res;
     try {
       res = await fetch(ENDPOINT, {
@@ -47,12 +49,7 @@ const AI = (() => {
           'anthropic-version': '2023-06-01',
           'anthropic-dangerous-direct-browser-access': 'true',
         },
-        body: JSON.stringify({
-          model: getModel(),
-          max_tokens: maxTokens,
-          system,
-          messages: [{ role: 'user', content: user }],
-        }),
+        body: JSON.stringify(body),
       });
     } catch (e) {
       const err = new Error('network'); err.status = -1; throw err;
@@ -63,6 +60,7 @@ const AI = (() => {
       const err = new Error(msg || ('HTTP ' + res.status)); err.status = res.status; throw err;
     }
     const data = await res.json();
+    // final answer is the text blocks (web-search tool results are server-side)
     return (data.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('').trim();
   };
 
@@ -86,6 +84,25 @@ const AI = (() => {
 
   const instruct = (opts) =>
     call(SYSTEM, wrap(opts, `Revise the ${opts.channelLabel} below according to this instruction: "${opts.instruction}". Apply it faithfully, but keep every hard rule (facts only, no discriminatory language, house style).`), 1500);
+
+  // ---- location research (uses live web search) ------------------------------
+  const RESEARCH_SYSTEM = [
+    'You research the real, local lifestyle amenities near a property for a real estate "location highlights" line. Use web search — never invent or guess a place name.',
+    'Include only genuine, verifiable nearby features a buyer cares about: beaches/coast/foreshore, parks and reserves, café/restaurant/shopping precincts (by name), and public transport (train/bus/ferry stations by name). Give a rough sense of proximity ("moments from", "a short walk to", "minutes from") only if the search supports it.',
+    'NEVER mention schools or school catchments, crime, safety, or the demographic makeup of an area — these create anti-discrimination / fair-housing risk.',
+    'Output ONLY one polished phrase suitable to drop into a listing, e.g. "moments from Scarborough Beach, the cafés along the foreshore, and Stirling train station". No preamble, no bullet list, no citations, no quotes.',
+  ].join('\n');
+
+  const REGION_NAME = { au: 'Australia', us: 'United States', uk: 'United Kingdom', other: '' };
+  const research = ({ address, suburb, region }) => {
+    const where = [address, suburb, REGION_NAME[region]].filter(Boolean).join(', ');
+    return call(
+      RESEARCH_SYSTEM,
+      `Research the immediate area around this property and return the single location-highlights phrase:\n${where}`,
+      600,
+      [{ type: 'web_search_20260209', name: 'web_search', max_uses: 4 }],
+    );
+  };
 
   // quick validation ping — cheapest model, tiny output
   const test = async () => {
@@ -122,5 +139,5 @@ const AI = (() => {
     return e && e.message ? e.message : 'Something went wrong.';
   };
 
-  return { MODELS, available, getKey, setKey, getModel, setModel, modelLabel, polish, instruct, test, explain };
+  return { MODELS, available, getKey, setKey, getModel, setModel, modelLabel, polish, instruct, research, test, explain };
 })();
