@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v20';
+  const APP_VERSION = 'v21';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -32,6 +32,33 @@
   brand.logoImg = null; brand.headImg = null; // live Image objects
 
   const CHANNEL_LABEL = { mls: 'Listing description', instagram: 'Instagram caption', facebook: 'Facebook post', email: 'Email blast' };
+
+  // ---------------- loading indicators ----------------
+  // a global thin top bar (ref-counted across concurrent ops)
+  const Progress = (() => {
+    let n = 0;
+    return {
+      start() { n++; const el = $('loadbar'); el.hidden = false; el.classList.add('on'); },
+      stop() { n = Math.max(0, n - 1); if (n === 0) { const el = $('loadbar'); el.classList.remove('on'); el.hidden = true; } },
+    };
+  })();
+  // an inline status with a live elapsed-seconds counter + spinner + estimate
+  const startBusy = (el, baseClass, label, estimate) => {
+    const t0 = Date.now();
+    let text = label;
+    const tick = () => {
+      const s = Math.round((Date.now() - t0) / 1000);
+      el.className = baseClass + ' busy';
+      el.innerHTML = `<span class="spin" aria-hidden="true"></span><span>${text} ${s}s${estimate ? ` · usually ${estimate}` : ''}</span>`;
+    };
+    tick();
+    const iv = setInterval(tick, 1000);
+    Progress.start();
+    return {
+      label: (l) => { text = l; tick(); },
+      finish: (msg, kind) => { clearInterval(iv); Progress.stop(); el.className = baseClass + (kind ? ' ' + kind : ''); el.textContent = msg; },
+    };
+  };
 
   // sensible per-market defaults for the per-listing selects
   const REGION_DEFAULTS = {
@@ -525,11 +552,16 @@
     $('openStudio').addEventListener('click', openStudio);
   };
 
-  // open the design studio from anywhere (works before a kit is generated too)
-  const openStudio = () => {
+  // the listing facts the studio binds its price/address/stats/badge layers to
+  const studioFields = () => {
     const d = vizData();
     const stats = [d.beds && d.beds + ' BD', d.baths && d.baths + ' BA', d.cars && d.cars + ' CAR', d.sqft && d.sqft + ' ' + (d.areaUnit === 'sqm' ? 'M²' : 'SQ FT')].filter(Boolean).join('  ·  ');
-    Studio.open({ photos: d.photos, brand, fields: { price: d.price, address: d.address, stats, badge: d.badgeText } }, 'square');
+    return { photos: d.photos, fields: { price: d.price, address: d.address, stats, badge: d.badgeText } };
+  };
+  // open the design studio from anywhere (works before a kit is generated too)
+  const openStudio = () => {
+    const s = studioFields();
+    Studio.open({ photos: s.photos, brand, fields: s.fields }, 'square');
   };
 
   // ---------------- flyer tab ----------------
@@ -751,13 +783,23 @@
     el.className = 'import-status' + (kind ? ' ' + kind : '');
   };
 
+  // determinate import progress bar
+  const importBar = (frac) => {
+    const wrap = $('importBar');
+    if (frac == null) { wrap.classList.add('hide'); wrap.firstElementChild.style.width = '0'; return; }
+    wrap.classList.remove('hide');
+    wrap.firstElementChild.style.width = Math.round(Math.max(0, Math.min(1, frac)) * 100) + '%';
+  };
+
   // fetch a list of image URLs into local photos; returns how many landed
   const importPhotoURLs = async (urls) => {
     if (!urls.length) return 0;
     setImportStatus(`Importing photos 0/${urls.length}…`);
-    const blobs = await Importer.fetchImages(urls, (done, total) => setImportStatus(`Importing photos ${done}/${total}…`));
+    importBar(0);
+    const blobs = await Importer.fetchImages(urls, (done, total) => { setImportStatus(`Importing photos ${done}/${total}…`); importBar(done / total); });
     let added = 0;
     for (const b of blobs) if (b && photos.length < 14) added += (await addPhotoBlob(b, 'imported')) ? 1 : 0;
+    importBar(null);
     return added;
   };
   const importGallery = (ref) => importPhotoURLs(Importer.reiwaGalleryURLs(ref, 12));
@@ -768,6 +810,7 @@
     if (!/^https?:\/\//i.test(url)) { setImportStatus('That doesn’t look like a link — it should start with https://', 'err'); return; }
     const btn = $('importBtn');
     btn.disabled = true; btn.textContent = '…';
+    Progress.start();
     try {
       // direct image link → just add the photo
       if (Importer.isImageURL(url) && !/reiwa\.com\.au\/[a-z]/i.test(url)) {
@@ -847,6 +890,8 @@
     } catch (e) {
       setImportStatus('Import failed unexpectedly — paste the listing text below instead.', 'err');
     } finally {
+      importBar(null);
+      Progress.stop();
       btn.disabled = false; btn.textContent = 'Import';
     }
   };
@@ -980,11 +1025,11 @@
     return S.join('\n');
   };
 
+  const setAiButtons = (on) => { $('aiPolishBtn').disabled = on; $('aiApply').disabled = on; $('aiPolishBtn').textContent = on ? '…' : '✨ Polish'; };
   const aiBusy = (on, msg, kind) => {
     $('aiStatus').textContent = msg || '';
     $('aiStatus').className = 'ai-status' + (kind ? ' ' + kind : '');
-    $('aiPolishBtn').disabled = on; $('aiApply').disabled = on;
-    $('aiPolishBtn').textContent = on ? '…' : '✨ Polish';
+    setAiButtons(on);
   };
 
   const runAI = async (mode, instruction) => {
@@ -995,11 +1040,12 @@
       aiBusy(false, 'Add your API key in “Your brand” to enable AI.', 'err');
       return;
     }
-    aiBusy(true, mode === 'polish' ? 'Polishing…' : 'Revising…');
+    setAiButtons(true);
+    const busy = startBusy($('aiStatus'), 'ai-status', mode === 'polish' ? 'Polishing' : 'Revising', '5–20s');
     try {
       const opts = { channelLabel: AI_CHANNEL[activeTab], currentText: outputs[activeTab], facts: aiFacts(), style: aiStyle() };
       const text = mode === 'polish' ? await AI.polish(opts) : await AI.instruct({ ...opts, instruction });
-      if (!text) { aiBusy(false, 'No change returned — try again.', 'err'); return; }
+      if (!text) { busy.finish('No change returned — try again.', 'err'); setAiButtons(false); return; }
       pushHistory(activeTab); // remember the before-AI version so Undo works
       // mechanical house-style is still enforced, and compliance re-scanned
       const single = Generator.applyPrefs({ [activeTab]: text }, brand.prefs || {});
@@ -1008,10 +1054,12 @@
       updateCharcount();
       runScan();
       updateUndo();
-      aiBusy(false, '✓ Updated with ' + AI.modelLabel() + ' · ↶ Undo to compare', 'ok');
+      busy.finish('✓ Updated with ' + AI.modelLabel() + ' · ↶ Undo to compare', 'ok');
       if (mode === 'instruct') $('aiInstruction').value = '';
     } catch (e) {
-      aiBusy(false, AI.explain(e), 'err');
+      busy.finish(AI.explain(e), 'err');
+    } finally {
+      setAiButtons(false);
     }
   };
 
@@ -1051,18 +1099,18 @@
     const address = $('address').value.trim(), suburb = $('city').value.trim();
     if (!address && !suburb) { note('Enter an address or suburb first.', 'err'); return; }
     $('researchBtn').disabled = true;
-    note('Researching nearby amenities — uses live web search (about 1–2¢)…');
+    const busy = startBusy($('researchStatus'), 'parse-note', 'Researching nearby amenities (web search)', '10–25s');
     try {
       const phrase = (await AI.research({ address, suburb, region: brand.region }) || '').replace(/^["'“]+|["'”]+$/g, '').trim();
       if (phrase) {
         $('neighborhood').value = phrase;
         $('neighborhood').classList.remove('missing');
         saveDraft();
-        note('✓ Filled — check it reads right, then Generate (or Reword).', 'ok');
+        busy.finish('✓ Filled — check it reads right, then Generate (or Reword).', 'ok');
         if (outputs) generate();
-      } else note('Nothing found — fill it in manually.', 'err');
+      } else busy.finish('Nothing found — fill it in manually.', 'err');
     } catch (e) {
-      note(AI.explain(e), 'err');
+      busy.finish(AI.explain(e), 'err');
     } finally {
       $('researchBtn').disabled = false;
     }
@@ -1073,11 +1121,10 @@
   form.addEventListener('input', (e) => {
     if (e.target && e.target.classList) e.target.classList.remove('missing');
     saveDraft();
+    Studio.refreshFields(studioFields().fields);   // live form → open studio binding
   });
-  document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => {
-    if (t.dataset.tab === 'studio') { openStudio(); return; } // opens the overlay, not a panel
-    renderTab(t.dataset.tab);
-  }));
+  document.querySelectorAll('.tab').forEach((t) => t.addEventListener('click', () => renderTab(t.dataset.tab)));
+  $('studioLaunch').addEventListener('click', openStudio);
   $('copyBtn').addEventListener('click', doCopy);
   $('rewordBtn').addEventListener('click', () => { if (outputs) generate(); });
   $('undoBtn').addEventListener('click', () => {

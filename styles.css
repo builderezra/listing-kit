@@ -489,7 +489,7 @@ body.dark .or-divider { color: var(--muted); }
 .studio-bar-right { margin-left: auto; display: flex; gap: 10px; align-items: center; }
 .st-close { background: rgba(255,255,255,.12); color: #fff; border: none; width: 32px; height: 32px; border-radius: 50%; font-size: 18px; line-height: 1; cursor: pointer; }
 .studio-body { flex: 1; display: flex; min-height: 0; }
-.studio-stage { flex: 1; display: flex; align-items: center; justify-content: center; padding: 18px; background: #2a2f35; overflow: auto; }
+.studio-stage { position: relative; flex: 1; display: flex; align-items: center; justify-content: center; padding: 18px; background: #2a2f35; overflow: auto; }
 #stCanvas { max-width: 100%; max-height: 100%; box-shadow: 0 6px 30px rgba(0,0,0,.4); background: #111; touch-action: none; cursor: move; border-radius: 2px; }
 .studio-panel { width: 290px; flex: 0 0 290px; background: var(--card); border-left: 1px solid var(--line); padding: 14px 16px; overflow-y: auto; }
 .st-group { margin-bottom: 18px; }
@@ -528,3 +528,52 @@ body.dark .or-divider { color: var(--muted); }
 .st-howto { font-size: 12.5px; line-height: 1.55; color: var(--muted); background: var(--hi); border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; margin: 0 0 14px; }
 .st-howto strong { color: var(--ink); font-weight: 600; }
 body.dark .st-howto { background: #191d22; }
+.st-howto kbd, .st-cheats kbd { font: 600 11px var(--sans); background: rgba(0,0,0,.18); border: 1px solid var(--line); border-radius: 4px; padding: 1px 5px; }
+body.dark .st-howto kbd, .st-cheats kbd { background: rgba(255,255,255,.12); border-color: #3a4047; }
+
+/* sub-label inside the selected-layer panel */
+.st-sub { font-size: 11.5px; font-weight: 600; color: var(--muted); margin-bottom: 6px; }
+#stColorWrap { margin-bottom: 4px; }
+
+/* custom-colour swatch (wraps a native colour input) */
+.st-sw-pick { position: relative; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; background: conic-gradient(red, yellow, lime, aqua, blue, magenta, red); }
+.st-sw-pick input { position: absolute; inset: -6px; width: 200%; height: 200%; border: none; padding: 0; cursor: pointer; opacity: 0; }
+.st-sw-pick::after { content: '+'; color: #fff; font-weight: 700; font-size: 15px; text-shadow: 0 1px 2px rgba(0,0,0,.6); pointer-events: none; }
+
+/* layers panel */
+.st-layers { display: flex; flex-direction: column; gap: 4px; }
+.st-layer-row { display: flex; gap: 4px; align-items: center; }
+.st-layer-row.active .st-layer-name { border-color: var(--teal); box-shadow: 0 0 0 2px rgba(44,122,123,.25); }
+.st-layer-name { flex: 1; text-align: left; font: 600 12px var(--sans); background: var(--hi); border: 1px solid var(--line); color: var(--ink); border-radius: 7px; padding: 6px 9px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.st-layer-mini { width: 28px; flex: 0 0 28px; background: var(--hi); border: 1px solid var(--line); border-radius: 7px; cursor: pointer; font-size: 12px; padding: 6px 0; color: var(--ink); }
+.st-layer-mini:hover { border-color: var(--teal); }
+
+/* restore-last-session bar */
+.st-restore { font-size: 12.5px; color: var(--ink); background: #fff7e9; border: 1px solid var(--gold, #e3b34d); border-radius: 9px; padding: 9px 11px; margin-bottom: 14px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+body.dark .st-restore { background: #2a2410; border-color: #6b5a22; }
+.st-restore button { font: 700 12px var(--sans); background: var(--teal); color: #fff; border: none; border-radius: 7px; padding: 6px 11px; cursor: pointer; }
+.st-restore button.link { background: none; color: var(--muted); text-decoration: underline; padding: 6px 2px; }
+
+/* keyboard cheat-sheet overlay */
+.st-cheats { position: absolute; top: 14px; right: 14px; max-width: 320px; background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; box-shadow: 0 10px 40px rgba(0,0,0,.45); z-index: 5; }
+.st-cheats h4 { margin: 0 0 8px; font-size: 13px; }
+.st-cheats ul { margin: 0 0 10px; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--ink); }
+
+/* ============ loading indicators ============ */
+.loadbar { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 100; overflow: hidden; pointer-events: none; }
+.loadbar.on::after { content: ''; position: absolute; top: 0; bottom: 0; left: -40%; width: 40%; background: var(--teal); border-radius: 0 3px 3px 0; animation: loadbar-slide 1.05s ease-in-out infinite; }
+@keyframes loadbar-slide { 0% { left: -42%; } 100% { left: 100%; } }
+.spin { display: inline-block; width: 12px; height: 12px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; vertical-align: -2px; margin-right: 6px; animation: lk-spin .7s linear infinite; }
+@keyframes lk-spin { to { transform: rotate(360deg); } }
+.import-progress { height: 6px; background: var(--line); border-radius: 999px; overflow: hidden; margin-top: 8px; }
+.import-progress.hide { display: none; }
+.import-progress > i { display: block; height: 100%; width: 0; background: var(--teal); transition: width .25s ease; }
+
+/* ============ studio launcher (a CTA, not a tab) ============ */
+.studio-launch {
+  margin-left: 10px; flex: 0 0 auto; align-self: center;
+  font: 700 13px var(--sans); color: #fff; white-space: nowrap;
+  background: linear-gradient(120deg, var(--teal), var(--navy-2));
+  border: none; border-radius: 999px; padding: 8px 15px; cursor: pointer; margin-right: 6px;
+}
+.studio-launch:hover { filter: brightness(1.08); }

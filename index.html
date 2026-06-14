@@ -8,9 +8,10 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=20" />
+  <link rel="stylesheet" href="styles.css?v=21" />
 </head>
 <body>
+  <div id="loadbar" class="loadbar" hidden></div>
   <header class="topbar">
     <div class="brand">
       <span class="logo" aria-hidden="true">🏡</span>
@@ -172,6 +173,7 @@
                 <button type="button" class="mini-btn" id="importBtn">Import</button>
               </div>
               <div class="import-status" id="importStatus" hidden></div>
+              <div class="import-progress hide" id="importBar"><i></i></div>
               <div class="or-divider">or paste the listing text</div>
               <p class="hint paste-hint">On the listing page: <kbd>Ctrl/Cmd+A</kbd> select all → <kbd>Ctrl/Cmd+C</kbd> copy → paste below. Price, beds, baths, cars &amp; size fill in automatically. Pasting a copied photo adds it to your photos.</p>
               <textarea id="pasteBox" rows="3" placeholder="Paste the listing text (or a copied photo) here…"></textarea>
@@ -411,13 +413,13 @@
     <section class="panel out-panel" aria-label="Generated marketing kit">
       <nav class="tabs" id="tabs" role="tablist">
         <button class="tab active" data-tab="graphics" role="tab">🎨 Graphics</button>
-        <button class="tab tab-studio" data-tab="studio" role="tab">✏️ Studio</button>
         <button class="tab" data-tab="flyer" role="tab">📄 Flyer</button>
         <button class="tab" data-tab="mls" role="tab">Listing</button>
         <button class="tab" data-tab="instagram" role="tab">Instagram</button>
         <button class="tab" data-tab="facebook" role="tab">Facebook</button>
         <button class="tab" data-tab="email" role="tab">Email</button>
         <button class="tab compliance-tab" data-tab="compliance" role="tab">⚖️ <span class="dot" id="complianceDot"></span></button>
+        <button type="button" class="studio-launch" id="studioLaunch" title="Open the full-screen design editor">✏️ Design Studio ↗</button>
       </nav>
 
       <div class="output" id="output">
@@ -504,23 +506,57 @@
     <p>Runs in your browser — photos and details are never uploaded (link import fetches via public read proxies). The compliance check is decision support, not legal advice; always defer to your agency’s compliance guidance. <span id="verTag"></span></p>
   </footer>
 
-  <div class="studio-overlay" id="studio" hidden>
+  <div class="studio-overlay" id="studio" role="dialog" aria-modal="true" aria-label="Design studio editor" hidden>
     <div class="studio-bar">
       <span class="studio-title">🎨 Design studio</span>
       <div class="studio-sizes" id="stSizes">
         <button type="button" data-size="square" class="active">Post</button>
+        <button type="button" data-size="portrait">Portrait</button>
         <button type="button" data-size="story">Story</button>
         <button type="button" data-size="wide">Wide</button>
       </div>
       <div class="studio-bar-right">
-        <button type="button" class="mini-btn" id="stExport">⬇️ Export PNG</button>
+        <button type="button" class="mini-btn ghost" id="stUndo" title="Undo (⌘Z)" aria-label="Undo">↩︎</button>
+        <button type="button" class="mini-btn ghost" id="stRedo" title="Redo (⌘⇧Z)" aria-label="Redo">↪︎</button>
+        <button type="button" class="mini-btn ghost" id="stHelp" title="Keyboard shortcuts (?)" aria-label="Keyboard shortcuts">?</button>
+        <button type="button" class="mini-btn" id="stExport">⬇️ PNG</button>
+        <button type="button" class="mini-btn ghost" id="stExportJpg" title="Export as JPG">JPG</button>
         <button type="button" class="st-close" id="stClose" aria-label="Close studio">×</button>
       </div>
     </div>
     <div class="studio-body">
-      <div class="studio-stage" id="stStage"><canvas id="stCanvas"></canvas></div>
+      <div class="studio-stage" id="stStage">
+        <canvas id="stCanvas"></canvas>
+        <div class="st-cheats" id="stCheats" hidden>
+          <h4>Keyboard shortcuts</h4>
+          <ul>
+            <li><kbd>⌘/Ctrl</kbd> + <kbd>Z</kbd> Undo · <kbd>⇧</kbd> redo</li>
+            <li><kbd>⌘/Ctrl</kbd> + <kbd>C</kbd>/<kbd>X</kbd>/<kbd>V</kbd> Copy / cut / paste</li>
+            <li><kbd>⌘/Ctrl</kbd> + <kbd>D</kbd> Duplicate</li>
+            <li><kbd>Delete</kbd> Remove layer · <kbd>Esc</kbd> close</li>
+            <li><kbd>← ↑ → ↓</kbd> Nudge · <kbd>⇧</kbd> bigger steps</li>
+            <li><kbd>[</kbd> / <kbd>]</kbd> Send back / bring forward</li>
+            <li>Double-click a text layer to edit it</li>
+          </ul>
+          <button type="button" class="mini-btn" onclick="document.getElementById('stCheats').hidden=true">Got it</button>
+        </div>
+      </div>
       <div class="studio-panel">
-        <p class="st-howto">Add a layer below → it appears on the canvas. <strong>Drag</strong> it to move, <strong>tap</strong> it to style, drag the <strong>corner dot</strong> to resize. Pick a background, then <strong>Export PNG</strong> — or save your layout as a reusable template.</p>
+        <p class="st-howto"><strong>Drag</strong> a layer to move, <strong>tap</strong> to style, drag the <strong>corner dot</strong> to resize, <strong>double-click</strong> text to edit. Press <kbd>?</kbd> for shortcuts.</p>
+        <div class="st-restore" id="stRestore" hidden>
+          You have an unsaved design from last time.
+          <button type="button" id="stRestoreBtn">↩︎ Restore it</button>
+          <button type="button" id="stRestoreNo" class="link">Start fresh</button>
+        </div>
+        <div class="st-group">
+          <div class="st-group-title">Quick start <span class="hint">— a ready-made layout you can tweak</span></div>
+          <div class="st-add" id="stStarters">
+            <button type="button" data-tpl="bar">Bottom bar</button>
+            <button type="button" data-tpl="classic">Classic centred</button>
+            <button type="button" data-tpl="story">Story</button>
+            <button type="button" data-tpl="corner">SOLD corner</button>
+          </div>
+        </div>
         <div class="st-group">
           <div class="st-group-title">Add a layer</div>
           <div class="st-add" id="stAdd">
@@ -529,9 +565,15 @@
             <button type="button" data-add="address">+ Address</button>
             <button type="button" data-add="stats">+ Beds/baths</button>
             <button type="button" data-add="badge">+ Badge</button>
+            <button type="button" data-add="status">+ SOLD stamp</button>
+            <button type="button" data-add="homeopen">+ Home open</button>
+            <button type="button" data-add="agent">+ Agent details</button>
+            <button type="button" data-add="disclaimer">+ Disclaimer</button>
             <button type="button" data-add="logo" id="stAddLogo">+ Logo</button>
             <button type="button" data-add="head" id="stAddHead">+ Headshot</button>
             <button type="button" data-add="rect">+ Bar</button>
+            <button type="button" data-add="ellipse">+ Ellipse</button>
+            <button type="button" data-add="scrim">+ Photo scrim</button>
           </div>
         </div>
         <div class="st-group">
@@ -541,22 +583,46 @@
         <div class="st-group" id="stLayerCtl" hidden>
           <div class="st-group-title">Selected layer <span class="hint">— drag it on the canvas to move</span></div>
           <textarea id="stText" rows="2"></textarea>
-          <label class="st-slider" id="stSizeRow">Size <input type="range" id="stSize" min="16" max="220" step="1" /></label>
-          <div class="st-colors" id="stColors"></div>
+          <label class="st-slider" id="stSizeRow">Size <input type="range" id="stSize" min="16" max="260" step="1" /></label>
+          <div id="stColorWrap">
+            <div class="st-sub">Colour</div>
+            <div class="st-colors" id="stColors"></div>
+          </div>
+          <label class="st-slider">Opacity <input type="range" id="stOpacity" min="0" max="100" step="1" /></label>
+          <label class="st-slider">Rotate <input type="range" id="stRot" min="-180" max="180" step="1" /></label>
+          <div class="st-row" id="stWrapRow">
+            <button type="button" id="stWrap">Wrap text</button>
+          </div>
           <div class="st-row" id="stRowStyle">
             <button type="button" id="stFont">Serif</button>
             <button type="button" id="stBold">Bold</button>
             <button type="button" id="stShadow">Shadow</button>
+            <button type="button" id="stOutline">Outline</button>
           </div>
           <div class="st-row" id="stRowAlign">
             <button type="button" id="stAlignL">⯇</button>
             <button type="button" id="stAlignC">≡</button>
             <button type="button" id="stAlignR">⯈</button>
           </div>
+          <div class="st-row" id="stRowShape">
+            <button type="button" id="stShapeRect">▭ Rect</button>
+            <button type="button" id="stShapeEllipse">⬭ Ellipse</button>
+            <button type="button" id="stGrad">Fade</button>
+          </div>
+          <div class="st-row">
+            <button type="button" id="stBackward" title="Send backward ([)">⤓ Back</button>
+            <button type="button" id="stForward" title="Bring forward (])">⤒ Front</button>
+            <button type="button" id="stLock">🔓 Lock</button>
+            <button type="button" id="stHide">👁 Visible</button>
+          </div>
           <div class="st-row">
             <button type="button" id="stDup">Duplicate</button>
             <button type="button" id="stDel" class="danger">Delete</button>
           </div>
+        </div>
+        <div class="st-group">
+          <div class="st-group-title">Layers <span class="hint">— top of the list sits in front</span></div>
+          <div class="st-layers" id="stLayers"></div>
         </div>
         <div class="st-group">
           <div class="st-group-title">My templates <span class="hint">— save this layout, reuse on any listing</span></div>
@@ -605,14 +671,14 @@
     </div>
   </div>
 
-  <script src="generator.js?v=20"></script>
-  <script src="fairhousing.js?v=20"></script>
-  <script src="parser.js?v=20"></script>
-  <script src="importer.js?v=20"></script>
-  <script src="visuals.js?v=20"></script>
-  <script src="flyer.js?v=20"></script>
-  <script src="ai.js?v=20"></script>
-  <script src="studio.js?v=20"></script>
-  <script src="app.js?v=20"></script>
+  <script src="generator.js?v=21"></script>
+  <script src="fairhousing.js?v=21"></script>
+  <script src="parser.js?v=21"></script>
+  <script src="importer.js?v=21"></script>
+  <script src="visuals.js?v=21"></script>
+  <script src="flyer.js?v=21"></script>
+  <script src="ai.js?v=21"></script>
+  <script src="studio.js?v=21"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>
