@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=24" />
+  <link rel="stylesheet" href="styles.css?v=25" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -37,6 +37,15 @@
     <!-- ============ INPUT ============ -->
     <section class="panel form-panel" aria-label="Listing input">
       <form id="listingForm" autocomplete="off">
+
+        <details class="section" id="librarySection">
+          <summary><span class="step">📁</span> Saved listings <span class="hint">— stored on this device</span></summary>
+          <div class="section-body">
+            <p class="hint">Save the current listing (details + photos) to reopen or clone later — nothing leaves your device.</p>
+            <button type="button" class="copy-btn" id="libSave">💾 Save current listing</button>
+            <div class="lib-list" id="libList"></div>
+          </div>
+        </details>
 
         <details class="section" id="brandSection">
           <summary><span class="step">1</span> Your brand <span class="hint">— saved on this device, set it once</span></summary>
@@ -513,6 +522,7 @@
   </main>
 
   <div id="studioHint" class="studio-hint" hidden></div>
+  <div id="toast" class="toast" hidden></div>
 
   <div class="studio-overlay" id="studio" role="dialog" aria-modal="true" aria-label="Design studio editor" hidden>
     <div class="studio-bar">
@@ -772,15 +782,15 @@
     </div>
   </div>
 
-  <script src="generator.js?v=24"></script>
-  <script src="fairhousing.js?v=24"></script>
-  <script src="parser.js?v=24"></script>
-  <script src="importer.js?v=24"></script>
-  <script src="visuals.js?v=24"></script>
-  <script src="flyer.js?v=24"></script>
-  <script src="ai.js?v=24"></script>
-  <script src="studio.js?v=24"></script>
-  <script src="tour.js?v=24"></script>
-  <script src="app.js?v=24"></script>
+  <script src="generator.js?v=25"></script>
+  <script src="fairhousing.js?v=25"></script>
+  <script src="parser.js?v=25"></script>
+  <script src="importer.js?v=25"></script>
+  <script src="visuals.js?v=25"></script>
+  <script src="flyer.js?v=25"></script>
+  <script src="ai.js?v=25"></script>
+  <script src="studio.js?v=25"></script>
+  <script src="tour.js?v=25"></script>
+  <script src="app.js?v=25"></script>
 </body>
 </html>

@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v24';
+  const APP_VERSION = 'v25';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -1063,6 +1063,72 @@
     try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
   };
 
+  // ---------------- transient toast ----------------
+  const toast = (msg) => { const t = $('toast'); if (!t) return; t.textContent = msg; t.hidden = false; clearTimeout(toast._t); toast._t = setTimeout(() => { t.hidden = true; }, 2600); };
+
+  // ---------------- saved-listings library (IndexedDB, on-device) ----------------
+  const LIB_DB = 'lk_library', LIB_STORE = 'listings';
+  const idb = () => new Promise((res, rej) => { let r; try { r = indexedDB.open(LIB_DB, 1); } catch (e) { return rej(e); } r.onupgradeneeded = () => { const db = r.result; if (!db.objectStoreNames.contains(LIB_STORE)) db.createObjectStore(LIB_STORE, { keyPath: 'id' }); }; r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  const libTx = async (mode, fn) => { const db = await idb(); return new Promise((res, rej) => { const tx = db.transaction(LIB_STORE, mode); const rq = fn(tx.objectStore(LIB_STORE)); tx.oncomplete = () => res(rq && rq.result); tx.onerror = () => rej(tx.error); }); };
+  const libAll = () => libTx('readonly', (st) => st.getAll());
+  const libGet = (id) => libTx('readonly', (st) => st.get(id));
+  const libPut = (rec) => libTx('readwrite', (st) => st.put(rec));
+  const libDel = (id) => libTx('readwrite', (st) => st.delete(id));
+
+  // serialize a photo to a size-capped JPEG data URL for storage
+  const photoToDataURL = (p) => {
+    if (p.url && p.url.startsWith('data:')) return p.url;
+    const img = p.img; if (!img || !img.width) return null;
+    const max = 1600, s = Math.min(1, max / Math.max(img.width, img.height));
+    const cv = document.createElement('canvas'); cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    return cv.toDataURL('image/jpeg', 0.85);
+  };
+  const addSavedPhoto = (ph) => new Promise((res) => { const img = new Image(); img.onload = () => { photos.push({ url: ph.dataURL, img, name: ph.name || 'photo', inCarousel: ph.inCarousel !== false, filter: ph.filter || { b: 100, c: 100, s: 100, w: 0 }, focus: ph.focus || 'center' }); res(true); }; img.onerror = () => res(false); img.src = ph.dataURL; });
+
+  const saveCurrentListing = async () => {
+    if (!$('address').value.trim() && !photos.length) { toast('Add an address or a photo first'); return; }
+    const fields = {}; LISTING_FIELDS.forEach((id) => { fields[id] = $(id).value; });
+    const rec = { id: 'L' + Date.now() + Math.floor(Math.random() * 1e4), savedAt: Date.now(), title: ($('address').value.trim() || 'Untitled listing'), mode, heroIndex, fields, photos: photos.map((p) => ({ dataURL: photoToDataURL(p), name: p.name, filter: p.filter, focus: p.focus, inCarousel: p.inCarousel })).filter((p) => p.dataURL) };
+    try { await libPut(rec); renderLibrary(); toast('✓ Saved to this device'); } catch (e) { toast('Couldn’t save — storage may be full or blocked'); }
+  };
+  const openListing = async (id) => {
+    let rec; try { rec = await libGet(id); } catch (e) { return; } if (!rec) return;
+    clearListing();
+    applyMode(rec.mode || 'sale', false);
+    LISTING_FIELDS.forEach((k) => { if (rec.fields[k] != null) $(k).value = rec.fields[k]; });
+    syncCustomWraps();
+    for (const ph of (rec.photos || [])) await addSavedPhoto(ph);
+    heroIndex = Math.min(Math.max(0, rec.heroIndex || 0), Math.max(0, photos.length - 1));
+    syncFcss(); renderPhotoGrid(); clearMissingFlags();
+    $('librarySection').open = false;
+    generate();
+    toast('Listing opened');
+  };
+  const cloneListing = async (id) => { const rec = await libGet(id); if (!rec) return; await libPut({ ...rec, id: 'L' + Date.now() + Math.floor(Math.random() * 1e4), savedAt: Date.now(), title: (rec.title || 'Listing') + ' (copy)' }); renderLibrary(); toast('Cloned'); };
+  const deleteListing = async (id) => { try { await libDel(id); } catch (e) {} renderLibrary(); };
+  const renderLibrary = async () => {
+    const box = $('libList'); if (!box) return;
+    let list = [];
+    try { list = await libAll(); } catch (e) { box.innerHTML = '<div class="lib-empty">Saved listings aren’t available in this browser.</div>'; return; }
+    list.sort((a, b) => b.savedAt - a.savedAt);
+    box.innerHTML = '';
+    if (!list.length) { box.innerHTML = '<div class="lib-empty">No saved listings yet — save one above.</div>'; return; }
+    list.forEach((rec) => {
+      const row = document.createElement('div'); row.className = 'lib-item';
+      const thumb = document.createElement('img'); thumb.className = 'lib-thumb'; thumb.alt = ''; if (rec.photos && rec.photos[0]) thumb.src = rec.photos[0].dataURL;
+      const main = document.createElement('div'); main.className = 'lib-main'; main.title = 'Open this listing';
+      const np = (rec.photos || []).length;
+      const title = document.createElement('div'); title.className = 'lib-title'; title.textContent = rec.title || 'Untitled';
+      const sub = document.createElement('div'); sub.className = 'lib-sub'; sub.textContent = `${np} photo${np === 1 ? '' : 's'} · ${new Date(rec.savedAt).toLocaleDateString()}`;
+      main.append(title, sub);
+      main.addEventListener('click', () => openListing(rec.id));
+      const clone = document.createElement('button'); clone.type = 'button'; clone.className = 'lib-act'; clone.title = 'Clone'; clone.textContent = '⎘'; clone.addEventListener('click', () => cloneListing(rec.id));
+      const del = document.createElement('button'); del.type = 'button'; del.className = 'lib-act del'; del.title = 'Delete'; del.textContent = '×'; del.addEventListener('click', () => deleteListing(rec.id));
+      row.append(thumb, main, clone, del); box.appendChild(row);
+    });
+  };
+
   // ---------------- misc wiring ----------------
   const wireChips = () => {
     document.querySelectorAll('#featureChips .chip').forEach((chip) => {
@@ -1430,6 +1496,9 @@
   window.addEventListener('keydown', (e) => {
     if ((e.metaKey || e.ctrlKey) && e.key === 'Enter' && $('studio').hidden) { e.preventDefault(); generate(); }
   });
+  // saved-listings library
+  $('libSave').addEventListener('click', saveCurrentListing);
+  renderLibrary();
   wirePhotoEditor();
   renderPalettes();
   window.addEventListener('resize', () => { if (activeTab === 'flyer' && outputs) scaleFlyer(); });
