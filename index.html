@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=25" />
+  <link rel="stylesheet" href="styles.css?v=26" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -655,6 +655,9 @@
           <div class="st-contrast" id="stContrast" hidden></div>
           <div class="st-slider"><span class="st-slk">Opacity</span><input type="range" id="stOpacity" min="0" max="100" step="1" /><span class="st-slv" id="stOpacityV"></span><button type="button" class="st-slr" id="stOpacityR" title="Reset to 100%">⟲</button></div>
           <div class="st-slider"><span class="st-slk">Rotate</span><input type="range" id="stRot" class="st-centered" min="-180" max="180" step="1" /><span class="st-slv" id="stRotV"></span><button type="button" class="st-slr" id="stRotR" title="Reset to level (0°)">⟲</button></div>
+          <div class="st-slider" id="stTrackRow"><span class="st-slk">Spacing</span><input type="range" id="stTrack" min="-8" max="40" step="1" /><span class="st-slv" id="stTrackV"></span></div>
+          <div class="st-slider" id="stLinehRow"><span class="st-slk">Line ht</span><input type="range" id="stLineh" min="90" max="220" step="5" /><span class="st-slv" id="stLinehV"></span></div>
+          <label class="st-slider" id="stBlendRow"><span class="st-slk">Blend</span><select id="stBlend" class="cs-select"><option value="source-over">Normal</option><option value="multiply">Multiply</option><option value="screen">Screen</option><option value="overlay">Overlay</option><option value="darken">Darken</option><option value="lighten">Lighten</option><option value="soft-light">Soft light</option><option value="hard-light">Hard light</option><option value="color-dodge">Dodge</option></select></label>
           <div class="st-row" id="stWrapRow">
             <button type="button" id="stWrap">Wrap text</button>
             <button type="button" id="stFit" title="Shrink to fit the canvas">Fit text</button>
@@ -782,15 +785,15 @@
     </div>
   </div>
 
-  <script src="generator.js?v=25"></script>
-  <script src="fairhousing.js?v=25"></script>
-  <script src="parser.js?v=25"></script>
-  <script src="importer.js?v=25"></script>
-  <script src="visuals.js?v=25"></script>
-  <script src="flyer.js?v=25"></script>
-  <script src="ai.js?v=25"></script>
-  <script src="studio.js?v=25"></script>
-  <script src="tour.js?v=25"></script>
-  <script src="app.js?v=25"></script>
+  <script src="generator.js?v=26"></script>
+  <script src="fairhousing.js?v=26"></script>
+  <script src="parser.js?v=26"></script>
+  <script src="importer.js?v=26"></script>
+  <script src="visuals.js?v=26"></script>
+  <script src="flyer.js?v=26"></script>
+  <script src="ai.js?v=26"></script>
+  <script src="studio.js?v=26"></script>
+  <script src="tour.js?v=26"></script>
+  <script src="app.js?v=26"></script>
 </body>
 </html>

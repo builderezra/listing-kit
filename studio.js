@@ -133,13 +133,16 @@ const Studio = (() => {
     });
     return out;
   };
+  const HAS_LS = (() => { try { return 'letterSpacing' in (document.createElement('canvas').getContext('2d')); } catch (e) { return false; } })();
   const measure = (L) => {
     ctx2d.font = fontStr(L);
+    if (HAS_LS) { try { ctx2d.letterSpacing = (L.tracking || 0) + 'px'; } catch (e) {} }
     const maxW = L.wrapf ? L.wrapf * W() : 0;
     const lines = wrapLines(L.text, maxW);
     let textW = 0;
     lines.forEach((ln) => { textW = Math.max(textW, ctx2d.measureText(ln).width); });
-    const lh = L.size * 1.25;
+    if (HAS_LS) { try { ctx2d.letterSpacing = '0px'; } catch (e) {} }   // don't leak onto later measures
+    const lh = L.size * (L.lineh || 1.25);
     const bw = textW + (L.type === 'badge' ? L.size * 1.4 : 0);
     const bh = lines.length * lh + (L.type === 'badge' ? L.size * 0.6 : 0);
     return { lines, lh, bw, bh, textW };
@@ -166,6 +169,7 @@ const Studio = (() => {
     ctx2d.translate(cx, cy);
     if (rot) ctx2d.rotate(rot);
     ctx2d.globalAlpha = L.opacity == null ? 1 : L.opacity;
+    if (L.blend && L.blend !== 'source-over') ctx2d.globalCompositeOperation = L.blend;
 
     let bw = 0, bh = 0, pad = 0;
 
@@ -239,6 +243,7 @@ const Studio = (() => {
       // text + badge
       const m = measure(L);
       ctx2d.textBaseline = 'top';
+      if (HAS_LS) { try { ctx2d.letterSpacing = (L.tracking || 0) + 'px'; } catch (e) {} }   // re-apply for drawing (measure reset it)
       if (L.type === 'badge') {
         bw = m.bw; bh = m.bh;
         ctx2d.fillStyle = resolveColor(L.color);
@@ -635,6 +640,10 @@ const Studio = (() => {
     show('stText', isText); show('stSizeRow', isText); show('stColorWrap', hasColor);
     show('stRowStyle', isText); show('stRowAlign', L.type === 'text'); show('stRowShape', L.type === 'rect');
     show('stWrapRow', L.type === 'text');
+    show('stTrackRow', isText); show('stLinehRow', isText);
+    $('stTrack').value = L.tracking || 0; slv('stTrackV', (L.tracking || 0) + 'px');
+    $('stLineh').value = Math.round((L.lineh || 1.25) * 100); slv('stLinehV', Math.round((L.lineh || 1.25) * 100) + '%');
+    $('stBlend').value = L.blend || 'source-over';
     const pc = $('stPhotoCtl'); if (pc) pc.hidden = !isPhoto;
     if (isPhoto) syncPhotoPanel(L);
     if (isText) {
@@ -857,7 +866,7 @@ const Studio = (() => {
 
   // copy / paste a layer's look (format painter) — visual style keys only
   let styleClip = null;
-  const STYLE_KEYS = ['color', 'font', 'weight', 'align', 'shadow', 'outline', 'glow', 'glowColor', 'tgrad', 'stroke', 'wrapf', 'opacity', 'rot'];
+  const STYLE_KEYS = ['color', 'font', 'weight', 'align', 'shadow', 'outline', 'glow', 'glowColor', 'tgrad', 'stroke', 'wrapf', 'opacity', 'rot', 'tracking', 'lineh', 'blend'];
   const copyStyle = () => { const L = sel(); if (!L) return; styleClip = {}; STYLE_KEYS.forEach((k) => { if (L[k] !== undefined) styleClip[k] = JSON.parse(JSON.stringify(L[k])); }); if ($('stPasteStyle')) $('stPasteStyle').disabled = false; };
   const pasteStyle = () => { const L = sel(); if (!L || !styleClip) return; Object.keys(styleClip).forEach((k) => { L[k] = JSON.parse(JSON.stringify(styleClip[k])); }); commit(); };
 
@@ -991,6 +1000,11 @@ const Studio = (() => {
     $('stRot').addEventListener('change', commit);
     $('stRot').addEventListener('dblclick', () => { const L = cur(); if (L) { L.rot = 0; commit(); } });
     $('stRotR').addEventListener('click', () => { const L = cur(); if (L) { L.rot = 0; commit(); } });
+    $('stTrack').addEventListener('input', () => { const L = cur(); if (L) { L.tracking = Number($('stTrack').value); slv('stTrackV', L.tracking + 'px'); render(); } });
+    $('stTrack').addEventListener('change', commit);
+    $('stLineh').addEventListener('input', () => { const L = cur(); if (L) { L.lineh = Number($('stLineh').value) / 100; slv('stLinehV', $('stLineh').value + '%'); render(); } });
+    $('stLineh').addEventListener('change', commit);
+    $('stBlend').addEventListener('change', () => { const L = cur(); if (L) { L.blend = $('stBlend').value; commit(); } });
     $('stFont').addEventListener('click', () => { const L = cur(); if (L) { L.font = L.font === 'serif' ? 'sans' : 'serif'; commit(); } });
     $('stBold').addEventListener('click', () => { const L = cur(); if (L) { L.weight = (L.weight || 0) >= 700 ? 400 : 800; commit(); } });
     $('stShadow').addEventListener('click', () => { const L = cur(); if (L) { L.shadow = !L.shadow; commit(); } });
