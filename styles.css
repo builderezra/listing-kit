@@ -475,3 +475,6 @@ body.dark .flyer-wrap { background: #3a3f45; }
 body.dark .tpl { background: #1d2127; color: var(--ink); }
 body.dark .mini-btn.ghost { background: #23282e; }
 body.dark .flag-phrase { color: #3a2f12; }
+body.dark .import-title, body.dark .tab.active { color: var(--ink); }
+body.dark .import-box { background: #191d22; }
+body.dark .or-divider { color: var(--muted); }

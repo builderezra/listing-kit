@@ -93,7 +93,7 @@ const AI = (() => {
     'You research the real, local lifestyle amenities near a property for a real estate "location highlights" line. Use web search — never invent or guess a place name.',
     'Include only genuine, verifiable nearby features a buyer cares about: beaches/coast/foreshore, parks and reserves, café/restaurant/shopping precincts (by name), and public transport (train/bus/ferry stations by name). Give a rough sense of proximity ("moments from", "a short walk to", "minutes from") only if the search supports it.',
     'NEVER mention schools or school catchments, crime, safety, or the demographic makeup of an area — these create anti-discrimination / fair-housing risk.',
-    'Output ONLY one polished phrase suitable to drop into a listing, e.g. "moments from Scarborough Beach, the cafés along the foreshore, and Stirling train station". No preamble, no bullet list, no citations, no quotes.',
+    'You may think and search freely. But your FINAL output must wrap the single finished phrase between [HL] and [/HL] markers and contain nothing else inside them — e.g. [HL]moments from Scarborough Beach, the cafés along the foreshore, and Stirling train station[/HL]. Any commentary like "I have gathered the information" must stay OUTSIDE the markers.',
   ].join('\n');
 
   const REGION_NAME = { au: 'Australia', us: 'United States', uk: 'United Kingdom', other: '' };
@@ -101,11 +101,18 @@ const AI = (() => {
     const where = [address, suburb, REGION_NAME[region]].filter(Boolean).join(', ');
     return call(
       RESEARCH_SYSTEM,
-      `Research the immediate area around this property and return the single location-highlights phrase:\n${where}`,
-      600,
+      `Research the immediate area around this property and return the location-highlights phrase wrapped in [HL]…[/HL]:\n${where}`,
+      700,
       [{ type: 'web_search_20260209', name: 'web_search', max_uses: 4 }],
-      true, // only the final text block — skip the "let me search…" narration
-    ).then((t) => t.replace(/^(here(?:'s| is)[^:]*:\s*|sure[,!]?\s*|location highlights:\s*)/i, '').trim());
+      true,
+    ).then((t) => {
+      const m = t.match(/\[HL\]([\s\S]*?)\[\/HL\]/i);   // extract only the marked phrase
+      let phrase = (m ? m[1] : t).trim();
+      // strip any stray commentary / quotes if the model skipped the markers
+      phrase = phrase.replace(/^(here(?:'s| is)[^:]*:\s*|sure[,!]?\s*|i (?:have|'ve)[^:]*:\s*|location highlights:\s*)/i, '')
+        .replace(/^["'“]+|["'”]+$/g, '').trim();
+      return phrase;
+    });
   };
 
   // ---- AI design styling (text-only → template + colours + font) ------------

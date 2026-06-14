@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v16';
+  const APP_VERSION = 'v17';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -1036,31 +1036,6 @@
     $('aiInstruction').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); const i = e.target.value.trim(); if (i) runAI('instruct', i); } });
   };
 
-  // AI design styler — a vibe → template + colours + font
-  const runDesignStyle = async () => {
-    const note = (msg, kind) => { $('styleStatus').textContent = msg; $('styleStatus').className = 'parse-note' + (kind ? ' ' + kind : ''); };
-    const vibe = $('styleVibe').value.trim();
-    if (!vibe) { $('styleVibe').focus(); return; }
-    if (!AI.available()) { setTimeout(() => $('aiKey').focus(), 50); note('Add your API key above to enable AI.', 'err'); return; }
-    $('styleApply').disabled = true;
-    note('Designing a look…');
-    try {
-      const st = await AI.designStyle(vibe);
-      if (st.templateId) { brand.templateId = st.templateId; markTemplate(); }
-      if (st.primary) { brand.primary = st.primary; $('brandPrimary').value = st.primary; }
-      if (st.accent) { brand.accent = st.accent; $('brandAccent').value = st.accent; }
-      if (st.font) { brand.font = st.font; $('brandFont').value = st.font; }
-      saveBrand();
-      rerenderVisuals();
-      const bits = [st.templateId && st.templateId, st.font && st.font + ' font', (st.primary || st.accent) && 'new colours'].filter(Boolean);
-      note('✓ Applied ' + (bits.join(', ') || 'style') + ' — tweak the colours/template if you like.', 'ok');
-    } catch (e) {
-      note(AI.explain(e), 'err');
-    } finally {
-      $('styleApply').disabled = false;
-    }
-  };
-
   // AI + live web search → real nearby amenities into Location highlights
   const researchLocation = async () => {
     const note = (msg, kind) => { $('researchStatus').textContent = msg; $('researchStatus').className = 'parse-note' + (kind ? ' ' + kind : ''); };
@@ -1102,8 +1077,6 @@
     aiBusy(false, '↩ Reverted to the previous version', 'ok');
   });
   $('researchBtn').addEventListener('click', researchLocation);
-  $('styleApply').addEventListener('click', runDesignStyle);
-  $('styleVibe').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runDesignStyle(); } });
   $('clearBtn').addEventListener('click', clearListing);
 
   // import + paste UX
