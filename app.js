@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v22';
+  const APP_VERSION = 'v23';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -514,16 +514,18 @@
     const slides = d.photos.filter((p) => p.inCarousel !== false).slice(0, 6);
     const total = slides.length + 2;
 
-    const addSlide = (label, renderFn) => {
+    const addSlide = (label, renderFn, photo) => {
       const cell = document.createElement('div');
       cell.className = 'car-slide';
       const cv = document.createElement('canvas');
       renderFn(cv);
+      cv.title = 'Click to zoom & edit';
+      const n = carouselCanvases.length + 1;
+      cv.addEventListener('click', () => openLightbox(cv, photo || null, n));
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'copy-btn dl-mini';
       btn.textContent = label;
-      const n = carouselCanvases.length + 1;
       btn.addEventListener('click', () => Visuals.download(cv, `${slug()}-carousel-${String(n).padStart(2, '0')}.png`));
       cell.appendChild(cv); cell.appendChild(btn);
       row.appendChild(cell);
@@ -532,8 +534,24 @@
 
     addSlide('1 · Cover', (cv) => Visuals.render(brand.templateId, 'square', cv, d));
     slides.forEach((p, i) =>
-      addSlide(`${i + 2} · Photo`, (cv) => Visuals.featureSlide(cv, { photo: p, caption: feats[i] || '', brand, idx: i + 1, total })));
+      addSlide(`${i + 2} · Photo`, (cv) => Visuals.featureSlide(cv, { photo: p, caption: feats[i] || '', brand, idx: i + 1, total }), p));
     addSlide(`${total} · CTA`, (cv) => Visuals.ctaSlide(cv, { brand, address: d.address, badgeText: d.badgeText }));
+  };
+
+  // ---- carousel slide lightbox (zoom + edit) ----
+  let lbState = { photo: null, n: 1 };
+  const openLightbox = (cv, photo, n) => {
+    lbState = { photo, n };
+    $('lbImg').src = cv.toDataURL('image/png');
+    $('lightbox').hidden = false;
+  };
+  const closeLightbox = () => { $('lightbox').hidden = true; };
+  const wireLightbox = () => {
+    $('lbClose').addEventListener('click', closeLightbox);
+    $('lightbox').addEventListener('click', (e) => { if (e.target === $('lightbox')) closeLightbox(); });
+    $('lbDownload').addEventListener('click', () => { const a = document.createElement('a'); a.href = $('lbImg').src; a.download = `${slug()}-carousel-${String(lbState.n).padStart(2, '0')}.png`; a.click(); });
+    $('lbEdit').addEventListener('click', () => { closeLightbox(); openStudio(lbState.photo ? photos.indexOf(lbState.photo) : undefined); });
+    window.addEventListener('keydown', (e) => { if (!$('lightbox').hidden && e.key === 'Escape') closeLightbox(); });
   };
 
   const slug = () => ($('address').value.trim() || 'listing').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
@@ -559,13 +577,33 @@
     return { photos: d.photos, fields: { price: d.price, address: d.address, stats, badge: d.badgeText } };
   };
   // open the design studio from anywhere (works before a kit is generated too)
-  const openStudio = () => {
+  const openStudio = (startPhotoIndex) => {
     const s = studioFields();
     Studio.open({
       photos: s.photos, brand, fields: s.fields,
+      startPhotoIndex: (typeof startPhotoIndex === 'number') ? startPhotoIndex : null,
       // lets the studio upload a photo straight into the listing gallery
       addPhoto: async (file) => { const ok = await addPhotoBlob(file, 'studio'); if (!ok) return null; syncFcss(); return photos[photos.length - 1]; },
+      // closed with unsaved edits → point a friendly notifier at the launcher
+      onClose: (wasDirty) => { if (wasDirty) showStudioHint(); },
     }, 'square');
+  };
+
+  // small "your design is saved — reopen to keep editing" notifier with an arrow
+  // pointing at the Design Studio button (only after closing with unsaved work)
+  let studioHintTimer = null;
+  const showStudioHint = () => {
+    const btn = $('studioLaunch'), hint = $('studioHint');
+    if (!btn || !hint) return;
+    hint.innerHTML = '<b>Saved.</b> Your design is kept here — reopen the Design Studio any time to pick up where you left off.';
+    hint.hidden = false;
+    const r = btn.getBoundingClientRect();
+    hint.style.top = (r.bottom + 10) + 'px';
+    const left = Math.min(r.right - hint.offsetWidth, window.innerWidth - hint.offsetWidth - 10);
+    hint.style.left = Math.max(10, left) + 'px';
+    clearTimeout(studioHintTimer);
+    studioHintTimer = setTimeout(() => { hint.hidden = true; }, 7000);
+    hint.onclick = () => { hint.hidden = true; };
   };
 
   // ---------------- flyer tab ----------------
@@ -624,6 +662,56 @@
     $('aiBar').hidden = false;
     $('aiStatus').textContent = '';
     updateUndo();
+    renderChannelShare(tab);
+  };
+
+  // ---- per-channel "Open in…" share row (Instagram / Facebook / Email) ----
+  const enc = encodeURIComponent;
+  const EMAIL_SERVICES = [
+    { id: 'gmail', label: 'Gmail', url: (s, b) => `https://mail.google.com/mail/?view=cm&fs=1&su=${enc(s)}&body=${enc(b)}` },
+    { id: 'outlook', label: 'Outlook', url: (s, b) => `https://outlook.live.com/mail/0/deeplink/compose?subject=${enc(s)}&body=${enc(b)}` },
+    { id: 'yahoo', label: 'Yahoo Mail', url: (s, b) => `https://compose.mail.yahoo.com/?subject=${enc(s)}&body=${enc(b)}` },
+    { id: 'mailto', label: 'Default mail app', url: (s, b) => `mailto:?subject=${enc(s)}&body=${enc(b)}` },
+  ];
+  const savedEmailSvc = () => { try { return localStorage.getItem('lk_email_svc') || 'gmail'; } catch (e) { return 'gmail'; } };
+  const copyText = async (t) => { try { await navigator.clipboard.writeText(t); return true; } catch (e) { return false; } };
+  const openEmail = (svcId) => {
+    const svc = EMAIL_SERVICES.find((s) => s.id === svcId) || EMAIL_SERVICES[0];
+    const raw = (outputs && outputs.email) || '';
+    const subM = raw.match(/^\s*subject:\s*(.+)$/im);
+    const addr = $('address').value.trim();
+    const subject = subM ? subM[1].trim() : (addr ? `New listing — ${addr}` : 'New listing');
+    const body = raw.replace(/^\s*subject:.*$/im, '').replace(/^\s*preview:.*$/im, '').trim();
+    const url = svc.url(subject, body);
+    if (svcId === 'mailto') window.location.href = url; else window.open(url, '_blank', 'noopener');
+  };
+  const renderChannelShare = (tab) => {
+    const box = $('channelShare');
+    if (!['instagram', 'facebook', 'email'].includes(tab)) { box.hidden = true; box.innerHTML = ''; return; }
+    box.hidden = false; box.innerHTML = '';
+    const lbl = document.createElement('span'); lbl.className = 'cs-label';
+    const btn = document.createElement('button'); btn.type = 'button'; btn.className = 'mini-btn';
+    if (tab === 'email') {
+      lbl.textContent = 'Open a pre-filled draft in:';
+      const sel = document.createElement('select'); sel.className = 'cs-select';
+      EMAIL_SERVICES.forEach((s) => { const o = document.createElement('option'); o.value = s.id; o.textContent = s.label; sel.appendChild(o); });
+      sel.value = savedEmailSvc();
+      sel.addEventListener('change', () => { try { localStorage.setItem('lk_email_svc', sel.value); } catch (e) {} });
+      btn.textContent = '✉️ Open email ↗';
+      btn.addEventListener('click', () => openEmail(sel.value));
+      box.append(lbl, sel, btn);
+    } else {
+      const isIg = tab === 'instagram';
+      lbl.textContent = isIg ? 'Copy the caption & open Instagram:' : 'Copy the post & open Facebook:';
+      btn.textContent = isIg ? '📸 Open Instagram ↗' : '👍 Open Facebook ↗';
+      const note = document.createElement('span'); note.className = 'cs-note';
+      btn.addEventListener('click', async () => {
+        const ok = await copyText((outputs && outputs[tab]) || '');
+        note.textContent = ok ? '✓ Caption copied — paste it into your post.' : 'Select & copy the text below, then paste it in.';
+        window.open(isIg ? 'https://www.instagram.com/' : 'https://www.facebook.com/', '_blank', 'noopener');
+      });
+      box.append(lbl, btn, note);
+    }
   };
 
   const updateCharcount = () => {
@@ -967,15 +1055,20 @@
 
   const escapeHtml = (s) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-  // ---------------- undo history (per text channel) ----------------
+  // ---------------- undo / redo history (per text channel) ----------------
   let history = { mls: [], instagram: [], facebook: [], email: [] };
+  let redoStack = { mls: [], instagram: [], facebook: [], email: [] };
   const pushHistory = (tab) => {
     if (!outputs || outputs[tab] == null || !history[tab]) return;
     history[tab].push(outputs[tab]);
     if (history[tab].length > 25) history[tab].shift();
+    if (redoStack[tab]) redoStack[tab] = [];   // a fresh change invalidates the redo trail
   };
   const snapshotAll = () => { if (outputs) ['mls', 'instagram', 'facebook', 'email'].forEach(pushHistory); };
-  const updateUndo = () => { $('undoBtn').disabled = !(history[activeTab] && history[activeTab].length); };
+  const updateUndo = () => {
+    $('undoBtn').disabled = !(history[activeTab] && history[activeTab].length);
+    if ($('redoBtn')) $('redoBtn').disabled = !(redoStack[activeTab] && redoStack[activeTab].length);
+  };
 
   // ---------------- AI polish (bring-your-own-key) ----------------
   const AI_CHANNEL = {
@@ -1133,10 +1226,19 @@
   $('rewordBtn').addEventListener('click', () => { if (outputs) generate(); });
   $('undoBtn').addEventListener('click', () => {
     if (!outputs || !(history[activeTab] && history[activeTab].length)) return;
+    redoStack[activeTab].push(outputs[activeTab]);   // remember current so Redo can restore it
     outputs[activeTab] = history[activeTab].pop();
     $('copytext').textContent = outputs[activeTab];
     updateCharcount(); runScan(); updateUndo();
     aiBusy(false, '↩ Reverted to the previous version', 'ok');
+  });
+  $('redoBtn').addEventListener('click', () => {
+    if (!outputs || !(redoStack[activeTab] && redoStack[activeTab].length)) return;
+    history[activeTab].push(outputs[activeTab]);
+    outputs[activeTab] = redoStack[activeTab].pop();
+    $('copytext').textContent = outputs[activeTab];
+    updateCharcount(); runScan(); updateUndo();
+    aiBusy(false, '↪ Redid the change', 'ok');
   });
   $('researchBtn').addEventListener('click', researchLocation);
   $('clearBtn').addEventListener('click', clearListing);
@@ -1279,6 +1381,7 @@
   wireChips();
   wireDropZone();
   wireDownloads();
+  wireLightbox();
   wireEditableOutput();
   wireAI();
   wirePhotoEditor();
@@ -1302,9 +1405,15 @@
     applyTheme(theme);
   });
 
+  // about/privacy popover (replaces the old bottom footer warning)
+  $('infoBtn').addEventListener('click', (e) => { e.stopPropagation(); $('infoPop').hidden = !$('infoPop').hidden; });
+  document.addEventListener('click', (e) => { if (!$('infoPop').hidden && !$('infoPop').contains(e.target) && e.target !== $('infoBtn')) $('infoPop').hidden = true; });
+  $('infoTour').addEventListener('click', () => { $('infoPop').hidden = true; Tour.start(); });
+  $('tourBtn').addEventListener('click', () => Tour.start());
+
   loadBrand();
   restoreDraft();
-  $('verTag').textContent = 'Listing Kit ' + APP_VERSION;
+  $('verLine').textContent = 'Listing Kit ' + APP_VERSION;
 
   // integration/test hook
   window.ListingKit = { addPhotoDataURL, generate, importFromLink };

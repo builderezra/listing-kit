@@ -978,7 +978,6 @@ const Studio = (() => {
       if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
       else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
     });
-    window.addEventListener('beforeunload', (e) => { if (!$('studio').hidden && dirty) { e.preventDefault(); e.returnValue = ''; } });
   };
 
   let lastFocus = null;
@@ -989,7 +988,8 @@ const Studio = (() => {
     const wip = loadWip();
     sizeKey = startSize && SIZES[startSize] ? startSize : 'square';
     document.querySelectorAll('#stSizes button').forEach((x) => x.classList.toggle('active', x.dataset.size === sizeKey));
-    bg = ctxData.photos.length ? { type: 'photo', photoIndex: 0 } : { type: 'color' };
+    const startIdx = (typeof ctxData.startPhotoIndex === 'number' && ctxData.photos[ctxData.startPhotoIndex]) ? ctxData.startPhotoIndex : 0;
+    bg = ctxData.photos.length ? { type: 'photo', photoIndex: startIdx } : { type: 'color' };
     layers = []; selId = null;
     const f = ctxData.fields;
     replaying = true;            // seed starter layers without touching history / autosave
@@ -1011,13 +1011,12 @@ const Studio = (() => {
     lastFocus = document.activeElement;
     setTimeout(() => { const b = $('stUndo'); if (b) b.focus(); }, 30);
   };
-  const tryClose = () => {
-    if (dirty && !confirm('Close the design studio? Your layout is autosaved and will be offered when you reopen — but it won’t be exported.')) return;
-    close();
-  };
+  const tryClose = () => close();   // no nag — work is autosaved; we just hint that it can be restored
   const close = () => {
+    const wasDirty = dirty;
     $('studio').hidden = true; document.body.style.overflow = '';
     if (lastFocus && lastFocus.focus) try { lastFocus.focus(); } catch (e) {}
+    if (ctxData && ctxData.onClose) { try { ctxData.onClose(wasDirty); } catch (e) {} }
   };
 
   // reactive form→canvas binding: app calls this when listing fields change

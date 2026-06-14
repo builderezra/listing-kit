@@ -431,7 +431,11 @@ const Visuals = (() => {
 
     let y = 330;
     if (brand.headImg && brand.headImg.width) circleImg(ctx, brand.headImg, W / 2, y - 60, 230, brand.accent);
-    else if (brand.logoImg && brand.logoImg.width) logoImg(ctx, brand.logoImg, W / 2 + 140, y - 60, 150);
+    else if (brand.logoImg && brand.logoImg.width) {
+      // centre the logo (logoImg is right-anchored, so pass the right edge as W/2 + halfWidth)
+      const img = brand.logoImg, s = Math.min(150 / img.height, 280 / img.width), lw = img.width * s;
+      logoImg(ctx, img, W / 2 + lw / 2, y - 60, 150);
+    }
 
     ctx.textAlign = 'center';
     ctx.font = font(700, 66, priceFam(brand, SANS));

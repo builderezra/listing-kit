@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=22" />
+  <link rel="stylesheet" href="styles.css?v=23" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -22,7 +22,14 @@
     </div>
     <div class="topbar-right">
       <span class="badge" title="Every output is scanned for discrimination-risk language.">⚖️ Compliance-Aware</span>
+      <button type="button" class="round-btn" id="tourBtn" aria-label="Take the guided tour" title="Take the guided tour">?</button>
+      <button type="button" class="round-btn" id="infoBtn" aria-label="About &amp; privacy" title="About, privacy &amp; version">i</button>
       <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle light / dark">🌙</button>
+    </div>
+    <div class="info-pop" id="infoPop" hidden>
+      <p>Runs entirely in your browser — photos and details are never uploaded (link import fetches via public read proxies). The compliance check is decision support, not legal advice; always defer to your agency’s compliance guidance.</p>
+      <p class="muted" id="verLine"></p>
+      <button type="button" class="mini-btn" id="infoTour">▶ Take the guided tour</button>
     </div>
   </header>
 
@@ -163,7 +170,7 @@
           </div>
         </details>
 
-        <details class="section" id="listingSection" open>
+        <details class="section" id="listingSection">
           <summary><span class="step">2</span> The listing</summary>
           <div class="section-body">
             <div class="import-box">
@@ -388,7 +395,7 @@
           </div>
         </details>
 
-        <details class="section" id="photoSection" open>
+        <details class="section" id="photoSection">
           <summary><span class="step">3</span> Photos <span class="hint">— stay on your device</span></summary>
           <div class="section-body">
             <div class="dropzone" id="dropZone">
@@ -415,9 +422,9 @@
         <button class="tab active" data-tab="graphics" role="tab">🎨 Graphics</button>
         <button class="tab" data-tab="flyer" role="tab">📄 Flyer</button>
         <button class="tab" data-tab="mls" role="tab">Listing</button>
-        <button class="tab" data-tab="instagram" role="tab">Instagram</button>
-        <button class="tab" data-tab="facebook" role="tab">Facebook</button>
-        <button class="tab" data-tab="email" role="tab">Email</button>
+        <button class="tab" data-tab="instagram" role="tab"><svg class="tabico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5"/><circle cx="12" cy="12" r="4.4"/><circle cx="17.6" cy="6.4" r="1.3" fill="currentColor" stroke="none"/></svg> Instagram</button>
+        <button class="tab" data-tab="facebook" role="tab"><svg class="tabico" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M13.5 21v-7H16l.5-3h-3V9.2c0-.8.3-1.2 1.3-1.2H16.5V5.3C16.1 5.2 15 5 13.9 5 11.6 5 10 6.4 10 9v2H7.5v3H10v7z"/></svg> Facebook</button>
+        <button class="tab" data-tab="email" role="tab">✉️ Email</button>
         <button class="tab compliance-tab" data-tab="compliance" role="tab">⚖️ <span class="dot" id="complianceDot"></span></button>
         <button type="button" class="studio-launch" id="studioLaunch" title="Open the full-screen design editor">✏️ Design Studio ↗</button>
       </nav>
@@ -482,11 +489,13 @@
             <span class="charcount" id="charcount"></span>
             <div class="content-btns">
               <button type="button" class="copy-btn" id="undoBtn" title="Undo the last AI change on this tab" disabled>↶ Undo</button>
+              <button type="button" class="copy-btn" id="redoBtn" title="Redo the change you just undid" disabled>↷ Redo</button>
               <button type="button" class="copy-btn" id="rewordBtn" title="Generate a fresh wording (templates, instant, free)">↻ Reword</button>
               <button type="button" class="copy-btn ai" id="aiPolishBtn" title="Rewrite this with AI at human quality (uses your API key)">✨ Polish</button>
               <button type="button" class="copy-btn" id="copyBtn">Copy</button>
             </div>
           </div>
+          <div class="channel-share" id="channelShare" hidden></div>
           <pre class="copytext" id="copytext"></pre>
           <div class="ai-bar" id="aiBar" hidden>
             <input type="text" id="aiInstruction" placeholder="Tell the AI what to change — e.g. “more upmarket”, “shorter”, “aim at first-home buyers”…" />
@@ -502,9 +511,7 @@
     </section>
   </main>
 
-  <footer class="foot">
-    <p>Runs in your browser — photos and details are never uploaded (link import fetches via public read proxies). The compliance check is decision support, not legal advice; always defer to your agency’s compliance guidance. <span id="verTag"></span></p>
-  </footer>
+  <div id="studioHint" class="studio-hint" hidden></div>
 
   <div class="studio-overlay" id="studio" role="dialog" aria-modal="true" aria-label="Design studio editor" hidden>
     <div class="studio-bar">
@@ -726,14 +733,43 @@
     </div>
   </div>
 
-  <script src="generator.js?v=22"></script>
-  <script src="fairhousing.js?v=22"></script>
-  <script src="parser.js?v=22"></script>
-  <script src="importer.js?v=22"></script>
-  <script src="visuals.js?v=22"></script>
-  <script src="flyer.js?v=22"></script>
-  <script src="ai.js?v=22"></script>
-  <script src="studio.js?v=22"></script>
-  <script src="app.js?v=22"></script>
+  <!-- guided tour overlay -->
+  <div id="tourOverlay" hidden>
+    <div id="tourMask"></div>
+    <div id="tourHole"></div>
+    <div id="tourCard">
+      <h3 id="tourTitle"></h3>
+      <p id="tourText"></p>
+      <div class="tour-foot">
+        <button type="button" class="link-btn" id="tourSkip">Skip</button>
+        <span class="tour-prog" id="tourProg"></span>
+        <span class="tour-nav">
+          <button type="button" class="mini-btn ghost" id="tourBack">← Back</button>
+          <button type="button" class="mini-btn" id="tourNext">Next →</button>
+        </span>
+      </div>
+    </div>
+  </div>
+
+  <!-- carousel slide lightbox / zoom -->
+  <div id="lightbox" class="lightbox" hidden>
+    <button type="button" class="lb-close" id="lbClose" aria-label="Close">×</button>
+    <img id="lbImg" alt="Carousel slide preview" />
+    <div class="lb-actions">
+      <button type="button" class="mini-btn" id="lbEdit">✏️ Edit in studio</button>
+      <button type="button" class="mini-btn ghost" id="lbDownload">⬇️ Download</button>
+    </div>
+  </div>
+
+  <script src="generator.js?v=23"></script>
+  <script src="fairhousing.js?v=23"></script>
+  <script src="parser.js?v=23"></script>
+  <script src="importer.js?v=23"></script>
+  <script src="visuals.js?v=23"></script>
+  <script src="flyer.js?v=23"></script>
+  <script src="ai.js?v=23"></script>
+  <script src="studio.js?v=23"></script>
+  <script src="tour.js?v=23"></script>
+  <script src="app.js?v=23"></script>
 </body>
 </html>
