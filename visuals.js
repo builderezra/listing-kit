@@ -585,6 +585,44 @@ const Visuals = (() => {
     ctx.textAlign = 'left';
   };
 
+  // diagonal corner banner ("SOLD" / "UNDER OFFER" …) stamped over any graphic.
+  // Drawn as a post-render overlay so it works on every template uniformly.
+  const STAMP_COLORS = {
+    'SOLD': '#c0392b', 'LEASED': '#c0392b', 'UNDER OFFER': '#b9770e',
+    'PRICE REDUCED': '#1e8449', 'COMING SOON': '#21618c', 'NEW LISTING': '#21618c',
+  };
+  const cornerSash = (ctx, W, H, text, color) => {
+    const label = String(text || '').toUpperCase().trim();
+    if (!label) return;
+    const fill = color || STAMP_COLORS[label] || '#c0392b';
+    const s = Math.min(W, H);
+    const a1 = s * 0.235, a2 = s * 0.383;      // band edges as (x − y) offsets from the top-right corner
+    const am = (a1 + a2) / 2;
+    const pts = [[W - a1, 0], [W - a2, 0], [W, a2], [W, a1]];
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(pts[0][0], pts[0][1]);
+    pts.slice(1).forEach(([x, y]) => ctx.lineTo(x, y));
+    ctx.closePath();
+    ctx.shadowColor = 'rgba(0,0,0,0.30)'; ctx.shadowBlur = s * 0.022; ctx.shadowOffsetX = -s * 0.004; ctx.shadowOffsetY = s * 0.006;
+    ctx.fillStyle = fill; ctx.fill();
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = 'rgba(255,255,255,0.30)'; ctx.lineWidth = Math.max(1, s * 0.004); ctx.stroke();
+    // text along the diagonal, centred on the band, shrunk to fit
+    const cx = (4 * W - a1 - a2) / 4, cy = (a1 + a2) / 4;
+    const chord = am * Math.SQRT2;
+    let fs = s * 0.066;
+    spacing(ctx, Math.max(1, s * 0.004));
+    ctx.font = font(800, fs);
+    const tw = ctx.measureText(label).width, maxW = chord * 0.84;
+    if (tw > maxW) { fs *= maxW / tw; ctx.font = font(800, fs); }
+    ctx.translate(cx, cy); ctx.rotate(Math.PI / 4);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#ffffff'; ctx.fillText(label, 0, 0);
+    spacing(ctx, 0);
+    ctx.restore();
+  };
+
   // ---- public API ------------------------------------------------------------
   const SIZES = { square: [1080, 1080], story: [1080, 1920], wide: [1200, 630] };
   const TEMPLATES = { modern, classic, bold, minimal, luxe, banner };
@@ -595,6 +633,7 @@ const Visuals = (() => {
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, W, H);
     (TEMPLATES[templateId] || modern)(ctx, W, H, d, kind);
+    if (d && d.stamp) cornerSash(ctx, W, H, d.stamp);
   };
 
   const download = (canvas, filename) => {
@@ -658,6 +697,7 @@ const Visuals = (() => {
       ctx.fillStyle = '#9aa6ac'; ctx.font = font(500, 26); ctx.textAlign = 'right';
       ctx.fillText('Add a link below for a QR code →', W - 52, H - 110); ctx.textAlign = 'left';
     }
+    if (d && d.stamp) cornerSash(ctx, W, H, d.stamp);
   };
 
   return { render, download, SIZES, onColor, shade, featureSlide, ctaSlide, signboard };

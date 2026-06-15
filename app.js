@@ -16,6 +16,7 @@
   let report = null;      // fair-housing scan result
   let activeTab = 'graphics';
   let mode = 'sale';      // 'sale' | 'rent' — the listing type
+  let stamp = '';         // status sash overlaid on the graphics ('' | SOLD | UNDER OFFER | …)
 
   // status options per listing type
   const SALE_STATUS = [['justlisted', 'Just Listed'], ['openhouse', 'Home Open / Open House'], ['forsale', 'For Sale'], ['newprice', 'New Price'], ['sold', 'Just Sold'], ['custom', 'Custom…']];
@@ -479,6 +480,7 @@
       heroFocus: photos[heroIndex] ? photos[heroIndex].focus : 'center',
       heroFilter: photos[heroIndex] ? filterCSS(photos[heroIndex].filter) : '',
       photos: orderedPhotos(),
+      stamp,
       raw: d,
     };
   };
@@ -801,6 +803,18 @@
     if (!outputs) return;
     if (activeTab === 'graphics') renderGraphics();
     if (activeTab === 'flyer') renderFlyer();
+    if (activeTab === 'signboard') renderSignboard();
+  };
+
+  // ---- status stamp (SOLD / UNDER OFFER / PRICE REDUCED / LEASED) ----
+  const setStamp = (val) => {
+    stamp = val || '';
+    document.querySelectorAll('#stampRow .stamp-btn').forEach((b) => b.classList.toggle('active', (b.dataset.stamp || '') === stamp));
+    rerenderVisuals();
+  };
+  const wireStamps = () => {
+    document.querySelectorAll('#stampRow .stamp-btn').forEach((b) =>
+      b.addEventListener('click', () => setStamp(b.dataset.stamp || '')));
   };
 
   // ---------------- tabs ----------------
@@ -1240,6 +1254,8 @@
     photos = []; heroIndex = 0;
     renderPhotoGrid();
     document.querySelectorAll('#featureChips .chip').forEach((c) => c.classList.remove('added'));
+    stamp = '';
+    document.querySelectorAll('#stampRow .stamp-btn').forEach((b) => b.classList.toggle('active', !b.dataset.stamp));
     outputs = null; report = null;
     // a cleared listing must not let Undo/Redo resurrect the previous property's copy
     history = { mls: [], instagram: [], facebook: [], email: [] };
@@ -1684,6 +1700,7 @@
   wireImagePick('logo', 'logo');
   wireImagePick('head', 'headshot');
   wireChips();
+  wireStamps();
   wireDropZone();
   wireDownloads();
   wireLightbox();
