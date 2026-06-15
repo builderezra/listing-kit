@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=50" />
+  <link rel="stylesheet" href="styles.css?v=51" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -653,7 +653,8 @@
           <div class="st-row"><button type="button" id="stDrawToggle">✏️ Start drawing</button></div>
           <div id="stDrawOpts" hidden>
             <div class="st-row" id="stDrawColors"></div>
-            <div class="st-slider"><span class="st-slk">Pen</span><input type="range" id="stDrawW" min="2" max="48" step="1" /><span class="st-slv" id="stDrawWV"></span></div>
+            <div class="st-row"><label class="st-sw st-sw-pick" title="Any colour"><input type="color" id="stDrawCustom" value="#e0498b" /></label><span class="hint">pick any pen colour</span></div>
+            <div class="st-slider"><span class="st-slk">Pen</span><input type="range" id="stDrawW" min="2" max="80" step="1" /><span class="st-slv" id="stDrawWV"></span></div>
           </div>
         </div>
         <div class="st-group">
@@ -713,6 +714,7 @@
           <div class="st-group-title">Selected layer <span class="hint">— drag it on the canvas to move</span></div>
           <textarea id="stText" rows="2"></textarea>
           <div class="st-slider" id="stSizeRow"><span class="st-slk">Size</span><input type="range" id="stSize" min="16" max="260" step="1" /><span class="st-slv" id="stSizeV"></span></div>
+          <div class="st-slider" id="stDrawThickRow"><span class="st-slk">Pen</span><input type="range" id="stDrawThick" min="2" max="80" step="1" /><span class="st-slv" id="stDrawThickV"></span></div>
           <div id="stColorWrap">
             <div class="st-sub">Colour</div>
             <div class="st-colors" id="stColors"></div>
@@ -850,16 +852,16 @@
     </div>
   </div>
 
-  <script src="generator.js?v=50"></script>
-  <script src="fairhousing.js?v=50"></script>
-  <script src="parser.js?v=50"></script>
-  <script src="importer.js?v=50"></script>
-  <script src="qr.js?v=50"></script>
-  <script src="visuals.js?v=50"></script>
-  <script src="flyer.js?v=50"></script>
-  <script src="ai.js?v=50"></script>
-  <script src="studio.js?v=50"></script>
-  <script src="tour.js?v=50"></script>
-  <script src="app.js?v=50"></script>
+  <script src="generator.js?v=51"></script>
+  <script src="fairhousing.js?v=51"></script>
+  <script src="parser.js?v=51"></script>
+  <script src="importer.js?v=51"></script>
+  <script src="qr.js?v=51"></script>
+  <script src="visuals.js?v=51"></script>
+  <script src="flyer.js?v=51"></script>
+  <script src="ai.js?v=51"></script>
+  <script src="studio.js?v=51"></script>
+  <script src="tour.js?v=51"></script>
+  <script src="app.js?v=51"></script>
 </body>
 </html>

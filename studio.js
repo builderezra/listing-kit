@@ -944,11 +944,14 @@ const Studio = (() => {
     }
     if (!L) { updateContrast(); return; }   // nothing selected (but bg panel may still show)
     const isText = L.type === 'text' || L.type === 'badge';
-    const hasColor = isText || L.type === 'rect';
+    const isDraw = L.type === 'draw';
+    const hasColor = isText || L.type === 'rect' || isDraw;
     const show = (id, on) => { const el = $(id); if (el) el.style.display = on ? '' : 'none'; };
     show('stText', isText); show('stSizeRow', isText); show('stColorWrap', hasColor);
     show('stRowStyle', isText); show('stRowAlign', L.type === 'text'); show('stRowShape', L.type === 'rect');
     show('stWrapRow', L.type === 'text');
+    show('stDrawThickRow', isDraw);
+    if (isDraw) { const t = Math.round((L.strokeWf || 0.012) * 1080); $('stDrawThick').value = t; slv('stDrawThickV', t + ''); }
     show('stTrackRow', isText); show('stLinehRow', isText);
     $('stTrack').value = L.tracking || 0; slv('stTrackV', (L.tracking || 0) + 'px');
     $('stLineh').value = Math.round((L.lineh || 1.25) * 100); slv('stLinehV', Math.round((L.lineh || 1.25) * 100) + '%');
@@ -1587,6 +1590,11 @@ const Studio = (() => {
     $('stDrawToggle').addEventListener('click', () => setDrawMode(!drawMode));
     $('stDrawW').value = Math.round(drawWidth * 1080); slv('stDrawWV', Math.round(drawWidth * 1080) + '');
     $('stDrawW').addEventListener('input', () => { drawWidth = Math.max(1, Number($('stDrawW').value)) / 1080; slv('stDrawWV', $('stDrawW').value + ''); });
+    // any-colour pen
+    $('stDrawCustom').addEventListener('input', () => { drawColor = $('stDrawCustom').value; const box = $('stDrawColors'); if (box) box.querySelectorAll('.st-sw').forEach((x) => x.classList.remove('active')); });
+    // change a drawn stroke's thickness after the fact
+    $('stDrawThick').addEventListener('input', () => { const L = cur(); if (L && L.type === 'draw') { L.strokeWf = Math.max(1, Number($('stDrawThick').value)) / 1080; slv('stDrawThickV', $('stDrawThick').value + ''); render(); } });
+    $('stDrawThick').addEventListener('change', commit);
 
     // background: upload, gradient/solid, darken
     $('stUpload').addEventListener('change', (e) => { const files = [...(e.target.files || [])]; e.target.value = ''; if (files.length) uploadFiles(files); });

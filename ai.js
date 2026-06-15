@@ -127,7 +127,7 @@ const AI = (() => {
 
 OUTPUT: return ONE JSON object and nothing else — no prose, no markdown, no code fences. Shape:
 {"variations":[Design, ...]}  // exactly ${ctx.n} designs, best first, meaningfully different from each other.
-Design = {"name":"<=40 chars","rationale":"<=120 chars, about VISUAL design only","size":"${ctx.size}","background":Background,"layers":[Layer,...]}  // 3-7 layers, array order = paint order (index 0 = back).
+Design = {"name":"<=40 chars","rationale":"<=120 chars, about VISUAL design only","size":"${ctx.size}","background":Background,"layers":[Layer,...]}  // 3-12 layers (use more when a colour/pattern effect needs them), array order = paint order (index 0 = back).
 
 Coordinates xf,yf are FRACTIONS in [0,1] giving the CENTRE of a layer. (0,0)=top-left, (1,1)=bottom-right. Canvas = ${ctx.size} ${ctx.w}x${ctx.h}px.
 
@@ -160,7 +160,9 @@ SAFETY (legal hard line — never violate, including in name/rationale): never p
 
 AUSTRALIAN CONVENTIONS: currency AUD, areas m²; the status already uses "home open" (never "open house"); never reformat the price.
 
-READABILITY & TASTE: light ("white") text only over dark areas — over a photo or light background put a "scrim" or dark "shape" behind it, or use dark/primary text. The most important fact (usually price or status) is the largest element; establish clear hierarchy. Keep every layer centre within 0.06–0.94 of the edges. Stay within the brand palette (prefer tokens primary/accent/white/dark). At most one serif + one sans. Avoid rotating text beyond ~8°. Make the ${ctx.n} designs differ in background type, hierarchy and layout axis — not just recoloured.
+READABILITY & TASTE: light ("white") text only over dark areas — over a photo or light background put a "scrim" or dark "shape" behind it, or use dark/primary text. The most important fact (usually price or status) is the largest element; establish clear hierarchy. Keep every layer centre within 0.06–0.94 of the edges. At most one serif + one sans. Avoid rotating text beyond ~8°. Make the ${ctx.n} designs differ in background type, hierarchy and layout axis — not just recoloured.
+
+COLOUR: default to the brand palette (tokens primary/accent/white/dark) for a cohesive look — UNLESS the agent's instruction names colours or asks for a colourful/playful effect (e.g. "rainbow", "warm tones", "blue", "pastel"). In that case use those EXACT colours via #hex and do NOT fall back to brand tokens. A "gradient" blends only TWO colours, so to build a multi-colour effect like a RAINBOW you must layer several coloured "shape" rectangles or ellipses side by side or stacked (e.g. red #e63946, orange #f4a261, yellow #ffd166, green #2a9d8f, blue #277da1, indigo #5a4fcf, violet #9b5de5) — as many shapes as it takes. When the instruction explicitly requests colours or content, EVERY one of the ${ctx.n} variations must honour it (vary the LAYOUT/arrangement between them, never whether the request is satisfied).
 
 Now produce the JSON.`;
 
