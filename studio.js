@@ -564,9 +564,12 @@ const Studio = (() => {
     render(); e.preventDefault();
   };
   const onUp = () => {
+    const wasTap = drag && !drag.moved;
     if (drag && drag.moved) { guides = []; commit(); }
     else if (drag) guides = [];
     drag = null;
+    // a tap that landed on a photo (layer or background) → bring its crop controls into view
+    if (wasTap) revealPhotoControls();
   };
   const onDblClick = (e) => {
     const L = hit(pt(e).x, pt(e).y);
@@ -633,6 +636,15 @@ const Studio = (() => {
   let bgEdit = false;
   let rebuiltFrom = null, inRebuild = false;   // track if the current design came straight from a style rebuild
   const photoT = () => { const L = sel(); if (L && L.type === 'photo') return L; if (!selId && bgEdit && bg.type === 'photo') return bg; return null; };
+  // when a photo becomes the edit target, scroll its adjust/crop controls into view —
+  // otherwise they sit far below the fold and the crop feels "missing".
+  const revealPhotoControls = () => {
+    if (!photoT()) return;
+    const panel = document.querySelector('.studio-panel'), el = $('stPhotoCtl');
+    if (!panel || !el || el.hidden) return;
+    const delta = el.getBoundingClientRect().top - panel.getBoundingClientRect().top - 8;
+    if (Math.abs(delta) > 16) panel.scrollTop += delta;
+  };
 
   // photo colour-adjust + shape/crop panel (works for a layer or the background)
   const syncPhotoPanel = (t) => {
@@ -640,7 +652,7 @@ const Studio = (() => {
     t.filter = t.filter || (isBg ? {} : { b: 100, c: 100, s: 100, h: 0, sep: 0, blur: 0 });
     const f = t.filter;
     $('stPhTitle').childNodes[0].nodeValue = isBg ? 'Background photo ' : 'Photo ';
-    $('stPhHint').textContent = isBg ? '— drag the photo to reposition · zoom & crop below' : '— drag & corner-resize on the canvas';
+    $('stPhHint').textContent = isBg ? '— drag the photo to reposition · zoom & crop below' : '— zoom & crop below · drag/corner-resize on canvas';
     const applyRow = $('stBgApplyRow'); if (applyRow) applyRow.hidden = !(isBg && ctxData && ctxData.onApplyPhotoAdjust);
     $('stPhShapeRow').style.display = isBg ? 'none' : '';
     if (!isBg) {
@@ -670,10 +682,11 @@ const Studio = (() => {
       if (im && im.width) { const s0 = Math.max(box.w / im.width, box.h / im.height); roomX = im.width * s0 * z - box.w > 1; roomY = im.height * s0 * z - box.h > 1; }
       const lock = (id, room) => { const el = $(id); el.disabled = !room; const row = el.closest('.st-slider'); if (row) row.classList.toggle('locked', !room); };
       lock('stPhPanX', roomX); lock('stPhPanY', roomY);
-      if (isBg) $('stPhHint').textContent = (!roomX && !roomY) ? '— zoom in to crop & reposition'
-        : !roomY ? '— drag to pan · zoom in to move up/down'
-        : !roomX ? '— drag to pan · zoom in to move sideways'
-        : '— drag the photo to reposition · zoom to crop in';
+      const move = isBg ? 'drag the photo' : 'drag/resize on canvas';
+      $('stPhHint').textContent = (!roomX && !roomY) ? '— zoom in to crop & reposition'
+        : !roomY ? `— ${move} · zoom in to move up/down`
+        : !roomX ? `— ${move} · zoom in to move sideways`
+        : `— ${move} · zoom to crop in`;
     }
     set('stPhB', f.b == null ? 100 : f.b, '%'); set('stPhC', f.c == null ? 100 : f.c, '%'); set('stPhS', f.s == null ? 100 : f.s, '%');
     set('stPhHi', f.highlights || 0, ''); set('stPhSh', f.shadows || 0, '');
@@ -757,7 +770,7 @@ const Studio = (() => {
       const name = document.createElement('button');
       name.className = 'st-layer-name'; name.textContent = layerLabel(L); name.title = 'Select';
       if (L.hidden) name.style.opacity = '.45';
-      name.addEventListener('click', () => { selId = L.id; render(); syncPanel(); renderLayersPanel(); });
+      name.addEventListener('click', () => { selId = L.id; bgEdit = false; render(); syncPanel(); renderLayersPanel(); revealPhotoControls(); });
       const up = document.createElement('button'); up.className = 'st-layer-mini'; up.textContent = '▲'; up.title = 'Bring forward';
       up.addEventListener('click', () => moveLayer(L.id, 1));
       const dn = document.createElement('button'); dn.className = 'st-layer-mini'; dn.textContent = '▼'; dn.title = 'Send backward';
@@ -1338,7 +1351,7 @@ const Studio = (() => {
     $('stBgDarkenR').addEventListener('click', () => { if (bg.type === 'photo') { bg.darken = 0; renderBgPicker(); commit(); } });
 
     // photo editing — applies to the selected photo LAYER or the BACKGROUND (bgEdit)
-    $('stBgEdit').addEventListener('click', () => { if (bg.type !== 'photo') return; bgEdit = true; selId = null; bg.filter = bg.filter || {}; render(); syncPanel(); renderLayersPanel(); const pc = $('stPhotoCtl'); if (pc && pc.scrollIntoView) pc.scrollIntoView({ block: 'nearest' }); });
+    $('stBgEdit').addEventListener('click', () => { if (bg.type !== 'photo') return; bgEdit = true; selId = null; bg.filter = bg.filter || {}; render(); syncPanel(); renderLayersPanel(); revealPhotoControls(); });
     $('stBgApplyAll').addEventListener('click', () => { if (bgEdit && bg.type === 'photo' && ctxData.onApplyPhotoAdjust) ctxData.onApplyPhotoAdjust(bg.photoIndex, bg.filter || {}); });
     const ph = (fn) => () => { const t = photoT(); if (t) fn(t); };
     const phShape = (s) => ph((t) => { if (t !== bg) { t.shape = s; commit(); } });
