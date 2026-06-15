@@ -106,6 +106,21 @@ const AI = (() => {
       `Write the outreach email.\n\nPROPERTY FACTS (the only property facts you may use):\n${facts}\n\nWHAT THE BUYER IS LOOKING FOR (the agent's notes — match honestly, never overclaim, never echo any protected attribute):\n${requirements}\n\nHOUSE STYLE:\n${style}\n\nAGENT (sign off as):\n${agent || '(the agent)'}\n\nReturn only the email (a Subject line, then the body).`,
       1100);
 
+  // ---- reel captions: short on-screen lines for the video --------------------
+  const REEL_SYSTEM = [
+    'You write punchy on-screen caption lines for a short real-estate Reel / Story video. Each line flashes over a property photo, so it must be VERY short — 2 to 5 words, no full sentences, no trailing punctuation.',
+    'Use ONLY the property facts given — never invent features, rooms, materials, distances or claims. Each line must come from a real feature or fact.',
+    'Never use fair-housing / anti-discrimination-risk language (no "family", "safe", "perfect for…", "walking distance", schools, or demographics).',
+    'Follow the HOUSE STYLE (region/English variant, emoji rules).',
+    'Return ONLY a JSON array of strings — best first, no prose, no markdown fences — e.g. ["Just Listed","4 Spacious Bedrooms","Chef\'s Kitchen","Resort-Style Pool","Book Your Viewing"]. Return exactly the requested number of lines.',
+  ].join('\n');
+  const reelCaptions = async ({ facts, style, count }) => {
+    const raw = await call(REEL_SYSTEM, `Write ${count} caption lines for this listing's reel as a JSON array of short strings:\n\nPROPERTY FACTS (the only facts you may use):\n${facts}\n\nHOUSE STYLE:\n${style}`, 600);
+    let s = String(raw).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+    const m = s.match(/\[[\s\S]*\]/); if (m) s = m[0];
+    try { const a = JSON.parse(s); return Array.isArray(a) ? a.map((x) => String(x).trim()).filter(Boolean) : []; } catch (e) { return []; }
+  };
+
   // ---- location research (uses live web search) ------------------------------
   const RESEARCH_SYSTEM = [
     'You research the real, local lifestyle amenities near a property for a real estate "location highlights" line. Use web search — never invent or guess a place name.',
@@ -284,5 +299,5 @@ Now produce the JSON.`;
     return e && e.message ? e.message : 'Something went wrong.';
   };
 
-  return { MODELS, available, getKey, setKey, getModel, setModel, modelLabel, polish, instruct, buyerMatch, research, designStyle, designLayout, editLayout, compliance, test, explain };
+  return { MODELS, available, getKey, setKey, getModel, setModel, modelLabel, polish, instruct, buyerMatch, reelCaptions, research, designStyle, designLayout, editLayout, compliance, test, explain };
 })();

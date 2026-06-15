@@ -533,6 +533,8 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 .reel-pace select { padding: 6px 8px; }
 .reel-stage { display: flex; justify-content: center; background: var(--hi); border: 1px solid var(--line); border-radius: 12px; padding: 12px; }
 .reel-stage canvas, .reel-stage video { width: auto; max-width: 100%; max-height: 62vh; border-radius: 8px; display: block; background: #11161b; }
+.reel-caps { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 10px; }
+.reel-cap { font-size: 12px; font-weight: 600; padding: 4px 9px; border-radius: 999px; background: var(--hi); border: 1px solid var(--line); color: var(--ink); }
 
 /* campaign pack — the headline "download everything" action */
 .copy-btn.pack { margin-top: 18px; background: var(--teal); border-color: var(--teal); color: #fff; font-weight: 700; }

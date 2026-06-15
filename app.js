@@ -21,6 +21,7 @@
   let ohFormat = 'square';   // open-home post format ('square' | 'story')
   let ohPhoto = null;        // featured photo: a listing-photo object, 'you' (headshot), or null = hero
   let reelBlob = null, reelExt = 'webm', reelURL = '';   // last rendered Reel video
+  let reelCaps = null;    // AI-written on-screen captions for the reel (one per photo)
 
   // status options per listing type
   const SALE_STATUS = [['justlisted', 'Just Listed'], ['openhouse', 'Home Open / Open House'], ['forsale', 'For Sale'], ['newprice', 'New Price'], ['sold', 'Just Sold'], ['custom', 'Custom…']];
@@ -976,9 +977,30 @@
       $('reelStatus').className = 'parse-note err'; $('reelMake').disabled = true; return;
     }
     $('reelMake').disabled = false;
+    renderReelCaps();
     if (reelBlob) return;                 // keep a finished video on screen until re-made
     $('reelStatus').textContent = ''; $('reelStatus').className = 'parse-note';
     Reel.previewFrame($('cvReel'), brand, vizData());
+  };
+  const renderReelCaps = () => {
+    const box = $('reelCaps'); if (!box) return;
+    if (!reelCaps || !reelCaps.length) { box.hidden = true; box.innerHTML = ''; return; }
+    box.hidden = false; box.innerHTML = '<span class="hint">AI captions (used on Create reel):</span> ';
+    reelCaps.forEach((c) => { const s = document.createElement('span'); s.className = 'reel-cap'; s.textContent = c; box.appendChild(s); });
+  };
+  const genReelCaptions = async () => {
+    if (typeof AI === 'undefined' || !AI.available()) { $('brandSection').open = true; setTimeout(() => $('aiKey').focus(), 50); $('reelStatus').className = 'parse-note err'; $('reelStatus').textContent = 'Add your API key in “Your brand” to use AI captions.'; return; }
+    const d = vizData();
+    const count = Math.max(3, d.photos.filter((p) => p.inCarousel !== false).slice(0, 6).length);
+    const btn = $('reelAi'); btn.disabled = true;
+    const busy = startBusy($('reelStatus'), 'parse-note', 'Writing captions', '5–15s');
+    try {
+      const caps = await AI.reelCaptions({ facts: aiFacts(), style: aiStyle(), count });
+      if (!caps.length) { busy.finish('No captions returned — try again.', 'err'); return; }
+      reelCaps = caps; renderReelCaps();
+      busy.finish('✓ AI captions ready — they’ll appear when you create the reel', 'ok');
+    } catch (e) { busy.finish(AI.explain(e), 'err'); }
+    finally { btn.disabled = false; }
   };
   const makeReel = async () => {
     if (typeof Reel === 'undefined' || !Reel.supported()) return;
@@ -986,7 +1008,7 @@
     const d = vizData();
     const pics = d.photos.filter((p) => p.inCarousel !== false).slice(0, 6);
     const feats = Generator.flyerFeatures(d.raw, 8);
-    let fi = 0; pics.forEach((p) => { if (p._caption == null) p._caption = feats[fi++] || ''; });
+    let fi = 0; pics.forEach((p, i) => { if (reelCaps && reelCaps[i]) p._caption = reelCaps[i]; else if (p._caption == null) p._caption = feats[fi++] || ''; });
     const pace = parseFloat($('reelPace').value) || 2.6;
     const btn = $('reelMake'); btn.disabled = true;
     const st = $('reelStatus'); st.className = 'parse-note'; Progress.start();
@@ -1010,6 +1032,7 @@
   };
   const wireReel = () => {
     $('reelMake').addEventListener('click', makeReel);
+    $('reelAi').addEventListener('click', genReelCaptions);
     $('reelDownload').addEventListener('click', () => { if (reelBlob) saveBlob(reelBlob, `${slug()}-reel.${reelExt}`); });
     $('reelPace').addEventListener('change', () => { resetReel(); renderReel(); });
   };
@@ -1461,6 +1484,7 @@
     ohFormat = 'square'; ohPhoto = null;
     document.querySelectorAll('#ohFmtRow .fmt-btn').forEach((b) => b.classList.toggle('active', b.dataset.fmt === 'square'));
     if ($('ohRoundupWrap')) $('ohRoundupWrap').hidden = true;
+    reelCaps = null; if ($('reelCaps')) { $('reelCaps').hidden = true; $('reelCaps').innerHTML = ''; }
     resetReel();
     outputs = null; report = null;
     // a cleared listing must not let Undo/Redo resurrect the previous property's copy
