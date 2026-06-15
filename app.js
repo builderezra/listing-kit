@@ -18,6 +18,8 @@
   let mode = 'sale';      // 'sale' | 'rent' — the listing type
   let stamp = '';         // status sash overlaid on the graphics ('' | SOLD | UNDER OFFER | …)
   let ohDir = 'right';    // open-home directional-sign arrow ('left' | 'up' | 'right')
+  let ohFormat = 'square';   // open-home post format ('square' | 'story')
+  let ohPhoto = null;        // featured photo: a listing-photo object, 'you' (headshot), or null = hero
   let reelBlob = null, reelExt = 'webm', reelURL = '';   // last rendered Reel video
 
   // status options per listing type
@@ -722,9 +724,11 @@
       // 3b) open-home post + directional sign (only when an inspection time is set)
       const hasOpen = hasOpenHome();
       if (hasOpen) {
-        const when = openHomeWhen();
-        const opCv = offscreenCanvas(); Visuals.openHomePost(opCv, 'square', { brand, d, when });
-        const opB = await canvasPNGBytes(opCv); if (opB) files.push({ name: 'open-home/open-home-post.png', data: opB });
+        const when = openHomeWhen(), ohp = resolveOhPhoto();
+        for (const k of ['square', 'story']) {
+          const c = offscreenCanvas(); Visuals.openHomePost(c, k, { brand, d, when, photo: ohp });
+          const b = await canvasPNGBytes(c); if (b) files.push({ name: `open-home/open-home-post-${k}.png`, data: b });
+        }
         const asCv = offscreenCanvas(); Visuals.arrowSign(asCv, { brand, d, when, dir: ohDir });
         const asB = await canvasPNGBytes(asCv); if (asB) files.push({ name: 'open-home/directional-sign.png', data: asB });
       }
@@ -886,10 +890,35 @@
     const when = parts.length ? parts.join(', ') : legacy;
     return { when, set: !!when };
   };
+  // which photo to feature on the open-home post: a chosen listing photo, the
+  // agent's headshot ('you'), or null → openHomePost falls back to the hero
+  const resolveOhPhoto = () => {
+    if (ohPhoto === 'you') return (brand.headImg && brand.headImg.width) ? { img: brand.headImg, focus: 'center', fcss: '' } : null;
+    if (ohPhoto && ohPhoto.img && ohPhoto.img.width) return ohPhoto;
+    return null;
+  };
+  const renderOhPhotos = () => {
+    const box = $('ohPhotos'); if (!box) return;
+    box.innerHTML = '';
+    const list = orderedPhotos();
+    const curObj = (ohPhoto && ohPhoto !== 'you') ? ohPhoto : null;
+    const defaultHero = !ohPhoto;
+    const mk = (url, sel, onClick, isYou) => {
+      const im = document.createElement('img');
+      im.src = url; im.className = 'oh-thumb' + (sel ? ' sel' : '') + (isYou ? ' you' : '');
+      im.title = isYou ? 'Feature a photo of you' : 'Feature this photo';
+      im.addEventListener('click', onClick);
+      box.appendChild(im);
+    };
+    list.forEach((p, i) => mk(p.url, curObj === p || (defaultHero && i === 0), () => { ohPhoto = p; renderOpenHome(); }));
+    if (brand.headshot) mk(brand.headshot, ohPhoto === 'you', () => { ohPhoto = 'you'; renderOpenHome(); }, true);
+    if (!list.length && !brand.headshot) box.innerHTML = '<span class="hint">Add photos (or a headshot) to choose one.</span>';
+  };
   const renderOpenHome = () => {
     if (!$('ohTime').value.trim() && $('openhouse').value.trim()) $('ohTime').value = $('openhouse').value.trim();   // prefill from the listing's open field
     const d = vizData(), when = openHomeWhen();
-    Visuals.openHomePost($('cvOpenPost'), 'square', { brand, d, when });
+    renderOhPhotos();
+    Visuals.openHomePost($('cvOpenPost'), ohFormat, { brand, d, when, photo: resolveOhPhoto() });
     Visuals.arrowSign($('cvOpenSign'), { brand, d, when, dir: ohDir });
     $('ohEmpty').hidden = !!(when.date || when.time);
   };
@@ -922,6 +951,11 @@
     document.querySelectorAll('#ohDirRow .dir-btn').forEach((b) => b.addEventListener('click', () => {
       ohDir = b.dataset.dir || 'right';
       document.querySelectorAll('#ohDirRow .dir-btn').forEach((x) => x.classList.toggle('active', x === b));
+      if (activeTab === 'openhome') renderOpenHome();
+    }));
+    document.querySelectorAll('#ohFmtRow .fmt-btn').forEach((b) => b.addEventListener('click', () => {
+      ohFormat = b.dataset.fmt || 'square';
+      document.querySelectorAll('#ohFmtRow .fmt-btn').forEach((x) => x.classList.toggle('active', x === b));
       if (activeTab === 'openhome') renderOpenHome();
     }));
     document.querySelectorAll('#openhomeContent .dlc').forEach((b) => b.addEventListener('click', () => Visuals.download($(b.dataset.canvas), `${slug()}-${b.dataset.name}.png`)));
@@ -1424,6 +1458,8 @@
     document.querySelectorAll('#stampRow .stamp-btn').forEach((b) => b.classList.toggle('active', !b.dataset.stamp));
     ohDir = 'right';
     document.querySelectorAll('#ohDirRow .dir-btn').forEach((b) => b.classList.toggle('active', b.dataset.dir === 'right'));
+    ohFormat = 'square'; ohPhoto = null;
+    document.querySelectorAll('#ohFmtRow .fmt-btn').forEach((b) => b.classList.toggle('active', b.dataset.fmt === 'square'));
     if ($('ohRoundupWrap')) $('ohRoundupWrap').hidden = true;
     resetReel();
     outputs = null; report = null;

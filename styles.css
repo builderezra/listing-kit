@@ -506,6 +506,16 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 .dir-btn:hover { border-color: var(--teal); color: var(--ink); }
 .dir-btn.active { background: var(--teal); border-color: var(--teal); color: #fff; }
 #ohEmpty { margin: 0 0 12px; }
+.oh-pick { margin: 2px 0 10px; }
+.oh-photos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.oh-thumb { width: 46px; height: 46px; object-fit: cover; border-radius: 8px; border: 2px solid transparent; cursor: pointer; opacity: .82; transition: opacity .12s, border-color .12s; }
+.oh-thumb:hover { opacity: 1; }
+.oh-thumb.sel { border-color: var(--teal); opacity: 1; }
+.oh-thumb.you { border-radius: 50%; }
+.oh-fmt { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+.fmt-btn { font-size: 12.5px; font-weight: 600; padding: 6px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--hi); color: var(--muted); cursor: pointer; }
+.fmt-btn:hover { border-color: var(--teal); color: var(--ink); }
+.fmt-btn.active { background: var(--teal); border-color: var(--teal); color: #fff; }
 
 /* buyer-match email composer (Email tab) */
 .bm { margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--hi); }

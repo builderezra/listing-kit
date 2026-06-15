@@ -609,12 +609,16 @@ const Visuals = (() => {
   };
 
   // a social post built around the open-home date & time, over the hero photo
-  const openHomePost = (canvas, kind, { brand, d, when }) => {
+  const openHomePost = (canvas, kind, { brand, d, when, photo }) => {
     const story = kind === 'story';
     const [W, H] = story ? [1080, 1920] : [1080, 1080];
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
-    cover(ctx, d.hero, 0, 0, W, H, 0, brand, d.heroFocus, d.heroFilter);
+    // feature the chosen photo (a property shot or the agent), else the hero
+    const img = (photo && photo.img) ? photo.img : d.hero;
+    const focus = photo ? (photo.focus || 'center') : d.heroFocus;
+    const filt = photo ? (photo.fcss || '') : d.heroFilter;
+    cover(ctx, img, 0, 0, W, H, 0, brand, focus, filt);
     const g = ctx.createLinearGradient(0, 0, 0, H);
     g.addColorStop(0, 'rgba(8,14,18,0.66)'); g.addColorStop(0.42, 'rgba(8,14,18,0.24)');
     g.addColorStop(0.72, 'rgba(8,14,18,0.5)'); g.addColorStop(1, 'rgba(8,14,18,0.92)');
