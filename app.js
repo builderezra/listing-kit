@@ -958,7 +958,7 @@
     const st = $('reelStatus'); st.className = 'parse-note'; Progress.start();
     try {
       const res = await Reel.record({
-        canvas: $('cvReel'), brand, d, photos: pics, opts: { perPhoto: pace },
+        canvas: $('cvReel'), brand, d, photos: pics, opts: { perPhoto: pace, fit: $('reelFit').checked },
         onProgress: (frac) => { st.textContent = `🎬 Rendering… ${Math.round(frac * 100)}% (recorded in real time)`; },
       });
       reelBlob = res.blob; reelExt = res.ext; reelURL = URL.createObjectURL(res.blob);

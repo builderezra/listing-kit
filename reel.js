@@ -28,12 +28,30 @@ const Reel = (() => {
   };
   const SANS = `-apple-system, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif`;
 
-  // cover-fit an image with a slow Ken-Burns zoom + pan over progress p (0..1)
-  const coverKB = (ctx, img, p, variant, filter) => {
+  // cover-fit an image with a slow Ken-Burns zoom + pan over progress p (0..1).
+  // fit=true instead shows the WHOLE photo (contain) over a blurred fill so nothing
+  // important is cropped — only a very gentle zoom.
+  const coverKB = (ctx, img, p, variant, filter, fit) => {
     if (!img || !img.width) {
       const g = ctx.createLinearGradient(0, 0, W, H);
       g.addColorStop(0, '#1d2a31'); g.addColorStop(1, '#0c161b');
       ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); return;
+    }
+    if (fit) {
+      // blurred, darkened cover behind (fills the letterbox tastefully)
+      const cs = Math.max(W / img.width, H / img.height) * 1.12;
+      const cw = img.width * cs, ch = img.height * cs;
+      ctx.save();
+      try { ctx.filter = 'blur(38px) brightness(0.55)'; } catch (e) {}
+      ctx.drawImage(img, (W - cw) / 2, (H - ch) / 2, cw, ch);
+      ctx.restore();
+      // whole photo, contained, with a gentle zoom only
+      const fs = Math.min(W / img.width, H / img.height) * (1.0 + 0.05 * easeInOut(p));
+      const dw = img.width * fs, dh = img.height * fs;
+      if (filter) { try { ctx.filter = filter; } catch (e) {} }
+      ctx.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+      ctx.filter = 'none';
+      return;
     }
     const baseS = Math.max(W / img.width, H / img.height);
     const s = baseS * (1.06 + 0.16 * easeInOut(p));
@@ -96,7 +114,7 @@ const Reel = (() => {
         return;
       }
       // photo scene
-      coverKB(ctx, sc.photo && sc.photo.img, p, sc.kb, sc.photo && sc.photo.fcss);
+      coverKB(ctx, sc.photo && sc.photo.img, p, sc.kb, sc.photo && sc.photo.fcss, o.fit);
       const g = ctx.createLinearGradient(0, H * 0.58, 0, H);
       g.addColorStop(0, 'rgba(8,14,18,0)'); g.addColorStop(1, 'rgba(8,14,18,0.84)');
       ctx.fillStyle = g; ctx.fillRect(0, H * 0.58, W, H * 0.42);
