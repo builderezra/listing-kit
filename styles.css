@@ -640,6 +640,8 @@ body.dark .or-divider { color: var(--muted); }
 /* a centre notch for symmetric sliders (rotate) so 0 is visible */
 .st-slider input[type=range].st-centered { background: linear-gradient(var(--line),var(--line)) no-repeat, linear-gradient(var(--muted),var(--muted)) no-repeat; background-size: 100% 6px, 2px 12px; background-position: center, center; }
 body.dark .st-slider input[type=range] { background: #3a4047; }
+.st-slider.locked { opacity: .4; }
+.st-slider.locked input[type=range] { cursor: not-allowed; }
 .st-colors { display: flex; gap: 8px; margin-bottom: 10px; }
 .st-sw { width: 28px; height: 28px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; }
 .st-sw.active { border-color: var(--teal); box-shadow: 0 0 0 2px rgba(44,122,123,.3); }

@@ -121,15 +121,29 @@ const Studio = (() => {
     return cv;
   };
   // draw a source (img or canvas) covering a box, honouring focus + crop {zoom, ox, oy}
+  // the image point (normalised 0..1) shown at the frame centre, for the un-cropped
+  // cover fit — i.e. exactly what visuals.js draws. Used as the crop's starting point.
+  const coverCenter = (iw, ih, bw, bh, focus) => {
+    const s0 = Math.max(bw / iw, bh / ih), dw0 = iw * s0, dh0 = ih * s0;
+    const fy = { top: 0, center: 0.5, bottom: 1 }[focus || 'center'];
+    return { cx: 0.5, cy: dh0 ? (bh / 2 - (bh - dh0) * fy) / dh0 : 0.5 };   // visuals always centres horizontally
+  };
   const drawCover = (src, bx, by, bw, bh, focus, crop) => {
     const iw = src.width, ih = src.height;
     const z = (crop && crop.zoom) ? crop.zoom : 1;
     const s = Math.max(bw / iw, bh / ih) * z;
     const dw = iw * s, dh = ih * s;
-    const fy = { top: 0, center: 0.5, bottom: 1 }[focus || 'center'];
-    const ox = (crop && crop.ox) || 0, oy = (crop && crop.oy) || 0;
-    let dx = bx + (bw - dw) / 2 + ox * (dw - bw) / 2;
-    let dy = by + (bh - dh) * fy + oy * (dh - bh) / 2;
+    let dx, dy;
+    if (crop && (crop.cx != null || crop.cy != null)) {
+      // explicit crop: anchor the visible-centre point. Zoom keeps it fixed (crops in,
+      // never drifts to a corner); pan range opens up the more you zoom.
+      const cx = crop.cx != null ? crop.cx : 0.5, cy = crop.cy != null ? crop.cy : 0.5;
+      dx = bx + bw / 2 - cx * dw; dy = by + bh / 2 - cy * dh;
+    } else {
+      // un-cropped: focus-based cover, identical to the generated graphic (stays faithful)
+      const fy = { top: 0, center: 0.5, bottom: 1 }[focus || 'center'];
+      dx = bx + (bw - dw) / 2; dy = by + (bh - dh) * fy;
+    }
     dx = Math.min(bx, Math.max(bx + bw - dw, dx));
     dy = Math.min(by, Math.max(by + bh - dh, dy));
     ctx2d.drawImage(src, dx, dy, dw, dh);
@@ -500,7 +514,10 @@ const Studio = (() => {
       // and drag-to-pan repositions the crop (the obvious "edit the photo" gesture)
       bgEdit = true;
       bg.crop = bg.crop || {};
-      drag = { bgPan: true, sx: p.x, sy: p.y, ox0: bg.crop.ox || 0, oy0: bg.crop.oy || 0, moved: false };
+      const ph = ctxData.photos[bg.photoIndex], im = ph && ph.img;
+      const c0 = (bg.crop.cx != null) ? { cx: bg.crop.cx, cy: bg.crop.cy != null ? bg.crop.cy : 0.5 }
+        : (im && im.width) ? coverCenter(im.width, im.height, W(), H(), ph.focus) : { cx: 0.5, cy: 0.5 };
+      drag = { bgPan: true, sx: p.x, sy: p.y, cx0: c0.cx, cy0: c0.cy, moved: false };
       e.preventDefault();
     } else {
       bgEdit = false;
@@ -513,15 +530,16 @@ const Studio = (() => {
     drag.moved = true;
     const p = pt(e);
     if (drag.bgPan) {
-      // drag the background photo to reposition its crop
+      // drag the background photo to reposition its crop (1:1 with the cursor)
       const ph = ctxData.photos[bg.photoIndex], img = ph && ph.img;
       if (img && img.width) {
         const z = (bg.crop && bg.crop.zoom) ? bg.crop.zoom : 1;
         const s = Math.max(W() / img.width, H() / img.height) * z;
         const dw = img.width * s, dh = img.height * s;
         bg.crop = bg.crop || {};
-        if (dw - W() > 0.5) bg.crop.ox = Math.min(1, Math.max(-1, drag.ox0 + (p.x - drag.sx) * 2 / (dw - W())));
-        if (dh - H() > 0.5) bg.crop.oy = Math.min(1, Math.max(-1, drag.oy0 + (p.y - drag.sy) * 2 / (dh - H())));
+        // grab-and-move: dragging right reveals the LEFT of the photo → centre point moves left
+        bg.crop.cx = Math.min(1, Math.max(0, drag.cx0 - (p.x - drag.sx) / dw));
+        bg.crop.cy = Math.min(1, Math.max(0, drag.cy0 - (p.y - drag.sy) / dh));
         render();
       }
       e.preventDefault(); return;
@@ -637,9 +655,25 @@ const Studio = (() => {
     const set = (id, v, suf) => { $(id).value = v; slv(id + 'V', v + suf); };
     if (cropAble) {
       const cr = t.crop || {};
-      set('stPhZoom', Math.round((cr.zoom || 1) * 100), '%');
-      set('stPhPanX', Math.round((cr.ox || 0) * 100), '');
-      set('stPhPanY', Math.round((cr.oy || 0) * 100), '');
+      const z = cr.zoom || 1;
+      set('stPhZoom', Math.round(z * 100), '%');
+      const box = isBg ? { w: W(), h: H() } : { w: (t.wf || 0.5) * W(), h: (t.hf || 0.5) * H() };
+      const pObj = ctxData.photos[isBg ? bg.photoIndex : t.photoIndex];
+      const im = pObj && pObj.img;
+      const base = (im && im.width) ? coverCenter(im.width, im.height, box.w, box.h, pObj.focus) : { cx: 0.5, cy: 0.5 };
+      const cx = cr.cx != null ? cr.cx : base.cx, cy = cr.cy != null ? cr.cy : base.cy;
+      set('stPhPanX', Math.round((cx - 0.5) * 200), '');
+      set('stPhPanY', Math.round((cy - 0.5) * 200), '');
+      // a wide photo fully fills the frame vertically (and vice-versa): that pan axis has no
+      // room until you zoom in. Disable it + guide the user, so it doesn't feel broken.
+      let roomX = true, roomY = true;
+      if (im && im.width) { const s0 = Math.max(box.w / im.width, box.h / im.height); roomX = im.width * s0 * z - box.w > 1; roomY = im.height * s0 * z - box.h > 1; }
+      const lock = (id, room) => { const el = $(id); el.disabled = !room; const row = el.closest('.st-slider'); if (row) row.classList.toggle('locked', !room); };
+      lock('stPhPanX', roomX); lock('stPhPanY', roomY);
+      if (isBg) $('stPhHint').textContent = (!roomX && !roomY) ? '— zoom in to crop & reposition'
+        : !roomY ? '— drag to pan · zoom in to move up/down'
+        : !roomX ? '— drag to pan · zoom in to move sideways'
+        : '— drag the photo to reposition · zoom to crop in';
     }
     set('stPhB', f.b == null ? 100 : f.b, '%'); set('stPhC', f.c == null ? 100 : f.c, '%'); set('stPhS', f.s == null ? 100 : f.s, '%');
     set('stPhHi', f.highlights || 0, ''); set('stPhSh', f.shadows || 0, '');
@@ -1317,9 +1351,24 @@ const Studio = (() => {
     phFilter('stPhB', 'b', '%'); phFilter('stPhC', 'c', '%'); phFilter('stPhS', 's', '%'); phFilter('stPhHue', 'h', '°'); phFilter('stPhSep', 'sep', '%');
     phFilter('stPhHi', 'highlights', ''); phFilter('stPhSh', 'shadows', ''); phFilter('stPhTint', 'tint', ''); phFilter('stPhSharp', 'sharpness', ''); phFilter('stPhVig', 'vignette', '');
     // crop / position (background only)
-    const phCrop = (id, key, div) => { const live = ph((t) => { if (t === bg || t.hf) { t.crop = t.crop || {}; t.crop[key] = Number($(id).value) / div; slv(id + 'V', $(id).value + (div === 100 && key === 'zoom' ? '%' : '')); render(); } }); $(id).addEventListener('input', live); $(id).addEventListener('change', commit); };
-    phCrop('stPhZoom', 'zoom', 100); phCrop('stPhPanX', 'ox', 100); phCrop('stPhPanY', 'oy', 100);
-    $('stPhReset').addEventListener('click', ph((t) => { t.filter = (t === bg) ? {} : { b: 100, c: 100, s: 100, h: 0, sep: 0, blur: 0 }; if (t === bg) t.crop = { zoom: 1, ox: 0, oy: 0 }; commit(); }));
+    // crop: zoom keeps the current view centred; Pan X/Y move the visible-centre point.
+    // ensure cx/cy exist (seeded from the focus cover-centre) so zoom never drifts to a corner.
+    const ensureCropCenter = (t) => {
+      t.crop = t.crop || {};
+      if (t.crop.cx != null && t.crop.cy != null) return;
+      const isBg = (t === bg);
+      const box = isBg ? { w: W(), h: H() } : { w: (t.wf || 0.5) * W(), h: (t.hf || 0.5) * H() };
+      const pObj = ctxData.photos[isBg ? bg.photoIndex : t.photoIndex];
+      const im = pObj && pObj.img;
+      const c = (im && im.width) ? coverCenter(im.width, im.height, box.w, box.h, pObj.focus) : { cx: 0.5, cy: 0.5 };
+      if (t.crop.cx == null) t.crop.cx = c.cx;
+      if (t.crop.cy == null) t.crop.cy = c.cy;
+    };
+    const cropLive = (id, apply, suf) => { const live = ph((t) => { if (!(t === bg || t.hf)) return; ensureCropCenter(t); apply(t, Number($(id).value)); slv(id + 'V', $(id).value + suf); render(); }); $(id).addEventListener('input', live); $(id).addEventListener('change', commit); };
+    cropLive('stPhZoom', (t, v) => { t.crop.zoom = v / 100; }, '%');
+    cropLive('stPhPanX', (t, v) => { t.crop.cx = 0.5 + v / 200; }, '');
+    cropLive('stPhPanY', (t, v) => { t.crop.cy = 0.5 + v / 200; }, '');
+    $('stPhReset').addEventListener('click', ph((t) => { t.filter = (t === bg) ? {} : { b: 100, c: 100, s: 100, h: 0, sep: 0, blur: 0 }; t.crop = { zoom: 1 }; commit(); }));
 
     const cur = () => sel();
     $('stText').addEventListener('input', () => { const L = cur(); if (L) { L.text = $('stText').value; L.edited = true; render(); renderLayersPanel(); } });
