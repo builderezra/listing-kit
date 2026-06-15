@@ -74,7 +74,7 @@ const Reel = (() => {
     const introImg = document.createElement('canvas');
     try { Visuals.render(brand.templateId, 'story', introImg, d); } catch (e) {}
     const ctaImg = document.createElement('canvas');
-    try { Visuals.ctaSlide(ctaImg, { brand, address: d.address, badgeText: d.badgeText }); } catch (e) {}
+    try { Visuals.ctaSlide(ctaImg, { brand, address: d.address, badgeText: d.badgeText, ohLine: d.ohLine }); } catch (e) {}
 
     const pics = (photos || []).slice(0, 6);
     const scenes = [{ type: 'intro', dur: o.intro }];

@@ -528,7 +528,7 @@ const Visuals = (() => {
   };
 
   // closing call-to-action slide
-  const ctaSlide = (canvas, { brand, address, badgeText }) => {
+  const ctaSlide = (canvas, { brand, address, badgeText, ohLine }) => {
     const W = 1080, H = 1080;
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
@@ -552,10 +552,10 @@ const Visuals = (() => {
     ctx.textAlign = 'center';
     ctx.font = font(700, 66, priceFam(brand, SANS));
     ctx.fillStyle = fg;
-    ctx.fillText('Like what you see?', W / 2, y + 130);
+    ctx.fillText(ohLine ? 'See you at the home open' : 'Like what you see?', W / 2, y + 130);
 
     // pill CTA
-    const ctaText = 'BOOK YOUR PRIVATE VIEWING';
+    const ctaText = ohLine ? 'ALL WELCOME' : 'BOOK YOUR PRIVATE VIEWING';
     ctx.font = font(800, 30);
     spacing(ctx, 4);
     const tw = ctx.measureText(ctaText).width;
@@ -567,6 +567,8 @@ const Visuals = (() => {
     ctx.fillText(ctaText, W / 2, py + ph / 2 + 2);
     ctx.textBaseline = 'alphabetic';
     spacing(ctx, 0);
+    // the open-home date/time, when scheduled
+    if (ohLine) { ctx.font = font(700, 34); ctx.fillStyle = alpha(brand.accent, 0.95); ctx.fillText(ohLine, W / 2, py + ph + 56); }
 
     y = py + ph + 110;
     ctx.font = font(700, 40); ctx.fillStyle = fg;
@@ -798,6 +800,15 @@ const Visuals = (() => {
 
     // price / address / stats (left, in the white zone — QR sits to their right)
     let y = photoY + photoH + 82;
+    // open-home date/time pill (when scheduled) — sits below the accent rule
+    if (d.ohLine) {
+      ctx.font = font(800, 27); spacing(ctx, 1.5);
+      const tw = ctx.measureText(d.ohLine).width, pw = tw + 44, ph = 50, px = 48, oy = photoY + photoH + 18;
+      ctx.fillStyle = b.accent; rr(ctx, px, oy, pw, ph, ph / 2); ctx.fill();
+      ctx.fillStyle = onColor(b.accent); ctx.textBaseline = 'middle'; ctx.fillText(d.ohLine, px + 22, oy + ph / 2 + 1);
+      ctx.textBaseline = 'alphabetic'; spacing(ctx, 0);
+      y += 60;
+    }
     if (d.price) { ctx.font = font(800, 78, priceFam(b, SANS)); ctx.fillStyle = b.primary; ctx.fillText(d.price, 48, y); }
     if (d.address) { y += 58; ctx.font = font(400, 36); ctx.fillStyle = '#23333b'; ctx.fillText(d.address, 48, y); }
     const stats = statText(d);

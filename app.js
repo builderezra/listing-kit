@@ -402,7 +402,8 @@
   };
 
   // ---------------- form ----------------
-  const readForm = () => ({
+  const readForm = () => {
+    const f = {
     mode,
     address: $('address').value.trim(),
     city: $('city').value.trim(),
@@ -434,7 +435,17 @@
     agentName: brand.agentName, brokerage: brand.brokerage, phone: brand.phone, email: brand.email,
     region: brand.region,
     photoCount: photos.length,
-  });
+    };
+    // Unify the home-open schedule into the snapshot so EVERY format (graphics,
+    // flyer, sign board, copy) reflects "Home Open" — not just the Open Home tab.
+    // Skip terminal statuses (sold/leased) where an open doesn't apply.
+    const oh = openSchedule();
+    if (oh.set && !['sold', 'leased'].includes(f.badge)) {
+      f.openhouse = oh.when;
+      if (f.badge !== 'openhouse' && f.badge !== 'inspection') f.badge = f.mode === 'rent' ? 'inspection' : 'openhouse';
+    }
+    return f;
+  };
 
   // ---------------- generate ----------------
   // (re)run the fair-housing scan + banned-word check over the current outputs
@@ -545,7 +556,7 @@
     addSlide('1 · Cover', (cv) => Visuals.render(brand.templateId, 'square', cv, d), null, 'cover');
     slides.forEach((p, i) =>
       addSlide(`${i + 2} · Photo`, (cv) => Visuals.featureSlide(cv, { photo: p, caption: p._caption || '', brand, idx: i + 1, total }), p, 'photo', { idx: i + 1, total }));
-    addSlide(`${total} · CTA`, (cv) => Visuals.ctaSlide(cv, { brand, address: d.address, badgeText: d.badgeText }), null, 'cta');
+    addSlide(`${total} · CTA`, (cv) => Visuals.ctaSlide(cv, { brand, address: d.address, badgeText: d.badgeText, ohLine: d.ohLine }), null, 'cta');
   };
 
   // ---- native share (Web Share API, with download fallback) ----
@@ -674,7 +685,7 @@
           Visuals.featureSlide(cv, { photo: carPhotos[i], caption: carPhotos[i]._caption || '', brand, idx: i + 1, total });
           await push(cv, 'photo');
         }
-        const cta = offscreenCanvas(); Visuals.ctaSlide(cta, { brand, address: d.address, badgeText: d.badgeText }); await push(cta, 'cta');
+        const cta = offscreenCanvas(); Visuals.ctaSlide(cta, { brand, address: d.address, badgeText: d.badgeText, ohLine: d.ohLine }); await push(cta, 'cta');
       }
 
       // 3) sign board (with QR if a link is set)
@@ -832,13 +843,24 @@
 
   // ---- open-home kit (event post + directional sign + weekly roundup) ----
   const REGION_LOCALE = { au: 'en-AU', us: 'en-US', uk: 'en-GB', other: 'en-AU' };
-  const fmtOpenDate = (yyyymmdd) => {
+  const fmtOpenDate = (yyyymmdd, opts) => {
     if (!yyyymmdd) return '';
-    try { const dt = new Date(yyyymmdd + 'T00:00:00'); if (!isNaN(dt)) return dt.toLocaleDateString(REGION_LOCALE[brand.region] || 'en-AU', { weekday: 'long', day: 'numeric', month: 'long' }); } catch (e) {}
+    try { const dt = new Date(yyyymmdd + 'T00:00:00'); if (!isNaN(dt)) return dt.toLocaleDateString(REGION_LOCALE[brand.region] || 'en-AU', opts || { weekday: 'long', day: 'numeric', month: 'long' }); } catch (e) {}
     return '';
   };
   const openHomeWhen = () => ({ date: fmtOpenDate($('ohDate').value), time: $('ohTime').value.trim() });
   const hasOpenHome = () => { const w = openHomeWhen(); return !!(w.date || w.time); };
+  // the open schedule as ONE compact line ("Sat 20 Jun, 11:00–11:30am"), used to
+  // flow "Home Open" into EVERY format. Prefers the Open Home tab's structured
+  // date+time; falls back to the listing form's free-text open field.
+  const openSchedule = () => {
+    const time = $('ohTime').value.trim();
+    const dateShort = fmtOpenDate($('ohDate').value, { weekday: 'short', day: 'numeric', month: 'short' });
+    const parts = [dateShort, time].filter(Boolean);
+    const legacy = (($('badge').value === 'openhouse' || $('badge').value === 'inspection') && $('openhouse').value.trim()) ? $('openhouse').value.trim() : '';
+    const when = parts.length ? parts.join(', ') : legacy;
+    return { when, set: !!when };
+  };
   const renderOpenHome = () => {
     if (!$('ohTime').value.trim() && $('openhouse').value.trim()) $('ohTime').value = $('openhouse').value.trim();   // prefill from the listing's open field
     const d = vizData(), when = openHomeWhen();
@@ -867,7 +889,11 @@
     toast(`Roundup built — ${items.length} listing${items.length === 1 ? '' : 's'}`);
   };
   const wireOpenHome = () => {
-    ['ohDate', 'ohTime'].forEach((id) => $(id).addEventListener('input', () => { if (activeTab === 'openhome') renderOpenHome(); saveDraft(); }));
+    ['ohDate', 'ohTime'].forEach((id) => {
+      $(id).addEventListener('input', () => { if (activeTab === 'openhome') renderOpenHome(); saveDraft(); });
+      // committing an open date/time flows "Home Open" into every other format
+      $(id).addEventListener('change', () => { if (outputs) generate(); else if (activeTab === 'openhome') renderOpenHome(); });
+    });
     document.querySelectorAll('#ohDirRow .dir-btn').forEach((b) => b.addEventListener('click', () => {
       ohDir = b.dataset.dir || 'right';
       document.querySelectorAll('#ohDirRow .dir-btn').forEach((x) => x.classList.toggle('active', x === b));
@@ -934,7 +960,7 @@
   const renderSignboard = () => {
     const d = vizData();
     if (!$('sbUrl').value.trim() && $('importUrl').value.trim()) $('sbUrl').value = $('importUrl').value.trim();   // prefill from the imported link
-    const status = d.raw.mode === 'rent' ? 'FOR LEASE' : 'FOR SALE';
+    const status = d.ohLine ? d.badgeText : (d.raw.mode === 'rent' ? 'FOR LEASE' : 'FOR SALE');
     Visuals.signboard($('cvSignboard'), { brand, d, status, qrUrl: $('sbUrl').value.trim() });
   };
 
