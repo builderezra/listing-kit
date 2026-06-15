@@ -88,6 +88,24 @@ const AI = (() => {
   const instruct = (opts) =>
     call(SYSTEM, wrap(opts, `Revise the ${opts.channelLabel} below according to this instruction: "${opts.instruction}". Apply it faithfully, but keep every hard rule (facts only, no discriminatory language, house style).`), 1500);
 
+  // ---- buyer-match email: personal outreach to a buyer in the database -------
+  const BUYER_SYSTEM = [
+    'You are an experienced real estate agent writing a short, warm, personal outreach email to a prospective buyer already in your database, letting them know about a listing that may suit what they are looking for.',
+    '',
+    'Hard rules, always:',
+    '1. Use ONLY the PROPERTY FACTS for anything about the property — never invent or imply features, room counts, price, location, or distances that are not given.',
+    '2. Match honestly against the BUYER NOTES: highlight the genuine overlaps between what they want and what this property actually offers. If the property does not meet one of their stated wants, do NOT claim it does — simply don’t mention that point.',
+    '3. Never use fair-housing / anti-discrimination-risk language: no "safe", "family-friendly", "perfect for [a group]", "good schools", "walking distance", or any reference to race, religion, nationality, sex, family/children status, age, or disability — even if the buyer notes mention them, do not echo or act on protected attributes.',
+    '4. Follow the HOUSE STYLE (tone, region/English variant, emoji and punctuation rules, sign-offs, banned words). Sign off as the AGENT details given.',
+    '5. Keep it concise (roughly 110–180 words), genuinely personal (not a mass blast), with one clear next step (book a viewing / reply to arrange a time).',
+    '6. Output ONLY the email: a "Subject: …" line, then the body. No preamble, no explanation, no surrounding quotes.',
+  ].join('\n');
+
+  const buyerMatch = ({ facts, style, requirements, agent }) =>
+    call(BUYER_SYSTEM,
+      `Write the outreach email.\n\nPROPERTY FACTS (the only property facts you may use):\n${facts}\n\nWHAT THE BUYER IS LOOKING FOR (the agent's notes — match honestly, never overclaim, never echo any protected attribute):\n${requirements}\n\nHOUSE STYLE:\n${style}\n\nAGENT (sign off as):\n${agent || '(the agent)'}\n\nReturn only the email (a Subject line, then the body).`,
+      1100);
+
   // ---- location research (uses live web search) ------------------------------
   const RESEARCH_SYSTEM = [
     'You research the real, local lifestyle amenities near a property for a real estate "location highlights" line. Use web search — never invent or guess a place name.',
@@ -266,5 +284,5 @@ Now produce the JSON.`;
     return e && e.message ? e.message : 'Something went wrong.';
   };
 
-  return { MODELS, available, getKey, setKey, getModel, setModel, modelLabel, polish, instruct, research, designStyle, designLayout, editLayout, compliance, test, explain };
+  return { MODELS, available, getKey, setKey, getModel, setModel, modelLabel, polish, instruct, buyerMatch, research, designStyle, designLayout, editLayout, compliance, test, explain };
 })();

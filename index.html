@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=57" />
+  <link rel="stylesheet" href="styles.css?v=58" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -533,6 +533,21 @@
             <button type="button" class="mini-btn" id="aiApply">Apply</button>
             <span class="ai-status" id="aiStatus"></span>
           </div>
+          <details class="bm" id="buyerMatch" hidden>
+            <summary>🎯 Draft a buyer-match email <span class="hint">— for a specific buyer in your database (uses your AI key)</span></summary>
+            <div class="bm-body">
+              <textarea id="bmReq" rows="3" placeholder="What is this buyer after? e.g. “4-bed family home, double garage, under $900k, close to the coast, wants to move before spring”"></textarea>
+              <div class="bm-row">
+                <button type="button" class="copy-btn ai" id="bmDraft">🎯 Draft email</button>
+                <span class="ai-status" id="bmStatus"></span>
+              </div>
+              <pre class="copytext bm-out" id="bmOut" hidden></pre>
+              <div class="bm-actions" id="bmActions" hidden>
+                <button type="button" class="mini-btn" id="bmCopy">Copy</button>
+                <button type="button" class="mini-btn" id="bmOpen">✉️ Open in email ↗</button>
+              </div>
+            </div>
+          </details>
         </article>
 
         <article class="panel-content" id="complianceContent" hidden>
@@ -926,18 +941,18 @@
     </div>
   </div>
 
-  <script src="generator.js?v=57"></script>
-  <script src="fairhousing.js?v=57"></script>
-  <script src="parser.js?v=57"></script>
-  <script src="importer.js?v=57"></script>
-  <script src="qr.js?v=57"></script>
-  <script src="visuals.js?v=57"></script>
-  <script src="flyer.js?v=57"></script>
-  <script src="ai.js?v=57"></script>
-  <script src="studio.js?v=57"></script>
-  <script src="tour.js?v=57"></script>
-  <script src="zip.js?v=57"></script>
-  <script src="reel.js?v=57"></script>
-  <script src="app.js?v=57"></script>
+  <script src="generator.js?v=58"></script>
+  <script src="fairhousing.js?v=58"></script>
+  <script src="parser.js?v=58"></script>
+  <script src="importer.js?v=58"></script>
+  <script src="qr.js?v=58"></script>
+  <script src="visuals.js?v=58"></script>
+  <script src="flyer.js?v=58"></script>
+  <script src="ai.js?v=58"></script>
+  <script src="studio.js?v=58"></script>
+  <script src="tour.js?v=58"></script>
+  <script src="zip.js?v=58"></script>
+  <script src="reel.js?v=58"></script>
+  <script src="app.js?v=58"></script>
 </body>
 </html>

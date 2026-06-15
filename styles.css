@@ -501,6 +501,16 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 .dir-btn.active { background: var(--teal); border-color: var(--teal); color: #fff; }
 #ohEmpty { margin: 0 0 12px; }
 
+/* buyer-match email composer (Email tab) */
+.bm { margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--hi); }
+.bm > summary { cursor: pointer; padding: 10px 12px; font-weight: 600; font-size: 13.5px; list-style: none; }
+.bm > summary::-webkit-details-marker { display: none; }
+.bm-body { padding: 0 12px 12px; }
+.bm-body textarea { width: 100%; resize: vertical; min-height: 64px; }
+.bm-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; flex-wrap: wrap; }
+.bm-out { margin-top: 10px; max-height: 340px; overflow: auto; white-space: pre-wrap; }
+.bm-actions { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+
 /* reel / story video */
 .reel-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
 .reel-pace { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; }

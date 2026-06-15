@@ -961,6 +961,7 @@
     $('aiStatus').textContent = '';
     updateUndo();
     renderChannelShare(tab);
+    if ($('buyerMatch')) { $('buyerMatch').hidden = (tab !== 'email'); if (tab !== 'email') $('buyerMatch').open = false; }
   };
 
   // ---- per-channel "Open in…" share row (Instagram / Facebook / Email) ----
@@ -973,9 +974,9 @@
   ];
   const savedEmailSvc = () => { try { return localStorage.getItem('lk_email_svc') || 'gmail'; } catch (e) { return 'gmail'; } };
   const copyText = async (t) => { try { await navigator.clipboard.writeText(t); return true; } catch (e) { return false; } };
-  const openEmail = (svcId) => {
+  const openEmail = (svcId, rawText) => {
     const svc = EMAIL_SERVICES.find((s) => s.id === svcId) || EMAIL_SERVICES[0];
-    const raw = (outputs && outputs.email) || '';
+    const raw = (rawText != null ? rawText : (outputs && outputs.email)) || '';
     const subM = raw.match(/^\s*subject:\s*(.+)$/im);
     const addr = $('address').value.trim();
     const subject = subM ? subM[1].trim() : (addr ? `New listing — ${addr}` : 'New listing');
@@ -1616,6 +1617,30 @@
     $('aiInstruction').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); const i = e.target.value.trim(); if (i) runAI('instruct', i); } });
   };
 
+  // ---- buyer-match email (AI: draft personal outreach to a buyer) ----
+  let bmEmail = '';
+  const draftBuyerMatch = async () => {
+    if (!AI.available()) { $('brandSection').open = true; setTimeout(() => $('aiKey').focus(), 50); $('bmStatus').textContent = 'Add your API key in “Your brand” to enable AI.'; $('bmStatus').className = 'ai-status err'; return; }
+    const req = $('bmReq').value.trim();
+    if (!req) { $('bmReq').focus(); return; }
+    const btn = $('bmDraft'); btn.disabled = true;
+    const busy = startBusy($('bmStatus'), 'ai-status', 'Drafting', '5–20s');
+    try {
+      const agent = [brand.agentName, brand.brokerage, brand.phone, brand.email].filter(Boolean).join(', ');
+      bmEmail = await AI.buyerMatch({ facts: aiFacts(), style: aiStyle(), requirements: req, agent });
+      if (!bmEmail) { busy.finish('No draft returned — try again.', 'err'); btn.disabled = false; return; }
+      $('bmOut').textContent = bmEmail; $('bmOut').hidden = false; $('bmActions').hidden = false;
+      busy.finish('✓ Draft ready with ' + AI.modelLabel(), 'ok');
+    } catch (e) { busy.finish(AI.explain(e), 'err'); }
+    finally { btn.disabled = false; }
+  };
+  const wireBuyerMatch = () => {
+    $('bmDraft').addEventListener('click', draftBuyerMatch);
+    $('bmReq').addEventListener('keydown', (e) => { if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') { e.preventDefault(); draftBuyerMatch(); } });
+    $('bmCopy').addEventListener('click', async () => { if (!bmEmail) return; const ok = await copyText(bmEmail); $('bmCopy').textContent = ok ? 'Copied ✓' : 'Copy'; setTimeout(() => { $('bmCopy').textContent = 'Copy'; }, 1500); });
+    $('bmOpen').addEventListener('click', () => { if (bmEmail) openEmail(savedEmailSvc(), bmEmail); });
+  };
+
   // AI + live web search → real nearby amenities into Location highlights
   const researchLocation = async () => {
     const note = (msg, kind) => { $('researchStatus').textContent = msg; $('researchStatus').className = 'parse-note' + (kind ? ' ' + kind : ''); };
@@ -1828,6 +1853,7 @@
   wireSignboard();
   wireEditableOutput();
   wireAI();
+  wireBuyerMatch();
   // accessibility: announce async status updates to screen readers
   ['importStatus', 'parseNote', 'researchStatus', 'aiStatus', 'aiKeyStatus', 'stAiStatus'].forEach((id) => { const e = $(id); if (e) { e.setAttribute('role', 'status'); e.setAttribute('aria-live', 'polite'); } });
   // ⌘/Ctrl+Enter generates from anywhere (except while the studio overlay is open)
