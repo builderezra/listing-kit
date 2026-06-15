@@ -30,6 +30,9 @@ const Studio = (() => {
   };
   const SANS = `-apple-system, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif`;
   const SERIF = `Georgia, 'Times New Roman', serif`;
+  // a connecting signature script (Snell Roundhand on Apple, Brush/Segoe Script on Windows)
+  const SCRIPT = `'Snell Roundhand', 'Savoye LET', 'Apple Chancery', 'Brush Script MT', 'Segoe Script', 'Lucida Handwriting', cursive`;
+  const FAMILY = (f) => f === 'serif' ? SERIF : f === 'script' ? SCRIPT : SANS;
   const COARSE = (() => { try { return matchMedia('(pointer:coarse)').matches; } catch (e) { return false; } })();
 
   let ctx2d, cv, ctxData = null;     // ctxData = { photos, brand, fields }
@@ -190,7 +193,7 @@ const Studio = (() => {
   };
 
   // ---- text measuring (with optional word-wrap) ------------------------------
-  const fontStr = (L) => `${L.weight || 400} ${L.size}px ${L.font === 'serif' ? SERIF : SANS}`;
+  const fontStr = (L) => `${L.weight || 400} ${L.size}px ${FAMILY(L.font)}`;
   const wrapLines = (text, maxW) => {
     const out = [];
     String(text).split('\n').forEach((para) => {
@@ -475,6 +478,7 @@ const Studio = (() => {
       status: { ...base, type: 'badge', text: 'SOLD', color: '#c0392b', size: Math.round(w * 0.055), weight: 800, yf: 0.2, xf: 0.5, rot: -10 },
       homeopen: { ...base, type: 'badge', text: 'HOME OPEN · SAT 11:00', color: 'primary', size: Math.round(w * 0.03), weight: 700, yf: 0.88, xf: 0.5 },
       agent: { ...base, text: [b.agentName, b.phone, b.brokerage].filter(Boolean).join('\n') || 'Your Name\n0400 000 000\nAgency', align: 'left', weight: 600, size: Math.round(w * 0.03), xf: 0.22, yf: 0.9 },
+      signature: { ...base, text: b.agentName || 'Your signature', font: 'script', weight: 400, color: 'dark', size: Math.round(w * 0.085), shadow: false, yf: 0.84 },
       disclaimer: { ...base, text: 'All information believed accurate but not guaranteed — verify independently.', weight: 400, size: Math.round(w * 0.017), yf: 0.975, wrapf: 0.92, shadow: false, opacity: 0.85 },
       ribbon: { ...base, type: 'ribbon', text: 'SOLD', color: '#c0392b', wf: 0.62, size: Math.round(w * 0.04), xf: 0.74, yf: 0.2, rot: 45 },
       statsstrip: { ...base, type: 'statsstrip', field: 'stats', text: f.stats || '4 BD · 2 BA · 2 CAR', color: 'primary', size: Math.round(w * 0.028), yf: 0.9, xf: 0.5, shadow: false },
@@ -959,8 +963,8 @@ const Studio = (() => {
     if (isText) {
       $('stText').value = L.text;
       $('stSize').value = L.size; slv('stSizeV', L.size + 'px');
-      $('stFont').textContent = L.font === 'serif' ? 'Serif' : 'Sans';
-      $('stFont').classList.toggle('on', L.font === 'serif');
+      $('stFont').textContent = L.font === 'serif' ? 'Serif' : L.font === 'script' ? '✍ Script' : 'Sans';
+      $('stFont').classList.toggle('on', L.font === 'serif' || L.font === 'script');
       $('stBold').classList.toggle('on', (L.weight || 0) >= 700);
       $('stShadow').classList.toggle('on', !!L.shadow);
       $('stOutline').classList.toggle('on', !!L.outline);
@@ -1016,7 +1020,7 @@ const Studio = (() => {
     const serif = b.font === 'serif', sans = b.font === 'sans';
     const priceFont = (def) => serif ? 'serif' : sans ? 'sans' : def;
     const out = [];
-    const measureW = (t, wt, size, fam) => { ctx2d.font = `${wt} ${size}px ${fam === 'serif' ? SERIF : SANS}`; return ctx2d.measureText(String(t)).width; };
+    const measureW = (t, wt, size, fam) => { ctx2d.font = `${wt} ${size}px ${FAMILY(fam)}`; return ctx2d.measureText(String(t)).width; };
     const stripW = (text, size) => { ctx2d.font = `700 ${size}px ${SANS}`; const parts = String(text).split(/[·•|]/).map((s) => s.trim()).filter(Boolean); const padX = size * 0.7, gap = size * 0.45; let tot = 0; parts.forEach((p, k2) => { tot += ctx2d.measureText(p).width + padX * 2; if (k2) tot += gap; }); return tot; };
     const push = (o) => { out.push({ id: uid++, opacity: 1, rot: 0, ...o }); return out[out.length - 1]; };
     const leftText = (t, mpx, baseY, size, o = {}) => { const fam = o.font || 'sans', wt = o.weight || 400; const w = measureW(t, wt, size, fam); return push({ type: 'text', text: String(t), size, weight: wt, font: fam, color: o.color || '#ffffff', align: 'left', shadow: !!o.shadow, xf: (mpx + w / 2) / W, yf: (baseY - size * 0.35) / H }); };
@@ -1212,7 +1216,7 @@ const Studio = (() => {
     const capFont = serif ? 'serif' : 'sans';           // mirrors priceFam(brand, SANS): serif only when brand.font==='serif'
     const out = [];
     const push = (o) => { out.push({ id: uid++, opacity: 1, rot: 0, ...o }); return out[out.length - 1]; };
-    const measureW = (t, wt, size, fam) => { ctx2d.font = `${wt} ${size}px ${fam === 'serif' ? SERIF : SANS}`; return ctx2d.measureText(String(t)).width; };
+    const measureW = (t, wt, size, fam) => { ctx2d.font = `${wt} ${size}px ${FAMILY(fam)}`; return ctx2d.measureText(String(t)).width; };
     // text whose alphabetic baseline sits at baseY, anchored left / centre / right
     const leftText = (t, mpx, baseY, size, o = {}) => { const fam = o.font || 'sans', wt = o.weight || 400; const w = measureW(t, wt, size, fam); return push({ type: 'text', text: String(t), size, weight: wt, font: fam, color: o.color || '#ffffff', align: 'left', shadow: !!o.shadow, locked: !!o.locked, tracking: o.tracking || 0, opacity: o.opacity == null ? 1 : o.opacity, xf: (mpx + w / 2) / W, yf: (baseY - size * 0.35) / H }); };
     const rightText = (t, rpx, baseY, size, o = {}) => { const fam = o.font || 'sans', wt = o.weight || 400; const w = measureW(t, wt, size, fam); return push({ type: 'text', text: String(t), size, weight: wt, font: fam, color: o.color || '#ffffff', align: 'right', shadow: !!o.shadow, opacity: o.opacity == null ? 1 : o.opacity, xf: (rpx - w / 2) / W, yf: (baseY - size * 0.35) / H }); };
@@ -1651,7 +1655,7 @@ const Studio = (() => {
     $('stLineh').addEventListener('input', () => { const L = cur(); if (L) { L.lineh = Number($('stLineh').value) / 100; slv('stLinehV', $('stLineh').value + '%'); render(); } });
     $('stLineh').addEventListener('change', commit);
     $('stBlend').addEventListener('change', () => { const L = cur(); if (L) { L.blend = $('stBlend').value; commit(); } });
-    $('stFont').addEventListener('click', () => { const L = cur(); if (L) { L.font = L.font === 'serif' ? 'sans' : 'serif'; commit(); } });
+    $('stFont').addEventListener('click', () => { const L = cur(); if (L) { L.font = L.font === 'sans' ? 'serif' : L.font === 'serif' ? 'script' : 'sans'; if (L.font === 'script' && (L.weight || 0) >= 700) L.weight = 400; commit(); } });
     $('stBold').addEventListener('click', () => { const L = cur(); if (L) { L.weight = (L.weight || 0) >= 700 ? 400 : 800; commit(); } });
     $('stShadow').addEventListener('click', () => { const L = cur(); if (L) { L.shadow = !L.shadow; commit(); } });
     $('stOutline').addEventListener('click', () => { const L = cur(); if (L) { L.outline = !L.outline; commit(); } });
