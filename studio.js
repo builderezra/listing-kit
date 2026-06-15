@@ -478,12 +478,12 @@ const Studio = (() => {
   };
   const sizeOf = (L) => (L.type === 'text' || L.type === 'badge') ? L.size : (L.type === 'rect' ? L.hf : L.wf);
   const onDown = (e) => {
-    bgEdit = false;   // interacting with the canvas leaves background-adjust mode
     const p = pt(e);
     const cur = layers.find((x) => x.id === selId);
     if (cur && cur._c && !cur.locked) {
       const br = boxCorners(cur._c)[2];
       if (Math.hypot(p.x - br.x, p.y - br.y) <= handleR() * 1.9) {
+        bgEdit = false;   // resizing a layer leaves background-adjust mode
         // capture the starting dimensions so resize scales from them (no drift / clamp distortion)
         drag = { id: cur.id, resize: true, startDist: Math.max(8, Math.hypot(p.x - cur._c.cx, p.y - cur._c.cy)), startSize: sizeOf(cur), startWf: cur.wf, startHf: cur.hf, moved: false };
         e.preventDefault(); return;
@@ -491,14 +491,42 @@ const Studio = (() => {
     }
     const L = hit(p.x, p.y);
     selId = L ? L.id : null;
-    if (L) { drag = { id: L.id, dx: p.x - L.xf * W(), dy: p.y - L.yf * H(), moved: false }; e.preventDefault(); }
+    if (L) {
+      bgEdit = false;
+      drag = { id: L.id, dx: p.x - L.xf * W(), dy: p.y - L.yf * H(), moved: false };
+      e.preventDefault();
+    } else if (bg.type === 'photo') {
+      // tap the empty canvas = grab the BACKGROUND photo: opens its adjust/crop panel,
+      // and drag-to-pan repositions the crop (the obvious "edit the photo" gesture)
+      bgEdit = true;
+      bg.crop = bg.crop || {};
+      drag = { bgPan: true, sx: p.x, sy: p.y, ox0: bg.crop.ox || 0, oy0: bg.crop.oy || 0, moved: false };
+      e.preventDefault();
+    } else {
+      bgEdit = false;
+    }
     render(); syncPanel(); renderLayersPanel();
   };
   const SNAP = [0, 0.25, 0.5, 0.75, 1];
   const onMove = (e) => {
     if (!drag) return;
     drag.moved = true;
-    const p = pt(e); const L = layers.find((x) => x.id === drag.id); if (!L) return;
+    const p = pt(e);
+    if (drag.bgPan) {
+      // drag the background photo to reposition its crop
+      const ph = ctxData.photos[bg.photoIndex], img = ph && ph.img;
+      if (img && img.width) {
+        const z = (bg.crop && bg.crop.zoom) ? bg.crop.zoom : 1;
+        const s = Math.max(W() / img.width, H() / img.height) * z;
+        const dw = img.width * s, dh = img.height * s;
+        bg.crop = bg.crop || {};
+        if (dw - W() > 0.5) bg.crop.ox = Math.min(1, Math.max(-1, drag.ox0 + (p.x - drag.sx) * 2 / (dw - W())));
+        if (dh - H() > 0.5) bg.crop.oy = Math.min(1, Math.max(-1, drag.oy0 + (p.y - drag.sy) * 2 / (dh - H())));
+        render();
+      }
+      e.preventDefault(); return;
+    }
+    const L = layers.find((x) => x.id === drag.id); if (!L) return;
     if (drag.resize) {
       const factor = Math.hypot(p.x - L._c.cx, p.y - L._c.cy) / drag.startDist;
       if (L.type === 'text' || L.type === 'badge') L.size = Math.max(12, Math.round(drag.startSize * factor));
@@ -586,7 +614,7 @@ const Studio = (() => {
   // photo editing can target a photo LAYER or the BACKGROUND photo
   let bgEdit = false;
   let rebuiltFrom = null, inRebuild = false;   // track if the current design came straight from a style rebuild
-  const photoT = () => { if (bgEdit && bg.type === 'photo') return bg; const L = sel(); return (L && L.type === 'photo') ? L : null; };
+  const photoT = () => { const L = sel(); if (L && L.type === 'photo') return L; if (!selId && bgEdit && bg.type === 'photo') return bg; return null; };
 
   // photo colour-adjust + shape/crop panel (works for a layer or the background)
   const syncPhotoPanel = (t) => {
@@ -594,7 +622,7 @@ const Studio = (() => {
     t.filter = t.filter || (isBg ? {} : { b: 100, c: 100, s: 100, h: 0, sep: 0, blur: 0 });
     const f = t.filter;
     $('stPhTitle').childNodes[0].nodeValue = isBg ? 'Background photo ' : 'Photo ';
-    $('stPhHint').textContent = isBg ? '— adjust, crop & reposition' : '— drag & corner-resize on the canvas';
+    $('stPhHint').textContent = isBg ? '— drag the photo to reposition · zoom & crop below' : '— drag & corner-resize on the canvas';
     const applyRow = $('stBgApplyRow'); if (applyRow) applyRow.hidden = !(isBg && ctxData && ctxData.onApplyPhotoAdjust);
     $('stPhShapeRow').style.display = isBg ? 'none' : '';
     if (!isBg) {
