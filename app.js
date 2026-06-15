@@ -17,6 +17,7 @@
   let activeTab = 'graphics';
   let mode = 'sale';      // 'sale' | 'rent' — the listing type
   let stamp = '';         // status sash overlaid on the graphics ('' | SOLD | UNDER OFFER | …)
+  let ohDir = 'right';    // open-home directional-sign arrow ('left' | 'up' | 'right')
 
   // status options per listing type
   const SALE_STATUS = [['justlisted', 'Just Listed'], ['openhouse', 'Home Open / Open House'], ['forsale', 'For Sale'], ['newprice', 'New Price'], ['sold', 'Just Sold'], ['custom', 'Custom…']];
@@ -681,6 +682,16 @@
       const sbBytes = await canvasPNGBytes(sbCv);
       if (sbBytes) files.push({ name: 'signboard.png', data: sbBytes });
 
+      // 3b) open-home post + directional sign (only when an inspection time is set)
+      const hasOpen = hasOpenHome();
+      if (hasOpen) {
+        const when = openHomeWhen();
+        const opCv = offscreenCanvas(); Visuals.openHomePost(opCv, 'square', { brand, d, when });
+        const opB = await canvasPNGBytes(opCv); if (opB) files.push({ name: 'open-home/open-home-post.png', data: opB });
+        const asCv = offscreenCanvas(); Visuals.arrowSign(asCv, { brand, d, when, dir: ohDir });
+        const asB = await canvasPNGBytes(asCv); if (asB) files.push({ name: 'open-home/directional-sign.png', data: asB });
+      }
+
       // 4) print-ready flyer — self-contained (photos baked in as data URLs so it works from the zip)
       try {
         const fo = flyerOpts();
@@ -702,6 +713,7 @@
         '  social/           Instagram post, story / reel cover, Facebook / link image\n' +
         (carPhotos.length ? '  carousel/         Instagram carousel — post the files in number order\n' : '') +
         '  signboard.png     Photo sign board' + (hasQR ? ' (with QR code)' : '') + '\n' +
+        (hasOpen ? '  open-home/        Open-home social post + printable directional sign\n' : '') +
         '  flyer-print.html  Open in a browser, then Print → Save as PDF (A4 / Letter)\n' +
         '  copy.txt          Listing description + Instagram / Facebook / email copy\n\n' +
         'Everything was generated on your device. Nothing was uploaded.\n' });
@@ -817,6 +829,53 @@
       b.addEventListener('click', () => setStamp(b.dataset.stamp || '')));
   };
 
+  // ---- open-home kit (event post + directional sign + weekly roundup) ----
+  const REGION_LOCALE = { au: 'en-AU', us: 'en-US', uk: 'en-GB', other: 'en-AU' };
+  const fmtOpenDate = (yyyymmdd) => {
+    if (!yyyymmdd) return '';
+    try { const dt = new Date(yyyymmdd + 'T00:00:00'); if (!isNaN(dt)) return dt.toLocaleDateString(REGION_LOCALE[brand.region] || 'en-AU', { weekday: 'long', day: 'numeric', month: 'long' }); } catch (e) {}
+    return '';
+  };
+  const openHomeWhen = () => ({ date: fmtOpenDate($('ohDate').value), time: $('ohTime').value.trim() });
+  const hasOpenHome = () => { const w = openHomeWhen(); return !!(w.date || w.time); };
+  const renderOpenHome = () => {
+    if (!$('ohTime').value.trim() && $('openhouse').value.trim()) $('ohTime').value = $('openhouse').value.trim();   // prefill from the listing's open field
+    const d = vizData(), when = openHomeWhen();
+    Visuals.openHomePost($('cvOpenPost'), 'square', { brand, d, when });
+    Visuals.arrowSign($('cvOpenSign'), { brand, d, when, dir: ohDir });
+    $('ohEmpty').hidden = !!(when.date || when.time);
+  };
+  const buildOpensRoundup = async () => {
+    const items = [];
+    const seen = new Set();
+    const add = (address, when, key) => { const a = (address || '').trim(); if (!a || seen.has(a.toLowerCase())) return; seen.add(a.toLowerCase()); items.push({ address: a, when, _key: key || '' }); };
+    const cur = openHomeWhen();
+    if (cur.date || cur.time) add($('address').value.trim() || 'This listing', cur, $('ohDate').value);
+    try {
+      const saved = await libAll();
+      saved.forEach((rec) => {
+        const f = rec.fields || {};
+        if (!f.ohDate && !f.ohTime) return;
+        add((f.address || rec.title || '').trim(), { date: fmtOpenDate(f.ohDate), time: (f.ohTime || '').trim() }, f.ohDate || '');
+      });
+    } catch (e) {}
+    if (!items.length) { toast('Add an open date/time (and save listings) to build a roundup'); return; }
+    items.sort((a, b) => (a._key || '9999').localeCompare(b._key || '9999'));
+    Visuals.opensRoundup($('cvOpenRoundup'), { brand, items });
+    $('ohRoundupWrap').hidden = false;
+    toast(`Roundup built — ${items.length} listing${items.length === 1 ? '' : 's'}`);
+  };
+  const wireOpenHome = () => {
+    ['ohDate', 'ohTime'].forEach((id) => $(id).addEventListener('input', () => { if (activeTab === 'openhome') renderOpenHome(); saveDraft(); }));
+    document.querySelectorAll('#ohDirRow .dir-btn').forEach((b) => b.addEventListener('click', () => {
+      ohDir = b.dataset.dir || 'right';
+      document.querySelectorAll('#ohDirRow .dir-btn').forEach((x) => x.classList.toggle('active', x === b));
+      if (activeTab === 'openhome') renderOpenHome();
+    }));
+    document.querySelectorAll('#openhomeContent .dlc').forEach((b) => b.addEventListener('click', () => Visuals.download($(b.dataset.canvas), `${slug()}-${b.dataset.name}.png`)));
+    $('ohRoundup').addEventListener('click', buildOpensRoundup);
+  };
+
   // ---------------- tabs ----------------
   // ---- sign board (with QR code) ----
   const renderSignboard = () => {
@@ -831,12 +890,13 @@
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === tab));
     if (!outputs) return;
 
-    ['graphicsContent', 'flyerContent', 'content', 'complianceContent', 'signboardContent'].forEach((id) => ($(id).hidden = true));
+    ['graphicsContent', 'flyerContent', 'content', 'complianceContent', 'signboardContent', 'openhomeContent'].forEach((id) => ($(id).hidden = true));
 
     if (tab === 'graphics') { $('graphicsContent').hidden = false; renderGraphics(); return; }
     if (tab === 'flyer') { $('flyerContent').hidden = false; renderFlyer(); return; }
     if (tab === 'compliance') { $('complianceContent').hidden = false; renderCompliance(); return; }
     if (tab === 'signboard') { $('signboardContent').hidden = false; renderSignboard(); return; }
+    if (tab === 'openhome') { $('openhomeContent').hidden = false; renderOpenHome(); return; }
 
     $('content').hidden = false;
     const text = outputs[tab] || '';
@@ -1221,7 +1281,7 @@
 
   // ---------------- draft autosave (listing fields survive a refresh) ----------------
   const DRAFT_KEY = 'lk_draft_v1';
-  const LISTING_FIELDS = ['address', 'city', 'price', 'currency', 'currencyCustom', 'rentPeriod', 'rentPeriodCustom', 'badge', 'badgeCustom', 'openhouse', 'type', 'typeCustom', 'tone', 'beds', 'baths', 'cars', 'sqft', 'areaUnit', 'areaUnitCustom', 'year', 'lot', 'available', 'bond', 'leaseTerm', 'leaseTermCustom', 'furnished', 'pets', 'features', 'neighborhood', 'sbUrl'];
+  const LISTING_FIELDS = ['address', 'city', 'price', 'currency', 'currencyCustom', 'rentPeriod', 'rentPeriodCustom', 'badge', 'badgeCustom', 'openhouse', 'type', 'typeCustom', 'tone', 'beds', 'baths', 'cars', 'sqft', 'areaUnit', 'areaUnitCustom', 'year', 'lot', 'available', 'bond', 'leaseTerm', 'leaseTermCustom', 'furnished', 'pets', 'features', 'neighborhood', 'sbUrl', 'ohDate', 'ohTime'];
   let draftTimer = null;
   const saveDraft = () => {
     clearTimeout(draftTimer);
@@ -1256,6 +1316,9 @@
     document.querySelectorAll('#featureChips .chip').forEach((c) => c.classList.remove('added'));
     stamp = '';
     document.querySelectorAll('#stampRow .stamp-btn').forEach((b) => b.classList.toggle('active', !b.dataset.stamp));
+    ohDir = 'right';
+    document.querySelectorAll('#ohDirRow .dir-btn').forEach((b) => b.classList.toggle('active', b.dataset.dir === 'right'));
+    if ($('ohRoundupWrap')) $('ohRoundupWrap').hidden = true;
     outputs = null; report = null;
     // a cleared listing must not let Undo/Redo resurrect the previous property's copy
     history = { mls: [], instagram: [], facebook: [], email: [] };
@@ -1701,6 +1764,7 @@
   wireImagePick('head', 'headshot');
   wireChips();
   wireStamps();
+  wireOpenHome();
   wireDropZone();
   wireDownloads();
   wireLightbox();

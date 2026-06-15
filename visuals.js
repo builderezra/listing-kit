@@ -585,6 +585,134 @@ const Visuals = (() => {
     ctx.textAlign = 'left';
   };
 
+  // ---- open-home kit: event post, directional arrow sign, weekly roundup ----
+  // shrink a font until the text fits maxW (sets ctx.font, returns the size used)
+  const fitFont = (ctx, text, maxW, size, weight, fam) => {
+    let s = size; ctx.font = font(weight, s, fam || SANS);
+    while (s > 12 && ctx.measureText(text).width > maxW) { s -= 2; ctx.font = font(weight, s, fam || SANS); }
+    return s;
+  };
+  // block arrow centred at (cx,cy), pointing along angle (0=right, π=left, −π/2=up)
+  const blockArrow = (ctx, cx, cy, len, thick, angle, color) => {
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(angle);
+    const half = len / 2, sw = thick, headLen = len * 0.44, hw = thick * 2.0;
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.moveTo(-half, -sw / 2); ctx.lineTo(half - headLen, -sw / 2); ctx.lineTo(half - headLen, -hw / 2);
+    ctx.lineTo(half, 0);
+    ctx.lineTo(half - headLen, hw / 2); ctx.lineTo(half - headLen, sw / 2); ctx.lineTo(-half, sw / 2);
+    ctx.closePath(); ctx.fill();
+    ctx.restore();
+  };
+
+  // a social post built around the open-home date & time, over the hero photo
+  const openHomePost = (canvas, kind, { brand, d, when }) => {
+    const story = kind === 'story';
+    const [W, H] = story ? [1080, 1920] : [1080, 1080];
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    cover(ctx, d.hero, 0, 0, W, H, 0, brand, d.heroFocus, d.heroFilter);
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, 'rgba(8,14,18,0.66)'); g.addColorStop(0.42, 'rgba(8,14,18,0.24)');
+    g.addColorStop(0.72, 'rgba(8,14,18,0.5)'); g.addColorStop(1, 'rgba(8,14,18,0.92)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+
+    const isRent = d.raw && d.raw.mode === 'rent';
+    const cx = W / 2;
+    ctx.textAlign = 'center';
+    let y = story ? H * 0.30 : H * 0.27;
+
+    ctx.fillStyle = brand.accent; spacing(ctx, 8);
+    ctx.font = font(800, story ? 44 : 40, priceFam(brand, SANS));
+    ctx.fillText(isRent ? 'OPEN FOR INSPECTION' : 'HOME OPEN', cx, y); spacing(ctx, 0);
+    ctx.fillStyle = brand.accent; ctx.fillRect(cx - 46, y + 26, 92, 6);
+
+    if (when.date) {
+      y += story ? 150 : 124;
+      const dl = when.date.toUpperCase();
+      fitFont(ctx, dl, W - 140, story ? 100 : 86, 800, priceFam(brand, SANS));
+      ctx.fillStyle = '#ffffff'; ctx.fillText(dl, cx, y);
+    }
+    if (when.time) {
+      y += story ? 116 : 98;
+      fitFont(ctx, when.time, W - 200, story ? 76 : 66, 700, priceFam(brand, SANS));
+      ctx.fillStyle = brand.accent; ctx.fillText(when.time, cx, y);
+    }
+    if (d.address) {
+      const ay = story ? H * 0.72 : H * 0.70;
+      fitFont(ctx, d.address, W - 160, story ? 44 : 40, 600, SANS);
+      ctx.fillStyle = 'rgba(255,255,255,0.92)'; ctx.fillText(d.address, cx, ay);
+    }
+    const yb = H - (story ? 150 : 92);
+    if (brand.agentName) { ctx.font = font(700, story ? 40 : 34); ctx.fillStyle = '#fff'; ctx.fillText(brand.agentName, cx, yb); }
+    const sub = [brand.brokerage, brand.phone].filter(Boolean).join('   ·   ');
+    if (sub) { ctx.font = font(400, story ? 30 : 26); ctx.globalAlpha = 0.85; ctx.fillStyle = '#fff'; ctx.fillText(sub, cx, yb + (story ? 44 : 38)); ctx.globalAlpha = 1; }
+    ctx.textAlign = 'left';
+  };
+
+  // printable directional sign with a big arrow pointing the way to the open
+  const arrowSign = (canvas, { brand, d, when, dir }) => {
+    const W = 1400, H = 1000;
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const prim = brand.primary, acc = brand.accent, fg = onColor(prim);
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, shade(prim, 14)); g.addColorStop(1, shade(prim, -28));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = alpha(acc, 0.92); ctx.lineWidth = 16; ctx.strokeRect(30, 30, W - 60, H - 60);
+
+    const direction = (dir === 'left' || dir === 'up') ? dir : 'right';
+    let box;
+    if (direction === 'up') { blockArrow(ctx, W / 2, H * 0.30, 320, 130, -Math.PI / 2, acc); box = { cx: W / 2, w: W - 200, cy: H * 0.70 }; }
+    else if (direction === 'left') { blockArrow(ctx, W * 0.24, H / 2, 380, 138, Math.PI, acc); box = { cx: W * 0.66, w: W * 0.5, cy: H / 2 }; }
+    else { blockArrow(ctx, W * 0.76, H / 2, 380, 138, 0, acc); box = { cx: W * 0.34, w: W * 0.5, cy: H / 2 }; }
+
+    ctx.textAlign = 'center';
+    const isRent = d.raw && d.raw.mode === 'rent';
+    let y = box.cy - (direction === 'up' ? 30 : 130);
+    spacing(ctx, 5); ctx.fillStyle = acc;
+    const hdr = isRent ? 'INSPECTION' : 'HOME OPEN';
+    fitFont(ctx, hdr, box.w, 92, 800, priceFam(brand, SANS));
+    ctx.fillText(hdr, box.cx, y); spacing(ctx, 0);
+    const dtl = [when.date, when.time].filter(Boolean).join('   ');
+    if (dtl) { y += 104; fitFont(ctx, dtl, box.w, 66, 700, priceFam(brand, SANS)); ctx.fillStyle = fg; ctx.fillText(dtl, box.cx, y); }
+    if (d.address) { y += 82; fitFont(ctx, d.address, box.w, 50, 600, SANS); ctx.fillStyle = fg; ctx.globalAlpha = 0.9; ctx.fillText(d.address, box.cx, y); ctx.globalAlpha = 1; }
+    if (brand.brokerage) { spacing(ctx, 3); ctx.fillStyle = acc; ctx.font = font(700, 30); ctx.fillText(brand.brokerage.toUpperCase(), W / 2, H - 74); spacing(ctx, 0); }
+    ctx.textAlign = 'left';
+  };
+
+  // one graphic listing several upcoming home opens (address + day/time)
+  const opensRoundup = (canvas, { brand, items }) => {
+    const W = 1080, H = 1080;
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const prim = brand.primary, acc = brand.accent, fg = onColor(prim);
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, shade(prim, 14)); g.addColorStop(1, shade(prim, -30));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center'; ctx.fillStyle = acc; spacing(ctx, 6);
+    ctx.font = font(800, 54, priceFam(brand, SANS));
+    ctx.fillText('HOME OPENS THIS WEEK', W / 2, 130); spacing(ctx, 0);
+    ctx.fillStyle = acc; ctx.fillRect(W / 2 - 60, 156, 120, 6);
+
+    const list = (items || []).slice(0, 6);
+    const top = 228, bottom = brand.brokerage ? H - 120 : H - 70;
+    const rowH = (bottom - top) / Math.max(1, list.length);
+    ctx.textAlign = 'left';
+    list.forEach((it, i) => {
+      const ry = top + i * rowH, midY = ry + rowH / 2;
+      if (i) { ctx.strokeStyle = alpha(fg, 0.18); ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(80, ry); ctx.lineTo(W - 80, ry); ctx.stroke(); }
+      ctx.textBaseline = 'middle'; ctx.fillStyle = fg;
+      fitFont(ctx, it.address || 'Listing', W - 172, 40, 700, SANS);
+      ctx.fillText(it.address || 'Listing', 86, midY - 22);
+      ctx.fillStyle = acc; ctx.font = font(600, 32);
+      ctx.fillText([it.when && it.when.date, it.when && it.when.time].filter(Boolean).join('  ·  '), 86, midY + 24);
+      ctx.textBaseline = 'alphabetic';
+    });
+    if (brand.brokerage) { ctx.textAlign = 'center'; ctx.fillStyle = acc; ctx.font = font(700, 30); spacing(ctx, 3); ctx.fillText(brand.brokerage.toUpperCase(), W / 2, H - 60); spacing(ctx, 0); }
+    ctx.textAlign = 'left';
+  };
+
   // diagonal corner banner ("SOLD" / "UNDER OFFER" …) stamped over any graphic.
   // Drawn as a post-render overlay so it works on every template uniformly.
   const STAMP_COLORS = {
@@ -700,5 +828,5 @@ const Visuals = (() => {
     if (d && d.stamp) cornerSash(ctx, W, H, d.stamp);
   };
 
-  return { render, download, SIZES, onColor, shade, featureSlide, ctaSlide, signboard };
+  return { render, download, SIZES, onColor, shade, featureSlide, ctaSlide, signboard, openHomePost, arrowSign, opensRoundup };
 })();

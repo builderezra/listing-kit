@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=55" />
+  <link rel="stylesheet" href="styles.css?v=56" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -443,6 +443,7 @@
         <button class="tab" data-tab="facebook" role="tab"><svg class="tabico" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M13.5 21v-7H16l.5-3h-3V9.2c0-.8.3-1.2 1.3-1.2H16.5V5.3C16.1 5.2 15 5 13.9 5 11.6 5 10 6.4 10 9v2H7.5v3H10v7z"/></svg> Facebook</button>
         <button class="tab" data-tab="email" role="tab">✉️ Email</button>
         <button class="tab" data-tab="signboard" role="tab">🪧 Sign board</button>
+        <button class="tab" data-tab="openhome" role="tab">🏠 Open home</button>
         <button class="tab compliance-tab" data-tab="compliance" role="tab">⚖️ <span class="dot" id="complianceDot"></span></button>
         <button type="button" class="studio-launch" id="studioLaunch" title="Open the full-screen design editor">✏️ Design Studio ↗</button>
       </nav>
@@ -546,6 +547,45 @@
           <div class="sb-actions">
             <button type="button" class="copy-btn dl-all" id="sbDownload">⬇️ Download sign board (PNG)</button>
             <button type="button" class="copy-btn dl-all" id="sbStudio">🎨 Open in design studio</button>
+          </div>
+        </article>
+
+        <article class="panel-content" id="openhomeContent" hidden>
+          <div class="oh-form">
+            <div class="row">
+              <div class="field">
+                <label for="ohDate">Open date</label>
+                <input type="date" id="ohDate" />
+              </div>
+              <div class="field">
+                <label for="ohTime">Time</label>
+                <input type="text" id="ohTime" placeholder="e.g. 11:00 – 11:30am" />
+              </div>
+            </div>
+            <div class="field">
+              <label>Arrow direction <span class="hint">— which way the street sign points</span></label>
+              <div class="oh-dir" id="ohDirRow">
+                <button type="button" class="dir-btn" data-dir="left">← Left</button>
+                <button type="button" class="dir-btn" data-dir="up">↑ Ahead</button>
+                <button type="button" class="dir-btn active" data-dir="right">Right →</button>
+              </div>
+            </div>
+          </div>
+          <p class="hint" id="ohEmpty">Add the inspection date &amp; time above — they’ll appear on the post and sign.</p>
+          <div class="gfx-grid">
+            <div class="gfx-card">
+              <canvas id="cvOpenPost"></canvas>
+              <div class="gfx-foot"><span>Open-home post · 1080×1080</span><button type="button" class="copy-btn dlc" data-canvas="cvOpenPost" data-name="open-home-post">Download</button></div>
+            </div>
+            <div class="gfx-card">
+              <canvas id="cvOpenSign"></canvas>
+              <div class="gfx-foot"><span>Directional sign · print A4 landscape</span><button type="button" class="copy-btn dlc" data-canvas="cvOpenSign" data-name="open-home-sign">Download</button></div>
+            </div>
+          </div>
+          <button type="button" class="copy-btn dl-all" id="ohRoundup">🗓 Build “this week’s opens” roundup</button>
+          <div class="gfx-card" id="ohRoundupWrap" hidden style="margin-top:12px">
+            <canvas id="cvOpenRoundup"></canvas>
+            <div class="gfx-foot"><span>Weekly roundup · 1080×1080</span><button type="button" class="copy-btn dlc" data-canvas="cvOpenRoundup" data-name="opens-roundup">Download</button></div>
           </div>
         </article>
       </div>
@@ -863,17 +903,17 @@
     </div>
   </div>
 
-  <script src="generator.js?v=55"></script>
-  <script src="fairhousing.js?v=55"></script>
-  <script src="parser.js?v=55"></script>
-  <script src="importer.js?v=55"></script>
-  <script src="qr.js?v=55"></script>
-  <script src="visuals.js?v=55"></script>
-  <script src="flyer.js?v=55"></script>
-  <script src="ai.js?v=55"></script>
-  <script src="studio.js?v=55"></script>
-  <script src="tour.js?v=55"></script>
-  <script src="zip.js?v=55"></script>
-  <script src="app.js?v=55"></script>
+  <script src="generator.js?v=56"></script>
+  <script src="fairhousing.js?v=56"></script>
+  <script src="parser.js?v=56"></script>
+  <script src="importer.js?v=56"></script>
+  <script src="qr.js?v=56"></script>
+  <script src="visuals.js?v=56"></script>
+  <script src="flyer.js?v=56"></script>
+  <script src="ai.js?v=56"></script>
+  <script src="studio.js?v=56"></script>
+  <script src="tour.js?v=56"></script>
+  <script src="zip.js?v=56"></script>
+  <script src="app.js?v=56"></script>
 </body>
 </html>

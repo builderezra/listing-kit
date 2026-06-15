@@ -493,6 +493,14 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 .stamp-btn:hover { border-color: var(--teal); color: var(--ink); }
 .stamp-btn.active { background: var(--teal); border-color: var(--teal); color: #fff; }
 
+/* open-home kit */
+.oh-form { margin-bottom: 14px; }
+.oh-dir { display: flex; gap: 8px; flex-wrap: wrap; }
+.dir-btn { font-size: 13px; font-weight: 600; padding: 8px 14px; border: 1px solid var(--line); border-radius: 9px; background: var(--hi); color: var(--muted); cursor: pointer; }
+.dir-btn:hover { border-color: var(--teal); color: var(--ink); }
+.dir-btn.active { background: var(--teal); border-color: var(--teal); color: #fff; }
+#ohEmpty { margin: 0 0 12px; }
+
 /* campaign pack — the headline "download everything" action */
 .copy-btn.pack { margin-top: 18px; background: var(--teal); border-color: var(--teal); color: #fff; font-weight: 700; }
 .copy-btn.pack:hover { filter: brightness(1.06); }
