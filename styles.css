@@ -44,9 +44,12 @@ body {
   color: #fff;
 }
 .brand { display: flex; align-items: center; gap: 14px; }
-.logo { font-size: 30px; line-height: 1; }
+.logo-mark { width: 38px; height: 38px; display: block; flex: 0 0 auto; }
+.lk-badge { fill: var(--gold); }
+.lk-roof, .lk-door { fill: var(--navy); }
+.lk-body { fill: #fff; }
 .topbar h1 { font-family: var(--serif); font-size: 26px; margin: 0; letter-spacing: .2px; }
-.tag { margin: 2px 0 0; font-size: 13.5px; color: #bcd2d8; }
+.tag { margin: 2px 0 0; font-size: 13.5px; color: rgba(255,255,255,.72); }
 .badge {
   background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22);
   color: #fff; font-size: 13px; font-weight: 600; padding: 7px 13px; border-radius: 999px;
@@ -655,6 +658,21 @@ body.dark {
   --bg: #14171b; --card: #1d2127; --ink: #e7e5df; --muted: #9aa1a7;
   --line: #333a41; --line-2: #2a3038; --hi: #23282e;
 }
+
+/* ---- colour themes: override the brand hues (header navy, accent teal, gold);
+   light/dark above still controls bg/ink, so themes work in both. Coastal = default. */
+body.th-forest   { --navy: #163a2c; --navy-2: #1f4d38; --teal: #2f8f5b; --gold: #c9a227; }
+body.th-plum     { --navy: #2b2440; --navy-2: #3a3056; --teal: #8268c9; --gold: #c77d92; }
+body.th-ocean    { --navy: #143a55; --navy-2: #1f5279; --teal: #2f86b8; --gold: #e0a85a; }
+body.th-charcoal { --navy: #20242b; --navy-2: #2c333d; --teal: #b9893f; --gold: #d4a23c; }
+
+/* theme picker (info popover) */
+.theme-pick { margin: 12px 0 4px; }
+.theme-pick-label { font-size: 12.5px; font-weight: 600; color: var(--muted); }
+.theme-dots { display: flex; gap: 8px; margin-top: 7px; }
+.theme-dot { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--line); cursor: pointer; padding: 0; transition: transform .1s, border-color .12s; }
+.theme-dot:hover { transform: scale(1.12); }
+.theme-dot.active { border-color: var(--ink); box-shadow: 0 0 0 2px var(--bg), 0 0 0 4px var(--teal); }
 body.dark input, body.dark select, body.dark textarea { background: #23282e; color: var(--ink); border-color: var(--line); }
 body.dark input[type="color"] { background: #23282e; }
 body.dark .section { background: #191d22; }

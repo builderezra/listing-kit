@@ -8,13 +8,18 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=67" />
+  <link rel="stylesheet" href="styles.css?v=68" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
   <header class="topbar">
     <div class="brand">
-      <span class="logo" aria-hidden="true">🏡</span>
+      <svg class="logo-mark" viewBox="0 0 40 40" role="img" aria-label="Listing Kit logo">
+        <rect class="lk-badge" x="2" y="2" width="36" height="36" rx="11" />
+        <path class="lk-roof" d="M20 9 L31.5 18.6 H8.5 Z" />
+        <rect class="lk-body" x="12.2" y="18.2" width="15.6" height="12.3" rx="1.6" />
+        <rect class="lk-door" x="17.4" y="23.2" width="5.2" height="7.3" rx="1" />
+      </svg>
       <div>
         <h1>Listing Kit</h1>
         <p class="tag">Photos + details in → branded graphics, flyer &amp; copy out.</p>
@@ -28,6 +33,16 @@
     </div>
     <div class="info-pop" id="infoPop" hidden>
       <p>Runs entirely in your browser — photos and details are never uploaded (link import fetches via public read proxies). The compliance check is decision support, not legal advice; always defer to your agency’s compliance guidance.</p>
+      <div class="theme-pick">
+        <span class="theme-pick-label">Colour theme</span>
+        <div class="theme-dots" id="themeDots">
+          <button type="button" class="theme-dot" data-theme="coastal" title="Coastal" style="background:linear-gradient(135deg,#16404f 50%,#2c7a7b 50%)"></button>
+          <button type="button" class="theme-dot" data-theme="forest" title="Forest" style="background:linear-gradient(135deg,#1f4d38 50%,#2f8f5b 50%)"></button>
+          <button type="button" class="theme-dot" data-theme="plum" title="Plum" style="background:linear-gradient(135deg,#3a3056 50%,#8268c9 50%)"></button>
+          <button type="button" class="theme-dot" data-theme="ocean" title="Ocean" style="background:linear-gradient(135deg,#1f5279 50%,#2f86b8 50%)"></button>
+          <button type="button" class="theme-dot" data-theme="charcoal" title="Charcoal &amp; brass" style="background:linear-gradient(135deg,#2c333d 50%,#b9893f 50%)"></button>
+        </div>
+      </div>
       <p class="muted" id="verLine"></p>
       <button type="button" class="mini-btn" id="infoTour">▶ Take the guided tour</button>
     </div>
@@ -967,18 +982,18 @@
     </div>
   </div>
 
-  <script src="generator.js?v=67"></script>
-  <script src="fairhousing.js?v=67"></script>
-  <script src="parser.js?v=67"></script>
-  <script src="importer.js?v=67"></script>
-  <script src="qr.js?v=67"></script>
-  <script src="visuals.js?v=67"></script>
-  <script src="flyer.js?v=67"></script>
-  <script src="ai.js?v=67"></script>
-  <script src="studio.js?v=67"></script>
-  <script src="tour.js?v=67"></script>
-  <script src="zip.js?v=67"></script>
-  <script src="reel.js?v=67"></script>
-  <script src="app.js?v=67"></script>
+  <script src="generator.js?v=68"></script>
+  <script src="fairhousing.js?v=68"></script>
+  <script src="parser.js?v=68"></script>
+  <script src="importer.js?v=68"></script>
+  <script src="qr.js?v=68"></script>
+  <script src="visuals.js?v=68"></script>
+  <script src="flyer.js?v=68"></script>
+  <script src="ai.js?v=68"></script>
+  <script src="studio.js?v=68"></script>
+  <script src="tour.js?v=68"></script>
+  <script src="zip.js?v=68"></script>
+  <script src="reel.js?v=68"></script>
+  <script src="app.js?v=68"></script>
 </body>
 </html>

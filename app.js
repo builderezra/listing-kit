@@ -2102,22 +2102,39 @@
   renderChecklist();
   window.addEventListener('resize', () => { if (activeTab === 'flyer' && outputs) scaleFlyer(); });
 
-  // ---------------- theme (light / dark) ----------------
+  // ---------------- theme: light/dark + colour palette ----------------
+  const THEME_NAVY = { coastal: '#0f2e3d', forest: '#163a2c', plum: '#2b2440', ocean: '#143a55', charcoal: '#20242b' };
+  const THEMES = Object.keys(THEME_NAVY);
+  let theme, themeName = 'coastal';
+  const setMetaColor = () => {
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', document.body.classList.contains('dark') ? '#14171b' : (THEME_NAVY[themeName] || '#0f2e3d'));
+  };
   const applyTheme = (t) => {
     document.body.classList.toggle('dark', t === 'dark');
     $('themeToggle').textContent = t === 'dark' ? '☀️' : '🌙';
-    const meta = document.querySelector('meta[name="theme-color"]');
-    if (meta) meta.setAttribute('content', t === 'dark' ? '#14171b' : '#0f2e3d');
+    setMetaColor();
   };
-  let theme;
+  const applyThemeName = (name) => {
+    themeName = THEMES.includes(name) ? name : 'coastal';
+    THEMES.forEach((t) => document.body.classList.toggle('th-' + t, t === themeName));
+    document.querySelectorAll('#themeDots .theme-dot').forEach((d) => d.classList.toggle('active', d.dataset.theme === themeName));
+    setMetaColor();
+  };
   try { theme = localStorage.getItem('lk_theme'); } catch (e) {}
   if (!theme) theme = (window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches) ? 'dark' : 'light';
+  try { themeName = localStorage.getItem('lk_theme_name') || 'coastal'; } catch (e) {}
+  applyThemeName(themeName);
   applyTheme(theme);
   $('themeToggle').addEventListener('click', () => {
     theme = theme === 'dark' ? 'light' : 'dark';
     try { localStorage.setItem('lk_theme', theme); } catch (e) {}
     applyTheme(theme);
   });
+  document.querySelectorAll('#themeDots .theme-dot').forEach((d) => d.addEventListener('click', () => {
+    applyThemeName(d.dataset.theme);
+    try { localStorage.setItem('lk_theme_name', themeName); } catch (e) {}
+  }));
 
   // about/privacy popover (replaces the old bottom footer warning)
   $('infoBtn').addEventListener('click', (e) => { e.stopPropagation(); $('infoPop').hidden = !$('infoPop').hidden; });
