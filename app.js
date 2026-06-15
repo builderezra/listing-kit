@@ -18,6 +18,7 @@
   let mode = 'sale';      // 'sale' | 'rent' — the listing type
   let stamp = '';         // status sash overlaid on the graphics ('' | SOLD | UNDER OFFER | …)
   let ohDir = 'right';    // open-home directional-sign arrow ('left' | 'up' | 'right')
+  let reelBlob = null, reelExt = 'webm', reelURL = '';   // last rendered Reel video
 
   // status options per listing type
   const SALE_STATUS = [['justlisted', 'Just Listed'], ['openhouse', 'Home Open / Open House'], ['forsale', 'For Sale'], ['newprice', 'New Price'], ['sold', 'Just Sold'], ['custom', 'Custom…']];
@@ -876,6 +877,58 @@
     $('ohRoundup').addEventListener('click', buildOpensRoundup);
   };
 
+  // ---- animated Reel / Story video (on-device, canvas → MediaRecorder) ----
+  const resetReel = () => {
+    if (reelURL) { try { URL.revokeObjectURL(reelURL); } catch (e) {} reelURL = ''; }
+    reelBlob = null;
+    const v = $('reelVideo'); if (v) { v.removeAttribute('src'); v.hidden = true; v.load && v.load(); }
+    if ($('cvReel')) $('cvReel').hidden = false;
+    if ($('reelDownload')) $('reelDownload').hidden = true;
+  };
+  const renderReel = () => {
+    if (typeof Reel === 'undefined' || !Reel.supported()) {
+      $('reelStatus').textContent = 'Video export isn’t supported in this browser — try Chrome, Edge or Safari.';
+      $('reelStatus').className = 'parse-note err'; $('reelMake').disabled = true; return;
+    }
+    $('reelMake').disabled = false;
+    if (reelBlob) return;                 // keep a finished video on screen until re-made
+    $('reelStatus').textContent = ''; $('reelStatus').className = 'parse-note';
+    Reel.previewFrame($('cvReel'), brand, vizData());
+  };
+  const makeReel = async () => {
+    if (typeof Reel === 'undefined' || !Reel.supported()) return;
+    resetReel();
+    const d = vizData();
+    const pics = d.photos.filter((p) => p.inCarousel !== false).slice(0, 6);
+    const feats = Generator.flyerFeatures(d.raw, 8);
+    let fi = 0; pics.forEach((p) => { if (p._caption == null) p._caption = feats[fi++] || ''; });
+    const pace = parseFloat($('reelPace').value) || 2.6;
+    const btn = $('reelMake'); btn.disabled = true;
+    const st = $('reelStatus'); st.className = 'parse-note'; Progress.start();
+    try {
+      const res = await Reel.record({
+        canvas: $('cvReel'), brand, d, photos: pics, opts: { perPhoto: pace },
+        onProgress: (frac) => { st.textContent = `🎬 Rendering… ${Math.round(frac * 100)}% (recorded in real time)`; },
+      });
+      reelBlob = res.blob; reelExt = res.ext; reelURL = URL.createObjectURL(res.blob);
+      const v = $('reelVideo'); v.src = reelURL; v.hidden = false; $('cvReel').hidden = true;
+      try { v.play().catch(() => {}); } catch (e) {}
+      $('reelDownload').hidden = false;
+      st.className = 'parse-note ok';
+      st.textContent = res.ext === 'mp4'
+        ? '✓ Reel ready (MP4) — ready to upload to Instagram / Facebook.'
+        : '✓ Reel ready (WebM) — plays everywhere; for Instagram you may need to convert to MP4 (CapCut or your phone’s editor do this).';
+    } catch (e) {
+      resetReel();
+      st.className = 'parse-note err'; st.textContent = (e && e.message) ? e.message : 'Couldn’t build the reel — try again.';
+    } finally { btn.disabled = false; Progress.stop(); }
+  };
+  const wireReel = () => {
+    $('reelMake').addEventListener('click', makeReel);
+    $('reelDownload').addEventListener('click', () => { if (reelBlob) saveBlob(reelBlob, `${slug()}-reel.${reelExt}`); });
+    $('reelPace').addEventListener('change', () => { resetReel(); renderReel(); });
+  };
+
   // ---------------- tabs ----------------
   // ---- sign board (with QR code) ----
   const renderSignboard = () => {
@@ -890,13 +943,14 @@
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === tab));
     if (!outputs) return;
 
-    ['graphicsContent', 'flyerContent', 'content', 'complianceContent', 'signboardContent', 'openhomeContent'].forEach((id) => ($(id).hidden = true));
+    ['graphicsContent', 'flyerContent', 'content', 'complianceContent', 'signboardContent', 'openhomeContent', 'reelContent'].forEach((id) => ($(id).hidden = true));
 
     if (tab === 'graphics') { $('graphicsContent').hidden = false; renderGraphics(); return; }
     if (tab === 'flyer') { $('flyerContent').hidden = false; renderFlyer(); return; }
     if (tab === 'compliance') { $('complianceContent').hidden = false; renderCompliance(); return; }
     if (tab === 'signboard') { $('signboardContent').hidden = false; renderSignboard(); return; }
     if (tab === 'openhome') { $('openhomeContent').hidden = false; renderOpenHome(); return; }
+    if (tab === 'reel') { $('reelContent').hidden = false; renderReel(); return; }
 
     $('content').hidden = false;
     const text = outputs[tab] || '';
@@ -1319,6 +1373,7 @@
     ohDir = 'right';
     document.querySelectorAll('#ohDirRow .dir-btn').forEach((b) => b.classList.toggle('active', b.dataset.dir === 'right'));
     if ($('ohRoundupWrap')) $('ohRoundupWrap').hidden = true;
+    resetReel();
     outputs = null; report = null;
     // a cleared listing must not let Undo/Redo resurrect the previous property's copy
     history = { mls: [], instagram: [], facebook: [], email: [] };
@@ -1765,6 +1820,7 @@
   wireChips();
   wireStamps();
   wireOpenHome();
+  wireReel();
   wireDropZone();
   wireDownloads();
   wireLightbox();

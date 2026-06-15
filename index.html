@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=56" />
+  <link rel="stylesheet" href="styles.css?v=57" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -444,6 +444,7 @@
         <button class="tab" data-tab="email" role="tab">✉️ Email</button>
         <button class="tab" data-tab="signboard" role="tab">🪧 Sign board</button>
         <button class="tab" data-tab="openhome" role="tab">🏠 Open home</button>
+        <button class="tab" data-tab="reel" role="tab">🎬 Reel</button>
         <button class="tab compliance-tab" data-tab="compliance" role="tab">⚖️ <span class="dot" id="complianceDot"></span></button>
         <button type="button" class="studio-launch" id="studioLaunch" title="Open the full-screen design editor">✏️ Design Studio ↗</button>
       </nav>
@@ -548,6 +549,28 @@
             <button type="button" class="copy-btn dl-all" id="sbDownload">⬇️ Download sign board (PNG)</button>
             <button type="button" class="copy-btn dl-all" id="sbStudio">🎨 Open in design studio</button>
           </div>
+        </article>
+
+        <article class="panel-content" id="reelContent" hidden>
+          <div class="reel-bar">
+            <span class="muted">A vertical video (1080×1920) for Reels &amp; Stories — built on your device from the listing photos.</span>
+            <label class="reel-pace">Pace
+              <select id="reelPace">
+                <option value="2">Snappy</option>
+                <option value="2.6" selected>Standard</option>
+                <option value="3.4">Relaxed</option>
+              </select>
+            </label>
+          </div>
+          <div class="reel-stage">
+            <canvas id="cvReel"></canvas>
+            <video id="reelVideo" playsinline controls loop hidden></video>
+          </div>
+          <div class="reel-actions">
+            <button type="button" class="copy-btn dl-all pack" id="reelMake">🎬 Create reel</button>
+            <button type="button" class="copy-btn dl-all" id="reelDownload" hidden>⬇️ Download video</button>
+          </div>
+          <p class="parse-note" id="reelStatus"></p>
         </article>
 
         <article class="panel-content" id="openhomeContent" hidden>
@@ -903,17 +926,18 @@
     </div>
   </div>
 
-  <script src="generator.js?v=56"></script>
-  <script src="fairhousing.js?v=56"></script>
-  <script src="parser.js?v=56"></script>
-  <script src="importer.js?v=56"></script>
-  <script src="qr.js?v=56"></script>
-  <script src="visuals.js?v=56"></script>
-  <script src="flyer.js?v=56"></script>
-  <script src="ai.js?v=56"></script>
-  <script src="studio.js?v=56"></script>
-  <script src="tour.js?v=56"></script>
-  <script src="zip.js?v=56"></script>
-  <script src="app.js?v=56"></script>
+  <script src="generator.js?v=57"></script>
+  <script src="fairhousing.js?v=57"></script>
+  <script src="parser.js?v=57"></script>
+  <script src="importer.js?v=57"></script>
+  <script src="qr.js?v=57"></script>
+  <script src="visuals.js?v=57"></script>
+  <script src="flyer.js?v=57"></script>
+  <script src="ai.js?v=57"></script>
+  <script src="studio.js?v=57"></script>
+  <script src="tour.js?v=57"></script>
+  <script src="zip.js?v=57"></script>
+  <script src="reel.js?v=57"></script>
+  <script src="app.js?v=57"></script>
 </body>
 </html>
