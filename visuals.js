@@ -135,6 +135,20 @@ const Visuals = (() => {
     return w;
   };
 
+  // optional small logo watermark, top-right of a social graphic (with a soft shadow)
+  const watermarkLogo = (ctx, W, H, brand) => {
+    const img = brand.logoImg;
+    if (!img || !img.width) return;
+    const s = Math.min(W, H), pad = s * 0.05;
+    const sc = Math.min((s * 0.085) / img.height, (s * 0.32) / img.width);
+    const w = img.width * sc, h = img.height * sc;
+    ctx.save();
+    ctx.globalAlpha = 0.92;
+    ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = s * 0.02; ctx.shadowOffsetY = s * 0.004;
+    ctx.drawImage(img, W - pad - w, pad, w, h);
+    ctx.restore();
+  };
+
   // brand bar across the bottom; returns its height
   const brandBar = (ctx, W, H, brand, h) => {
     const bg = brand.primary, fg = onColor(bg);
@@ -771,6 +785,7 @@ const Visuals = (() => {
     const td = (d && d.stamp) ? Object.assign({}, d, { badgeText: '' }) : d;
     (TEMPLATES[templateId] || modern)(ctx, W, H, td, kind);
     if (d && d.stamp) cornerSash(ctx, W, H, d.stamp);
+    else if (d && d.brand && d.brand.watermark && d.brand.logoImg) watermarkLogo(ctx, W, H, d.brand);
   };
 
   const download = (canvas, filename) => {

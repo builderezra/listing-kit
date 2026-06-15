@@ -499,6 +499,23 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 .stamp-btn:hover { border-color: var(--teal); color: var(--ink); }
 .stamp-btn.active { background: var(--teal); border-color: var(--teal); color: #fff; }
 
+/* brand profiles */
+.profile-row { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.profile-wrap { position: relative; display: inline-flex; }
+.profile-chip { font-size: 12.5px; font-weight: 600; padding: 6px 11px; border: 1px solid var(--line); border-radius: 999px; background: var(--hi); color: var(--ink); cursor: pointer; }
+.profile-chip:hover { border-color: var(--teal); }
+.profile-add { color: var(--muted); border-style: dashed; }
+.profile-add:hover { color: var(--teal); border-color: var(--teal); }
+.profile-del { position: absolute; top: -6px; right: -6px; width: 17px; height: 17px; padding: 0; line-height: 13px; border-radius: 50%; border: 1px solid var(--line); background: var(--bg); color: var(--muted); font-size: 13px; cursor: pointer; display: none; }
+.profile-wrap:hover .profile-del { display: block; }
+.profile-del:hover { border-color: var(--red); color: var(--red); }
+
+/* marketing checklist */
+.checklist { display: flex; flex-direction: column; gap: 3px; margin-top: 8px; }
+.ck-item { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--ink); cursor: pointer; padding: 3px 0; }
+.ck-item input { width: 16px; height: 16px; flex: 0 0 16px; cursor: pointer; }
+.ck-item.done span { color: var(--muted); text-decoration: line-through; }
+
 /* open-home kit */
 .oh-form { margin-bottom: 14px; }
 .oh-dir { display: flex; gap: 8px; flex-wrap: wrap; }

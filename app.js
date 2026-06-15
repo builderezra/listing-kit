@@ -32,6 +32,7 @@
     logo: '', headshot: '',      // dataURLs (persisted)
     templateId: 'modern',
     font: 'auto',                // headline font: auto | serif | sans
+    watermark: false,            // overlay the logo on social graphics
     prefs: { noEmojis: false, noHashtags: false, noExclaim: false, short: false, greeting: '', signoff: '', banned: '' },
     region: 'au',                // au | us | uk | other — drives defaults + compliance framing
   };
@@ -89,6 +90,7 @@
     $('phone').value = brand.phone; $('email').value = brand.email;
     $('brandPrimary').value = brand.primary; $('brandAccent').value = brand.accent;
     $('brandFont').value = brand.font || 'auto';
+    if ($('brandWatermark')) $('brandWatermark').checked = !!brand.watermark;
     // v10 stored prefs as free text — migrate to the structured object
     if (typeof brand.prefs === 'string') {
       const p = Generator.parsePrefs(brand.prefs);
@@ -215,6 +217,41 @@
       if (!p || !a) return;
       if ([...PALETTES, ...customPals].some(([cp, ca]) => cp.toLowerCase() === p && ca.toLowerCase() === a)) { toast('That palette is already saved'); return; }
       customPals.push([brand.primary, brand.accent]); savePals(); renderPalettes(); toast('✓ Palette saved');
+    });
+    row.appendChild(add);
+  };
+
+  // ---------------- brand profiles (save/switch multiple brand kits) ----------------
+  const PROFILES_KEY = 'lk_profiles_v1';
+  let profiles = [];
+  try { const a = JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]'); if (Array.isArray(a)) profiles = a.filter((p) => p && p.id && p.name && p.brand); } catch (e) {}
+  const saveProfiles = () => { try { localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); } catch (e) {} };
+  const snapshotBrand = () => { const { logoImg, headImg, ...persist } = brand; return persist; };
+  const applyProfile = (id) => {
+    const pr = profiles.find((q) => q.id === id); if (!pr) return;
+    Object.assign(brand, pr.brand);
+    saveBrand();    // persist the switched-in kit, then repopulate inputs + images from it
+    loadBrand();
+    rerenderVisuals();
+    toast('Switched to “' + pr.name + '”');
+  };
+  const renderProfiles = () => {
+    const row = $('brandProfiles'); if (!row) return;
+    row.innerHTML = '';
+    profiles.forEach((pr) => {
+      const wrap = document.createElement('span'); wrap.className = 'profile-wrap';
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'profile-chip'; b.textContent = pr.name; b.title = 'Switch to this brand kit';
+      b.addEventListener('click', () => applyProfile(pr.id));
+      const x = document.createElement('button'); x.type = 'button'; x.className = 'profile-del'; x.textContent = '×'; x.title = 'Delete this profile';
+      x.addEventListener('click', (e) => { e.stopPropagation(); profiles = profiles.filter((q) => q.id !== pr.id); saveProfiles(); renderProfiles(); });
+      wrap.append(b, x); row.appendChild(wrap);
+    });
+    const add = document.createElement('button'); add.type = 'button'; add.className = 'profile-chip profile-add'; add.textContent = '+ Save current'; add.title = 'Save the current brand kit as a profile';
+    add.addEventListener('click', () => {
+      const name = (prompt('Name this brand profile (e.g. “Personal” or “Acme Realty”):', brand.brokerage || brand.agentName || 'My brand') || '').trim();
+      if (!name) return;
+      profiles.push({ id: 'P' + Date.now() + Math.floor(Math.random() * 1e4), name: name.slice(0, 40), brand: snapshotBrand() });
+      saveProfiles(); renderProfiles(); toast('✓ Brand profile saved');
     });
     row.appendChild(add);
   };
@@ -504,6 +541,7 @@
     runScan();
     $('emptyState').hidden = true;
     renderTab(activeTab);
+    markDone('kit');
   };
 
   const vizData = () => {
@@ -622,7 +660,7 @@
   };
   const wireSignboard = () => {
     $('sbUrl').addEventListener('input', () => { if (activeTab === 'signboard' && outputs) renderSignboard(); saveDraft(); });
-    $('sbDownload').addEventListener('click', () => Visuals.download($('cvSignboard'), `${slug()}-signboard.png`));
+    $('sbDownload').addEventListener('click', () => { Visuals.download($('cvSignboard'), `${slug()}-signboard.png`); markDone('signboard'); });
     $('sbStudio').addEventListener('click', () => openStudio());
   };
   const wireShare = () => {
@@ -639,14 +677,16 @@
   const DL_NAME = { cvSquare: 'instagram-post', cvStory: 'story', cvWide: 'facebook' };
   const wireDownloads = () => {
     document.querySelectorAll('.dl').forEach((b) =>
-      b.addEventListener('click', () => Visuals.download($(b.dataset.dl), `${slug()}-${DL_NAME[b.dataset.dl]}.png`)));
+      b.addEventListener('click', () => { Visuals.download($(b.dataset.dl), `${slug()}-${DL_NAME[b.dataset.dl]}.png`); markDone('graphics'); }));
     $('dlAll').addEventListener('click', () => {
       Object.entries(DL_NAME).forEach(([id, name], i) =>
         setTimeout(() => Visuals.download($(id), `${slug()}-${name}.png`), i * 350));
+      markDone('graphics');
     });
     $('dlCarousel').addEventListener('click', () => {
       carouselCanvases.forEach((cv, i) =>
         setTimeout(() => Visuals.download(cv, `${slug()}-carousel-${String(i + 1).padStart(2, '0')}.png`), i * 350));
+      markDone('carousel');
     });
     $('openStudio').addEventListener('click', openStudio);
     if ($('dlPack')) $('dlPack').addEventListener('click', downloadCampaignPack);
@@ -756,6 +796,7 @@
 
       if (!files.length) { toast('Nothing to pack yet'); return; }
       saveBlob(Zip.build(files), `${slug()}-campaign-pack.zip`);
+      markDone('pack');
       toast(`📦 Campaign pack ready — ${files.length} files`);
     } catch (e) {
       toast('Couldn’t build the pack — try again');
@@ -954,7 +995,7 @@
       document.querySelectorAll('#ohFmtRow .fmt-btn').forEach((x) => x.classList.toggle('active', x === b));
       if (activeTab === 'openhome') renderOpenHome();
     }));
-    document.querySelectorAll('#openhomeContent .dlc').forEach((b) => b.addEventListener('click', () => Visuals.download($(b.dataset.canvas), `${slug()}-${b.dataset.name}.png`)));
+    document.querySelectorAll('#openhomeContent .dlc').forEach((b) => b.addEventListener('click', () => { Visuals.download($(b.dataset.canvas), `${slug()}-${b.dataset.name}.png`); markDone('openhome'); }));
     $('ohRoundup').addEventListener('click', buildOpensRoundup);
   };
 
@@ -1023,6 +1064,7 @@
       const v = $('reelVideo'); v.src = reelURL; v.hidden = false; $('cvReel').hidden = true;
       try { v.play().catch(() => {}); } catch (e) {}
       $('reelDownload').hidden = false;
+      markDone('reel');
       st.className = 'parse-note ok';
       st.textContent = res.ext === 'mp4'
         ? '✓ Reel ready (MP4) — ready to upload to Instagram / Facebook.'
@@ -1057,7 +1099,7 @@
 
     if (tab === 'graphics') { $('graphicsContent').hidden = false; renderGraphics(); return; }
     if (tab === 'flyer') { $('flyerContent').hidden = false; renderFlyer(); return; }
-    if (tab === 'compliance') { $('complianceContent').hidden = false; renderCompliance(); return; }
+    if (tab === 'compliance') { $('complianceContent').hidden = false; renderCompliance(); markDone('compliance'); return; }
     if (tab === 'signboard') { $('signboardContent').hidden = false; renderSignboard(); return; }
     if (tab === 'openhome') { $('openhomeContent').hidden = false; renderOpenHome(); return; }
     if (tab === 'reel') { $('reelContent').hidden = false; renderReel(); return; }
@@ -1260,6 +1302,7 @@
     const b = $('copyBtn');
     b.textContent = 'Copied ✓'; b.classList.add('copied');
     setTimeout(resetCopyBtn, 1600);
+    markDone('copy');
   };
 
   // ---------------- field filling (paste + link import share this) ----------------
@@ -1444,6 +1487,37 @@
     }
   };
 
+  // ---------------- per-listing marketing checklist ----------------
+  const CHECKLIST = [
+    ['kit', 'Generate the marketing kit'],
+    ['graphics', 'Download a social graphic'],
+    ['carousel', 'Download the carousel'],
+    ['copy', 'Copy a caption / description'],
+    ['flyer', 'Open / print the flyer'],
+    ['signboard', 'Download the sign board'],
+    ['openhome', 'Make an open-home asset'],
+    ['reel', 'Create a reel'],
+    ['compliance', 'Run the compliance check'],
+    ['pack', 'Download the campaign pack'],
+  ];
+  let checklist = {};
+  const renderChecklist = () => {
+    const box = $('checklistBox'); if (!box) return;
+    box.innerHTML = '';
+    let done = 0;
+    CHECKLIST.forEach(([key, label]) => {
+      const row = document.createElement('label');
+      row.className = 'ck-item' + (checklist[key] ? ' done' : '');
+      const cb = document.createElement('input'); cb.type = 'checkbox'; cb.checked = !!checklist[key];
+      cb.addEventListener('change', () => { checklist[key] = cb.checked; saveDraft(); renderChecklist(); });
+      const sp = document.createElement('span'); sp.textContent = label;
+      row.append(cb, sp); box.appendChild(row);
+      if (checklist[key]) done++;
+    });
+    const c = $('checklistCount'); if (c) c.textContent = `— ${done}/${CHECKLIST.length} done`;
+  };
+  const markDone = (key) => { if (!checklist[key]) { checklist[key] = true; saveDraft(); renderChecklist(); } };
+
   // ---------------- draft autosave (listing fields survive a refresh) ----------------
   const DRAFT_KEY = 'lk_draft_v1';
   const LISTING_FIELDS = ['address', 'city', 'price', 'currency', 'currencyCustom', 'rentPeriod', 'rentPeriodCustom', 'badge', 'badgeCustom', 'openhouse', 'type', 'typeCustom', 'tone', 'beds', 'baths', 'cars', 'sqft', 'areaUnit', 'areaUnitCustom', 'year', 'lot', 'available', 'bond', 'leaseTerm', 'leaseTermCustom', 'furnished', 'pets', 'features', 'neighborhood', 'sbUrl', 'ohDate', 'ohTime'];
@@ -1451,7 +1525,7 @@
   const saveDraft = () => {
     clearTimeout(draftTimer);
     draftTimer = setTimeout(() => {
-      const draft = { __mode: mode };
+      const draft = { __mode: mode, __checklist: checklist };
       LISTING_FIELDS.forEach((id) => (draft[id] = $(id).value));
       try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch (e) {}
     }, 400);
@@ -1462,6 +1536,8 @@
       if (!draft) return;
       if (draft.__mode) applyMode(draft.__mode, false); // rebuild status options before setting badge
       LISTING_FIELDS.forEach((id) => { if (draft[id] != null && draft[id] !== '') $(id).value = draft[id]; });
+      checklist = (draft.__checklist && typeof draft.__checklist === 'object') ? draft.__checklist : {};
+      renderChecklist();
       syncCustomWraps();
     } catch (e) {}
   };
@@ -1487,6 +1563,7 @@
     document.querySelectorAll('#ohFmtRow .fmt-btn').forEach((b) => b.classList.toggle('active', b.dataset.fmt === 'square'));
     if ($('ohRoundupWrap')) $('ohRoundupWrap').hidden = true;
     reelCaps = null; if ($('reelCaps')) { $('reelCaps').hidden = true; $('reelCaps').innerHTML = ''; }
+    checklist = {}; renderChecklist();
     resetReel();
     // clear the buyer-match draft so one property's outreach email can't leak into the next
     bmEmail = '';
@@ -1850,7 +1927,7 @@
     const files = e.clipboardData && e.clipboardData.files;
     if (files && files.length) { addPhotoFiles(files); rerenderVisuals(); }
   });
-  $('flyerOpen').addEventListener('click', () => { if (outputs) Flyer.openPrint(flyerOpts()); });
+  $('flyerOpen').addEventListener('click', () => { if (outputs) { Flyer.openPrint(flyerOpts()); markDone('flyer'); } });
   // selects with a Custom… option reveal their own text input
   const isInspectBadge = () => $('badge').value === 'openhouse' || $('badge').value === 'inspection';
   const wireCustomToggles = () => {
@@ -1954,6 +2031,7 @@
   bindBrandField('brandPrimary', 'primary');
   bindBrandField('brandAccent', 'accent');
   bindBrandField('brandFont', 'font');
+  $('brandWatermark').addEventListener('change', () => { brand.watermark = $('brandWatermark').checked; saveBrand(); rerenderVisuals(); });
   $('region').addEventListener('change', () => {
     brand.region = $('region').value;
     applyRegionDefaults();
@@ -1990,6 +2068,8 @@
   renderLibrary();
   wirePhotoEditor();
   renderPalettes();
+  renderProfiles();
+  renderChecklist();
   window.addEventListener('resize', () => { if (activeTab === 'flyer' && outputs) scaleFlyer(); });
 
   // ---------------- theme (light / dark) ----------------

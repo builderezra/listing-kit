@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=65" />
+  <link rel="stylesheet" href="styles.css?v=66" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -47,9 +47,21 @@
           </div>
         </details>
 
+        <details class="section" id="checklistSection">
+          <summary><span class="step">✅</span> Marketing checklist <span class="hint" id="checklistCount"></span></summary>
+          <div class="section-body">
+            <p class="hint">Ticks off as you create each asset — or tick manually. Saved with this listing.</p>
+            <div class="checklist" id="checklistBox"></div>
+          </div>
+        </details>
+
         <details class="section" id="brandSection">
           <summary><span class="step">1</span> Your brand <span class="hint">— saved on this device, set it once</span></summary>
           <div class="section-body">
+            <div class="field">
+              <label>Brand profiles <span class="hint">— save &amp; switch between brand kits (personal / agency)</span></label>
+              <div class="profile-row" id="brandProfiles"></div>
+            </div>
             <div class="row">
               <div class="field">
                 <label for="agentName">Name</label>
@@ -133,6 +145,7 @@
                 <button type="button" class="tpl" data-tpl="luxe"><span class="tpl-art tpl-luxe"></span>Luxe</button>
                 <button type="button" class="tpl" data-tpl="banner"><span class="tpl-art tpl-banner"></span>Banner</button>
               </div>
+              <label class="pref-check" style="margin-top:8px"><input type="checkbox" id="brandWatermark" /> Watermark social graphics with my logo</label>
             </div>
             <div class="field">
               <label>House style <span class="hint">— applied to all generated copy, saved with your brand</span></label>
@@ -954,18 +967,18 @@
     </div>
   </div>
 
-  <script src="generator.js?v=65"></script>
-  <script src="fairhousing.js?v=65"></script>
-  <script src="parser.js?v=65"></script>
-  <script src="importer.js?v=65"></script>
-  <script src="qr.js?v=65"></script>
-  <script src="visuals.js?v=65"></script>
-  <script src="flyer.js?v=65"></script>
-  <script src="ai.js?v=65"></script>
-  <script src="studio.js?v=65"></script>
-  <script src="tour.js?v=65"></script>
-  <script src="zip.js?v=65"></script>
-  <script src="reel.js?v=65"></script>
-  <script src="app.js?v=65"></script>
+  <script src="generator.js?v=66"></script>
+  <script src="fairhousing.js?v=66"></script>
+  <script src="parser.js?v=66"></script>
+  <script src="importer.js?v=66"></script>
+  <script src="qr.js?v=66"></script>
+  <script src="visuals.js?v=66"></script>
+  <script src="flyer.js?v=66"></script>
+  <script src="ai.js?v=66"></script>
+  <script src="studio.js?v=66"></script>
+  <script src="tour.js?v=66"></script>
+  <script src="zip.js?v=66"></script>
+  <script src="reel.js?v=66"></script>
+  <script src="app.js?v=66"></script>
 </body>
 </html>
