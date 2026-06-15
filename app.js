@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v71';
+  const APP_VERSION = 'v72';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -917,6 +917,7 @@
 
   // re-render whatever visual surface is active (cheap; canvases only)
   const rerenderVisuals = () => {
+    if (activeTab === 'testimonial') renderTestimonial();   // brand content works without a generated listing
     if (!outputs) return;
     if (activeTab === 'graphics') renderGraphics();
     if (activeTab === 'flyer') renderFlyer();
@@ -983,6 +984,7 @@
     if (!$('ohTime').value.trim() && $('openhouse').value.trim()) $('ohTime').value = $('openhouse').value.trim();   // prefill from the listing's open field
     const d = vizData(), when = openHomeWhen();
     renderOhPhotos();
+    const opCard = $('cvOpenPost').closest('.gfx-card'); if (opCard) opCard.classList.toggle('story', ohFormat === 'story');   // cap the tall story canvas
     Visuals.openHomePost($('cvOpenPost'), ohFormat, { brand, d, when, photo: resolveOhPhoto() });
     Visuals.arrowSign($('cvOpenSign'), { brand, d, when, dir: ohDir });
     $('ohEmpty').hidden = !!(when.date || when.time);
@@ -1118,6 +1120,7 @@
     if ($('postProspect')) $('postProspect').hidden = type !== 'prospect';
     if ($('postAgent')) $('postAgent').hidden = type !== 'agent';
     const cv = $('cvTestimonial');
+    const card = cv.closest('.gfx-card'); if (card) card.classList.toggle('story', tmFormat === 'story');   // cap the tall story canvas
     if (type === 'prospect') Visuals.prospectPost(cv, tmFormat, { brand, headline: $('psHeadline').value, sub: $('psSub').value, suburb: $('psSuburb').value.trim() });
     else if (type === 'agent') Visuals.agentPost(cv, tmFormat, { brand, tagline: $('agTagline').value.trim(), bio: $('agBio').value });
     else Visuals.testimonial(cv, tmFormat, { brand, quote: $('tmQuote').value, author: $('tmAuthor').value.trim(), role: $('tmRole').value.trim(), rating: parseInt($('tmRating').value, 10) || 5 });
