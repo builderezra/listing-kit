@@ -286,6 +286,8 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 .tpl-minimal::after { content: ''; position: absolute; inset: 55% 7px 6px 7px; background: #fff; border-radius: 4px; box-shadow: 0 1px 3px rgba(0,0,0,.25); }
 .tpl-luxe { background: #14110e; border: 1px solid #c08a3e; position: relative; }
 .tpl-luxe::after { content: ''; position: absolute; inset: 5px 5px 42% 5px; background: #6b8a96; }
+.tpl-banner { background: #8fb0c2; position: relative; }
+.tpl-banner::after { content: ''; position: absolute; inset: 62% 0 0 0; background: #0f2e3d; border-top: 3px solid #c08a3e; }
 
 /* listing-type toggle (For Sale / For Rent) */
 .mode-toggle { display: flex; gap: 0; border: 1.5px solid var(--line); border-radius: 10px; overflow: hidden; }

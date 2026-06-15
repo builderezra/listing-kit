@@ -415,9 +415,9 @@ const Visuals = (() => {
     const photoH = story ? 1060 : 624;
     cover(ctx, d.hero, mm, photoTop, W - mm * 2, photoH, 0, b, d.heroFocus, d.heroFilter);
     ctx.textAlign = 'center';
-    let y = photoTop + photoH + (story ? 116 : 92);
+    let y = photoTop + photoH + (story ? 134 : 108);
     ctx.font = font(600, story ? 22 : 19); spacing(ctx, 6); ctx.fillStyle = b.accent;
-    ctx.fillText(kicker, W / 2, y - (story ? 66 : 58)); spacing(ctx, 0);
+    ctx.fillText(kicker, W / 2, y - (story ? 92 : 76)); spacing(ctx, 0);
     if (d.price) { ctx.font = font(500, story ? 92 : 76, SERIF); ctx.fillStyle = ink; ctx.fillText(d.price, W / 2, y); y += story ? 60 : 52; }
     ctx.strokeStyle = alpha(b.accent, 0.85); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(W / 2 - 44, y - 10); ctx.lineTo(W / 2 + 44, y - 10); ctx.stroke(); y += 40;
     if (d.address) { ctx.font = font(400, story ? 34 : 30); ctx.fillStyle = mut; ctx.fillText(d.address, W / 2, y); y += story ? 52 : 46; }
@@ -426,6 +426,44 @@ const Visuals = (() => {
     ctx.font = font(500, story ? 30 : 26, SERIF); ctx.fillStyle = ink; ctx.fillText(b.agentName || 'Your Name Here', W / 2, baseY);
     const sub = [b.brokerage, b.phone].filter(Boolean).join('   ·   '); if (sub) { ctx.font = font(400, story ? 22 : 19); ctx.fillStyle = mut; ctx.fillText(sub, W / 2, baseY + (story ? 34 : 30)); }
     ctx.textAlign = 'left';
+  };
+
+  // =====================  BANNER — photo + solid brand colour band  ===========
+  const banner = (ctx, W, H, d, kind) => {
+    const b = d.brand, story = kind === 'story', wide = kind === 'wide';
+    const fg = onColor(b.primary);
+    if (wide) {
+      const panelW = Math.round(W * 0.4);
+      cover(ctx, d.hero, 0, 0, W - panelW, H, 0, b, d.heroFocus, d.heroFilter);
+      ctx.fillStyle = b.primary; ctx.fillRect(W - panelW, 0, panelW, H);
+      ctx.fillStyle = b.accent; ctx.fillRect(W - panelW, 0, 6, H);
+      badge(ctx, 36, 36, d.badgeText, b.accent, onColor(b.accent), 22);
+      const px = W - panelW + 44; let y = 220;
+      if (d.price) { ctx.font = font(800, 58, priceFam(b, SANS)); ctx.fillStyle = fg; ctx.fillText(d.price, px, y); y += 54; }
+      if (d.address) { ctx.font = font(400, 25); ctx.fillStyle = alpha(fg, 0.9); ctx.fillText(d.address, px, y); y += 40; }
+      ctx.fillStyle = b.accent; ctx.fillRect(px, y - 8, 52, 4); y += 36;
+      const stats = statText(d); if (stats) { ctx.font = font(600, 20); spacing(ctx, 3); ctx.fillStyle = fg; ctx.fillText(stats, px, y); spacing(ctx, 0); }
+      ctx.font = font(700, 24); ctx.fillStyle = fg; ctx.fillText(b.agentName || 'Your Name Here', px, H - 108);
+      const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  '); if (sub) { ctx.globalAlpha = 0.82; ctx.font = font(400, 18); ctx.fillText(sub, px, H - 76); ctx.globalAlpha = 1; }
+      return;
+    }
+    const bandH = story ? 624 : 364;
+    cover(ctx, d.hero, 0, 0, W, H - bandH, 0, b, d.heroFocus, d.heroFilter);
+    ctx.fillStyle = b.primary; ctx.fillRect(0, H - bandH, W, bandH);
+    ctx.fillStyle = b.accent; ctx.fillRect(0, H - bandH, W, 6);
+    const m = 56;
+    badge(ctx, m - 8, 40, d.badgeText, b.accent, onColor(b.accent), story ? 30 : 26);
+    let y = H - bandH + (story ? 118 : 92);
+    if (d.price) { ctx.font = font(800, story ? 104 : 80, priceFam(b, SANS)); ctx.fillStyle = fg; ctx.fillText(d.price, m, y); y += story ? 60 : 50; }
+    if (d.address) { ctx.font = font(400, story ? 36 : 30); ctx.fillStyle = alpha(fg, 0.92); ctx.fillText(d.address, m, y); y += story ? 50 : 42; }
+    ctx.fillStyle = b.accent; ctx.fillRect(m, y - 14, 56, 4); y += 26;
+    const stats = statText(d); if (stats) { ctx.font = font(600, story ? 27 : 23); spacing(ctx, 3); ctx.fillStyle = fg; ctx.fillText(stats, m, y); spacing(ctx, 0); }
+    const ry = H - (story ? 70 : 54);
+    ctx.font = font(700, story ? 30 : 26); ctx.fillStyle = fg; ctx.fillText(b.agentName || 'Your Name Here', m, ry);
+    const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
+    if (sub) { ctx.globalAlpha = 0.82; ctx.font = font(400, story ? 22 : 19); ctx.fillText(sub, m, ry + (story ? 32 : 27)); ctx.globalAlpha = 1; }
+    if (b.logoImg && b.logoImg.width) logoImg(ctx, b.logoImg, W - m, ry, story ? 64 : 52);
+    else if (b.headImg && b.headImg.width) circleImg(ctx, b.headImg, W - m - 40, ry - (story ? 18 : 14), story ? 96 : 78, b.accent);
   };
 
   // =====================  CAROUSEL SLIDES (1080×1080)  =========================
@@ -549,7 +587,7 @@ const Visuals = (() => {
 
   // ---- public API ------------------------------------------------------------
   const SIZES = { square: [1080, 1080], story: [1080, 1920], wide: [1200, 630] };
-  const TEMPLATES = { modern, classic, bold, minimal, luxe };
+  const TEMPLATES = { modern, classic, bold, minimal, luxe, banner };
 
   const render = (templateId, kind, canvas, d) => {
     const [W, H] = SIZES[kind];

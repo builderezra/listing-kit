@@ -1059,8 +1059,8 @@ const Studio = (() => {
       } else {
         const mm = 56, photoTop = mm + (k === 'story' ? 36 : 26), photoH = k === 'story' ? 1060 : 624;
         if (ctxData.photos.length) push({ type: 'photo', photoIndex: pIdx, shape: 'rect', wf: (W - mm * 2) / W, hf: photoH / H, xf: 0.5, yf: (photoTop + photoH / 2) / H });
-        let y = photoTop + photoH + (k === 'story' ? 116 : 92);
-        ctrText(kicker, W / 2, y - (k === 'story' ? 66 : 58), k === 'story' ? 22 : 19, { weight: 600, color: 'accent', tracking: 6 });
+        let y = photoTop + photoH + (k === 'story' ? 134 : 108);
+        ctrText(kicker, W / 2, y - (k === 'story' ? 92 : 76), k === 'story' ? 22 : 19, { weight: 600, color: 'accent', tracking: 6 });
         if (f.price) { ctrText(f.price, W / 2, y, k === 'story' ? 92 : 76, { weight: 500, font: 'serif', color: ink }); y += k === 'story' ? 60 : 52; }
         push({ type: 'rect', shape: 'rect', color: 'accent', wf: 88 / W, hf: 2 / H, xf: 0.5, yf: (y - 10) / H, radius: 0 }); y += 40;
         if (f.address) { ctrText(f.address, W / 2, y, k === 'story' ? 34 : 30, { weight: 400, color: mut }); y += k === 'story' ? 52 : 46; }
@@ -1069,6 +1069,38 @@ const Studio = (() => {
         ctrText(b.agentName || 'Your Name Here', W / 2, baseY, k === 'story' ? 30 : 26, { weight: 500, font: 'serif', color: ink });
         const sub = [b.brokerage, b.phone].filter(Boolean).join('   ·   ');
         if (sub) ctrText(sub, W / 2, baseY + (k === 'story' ? 34 : 30), k === 'story' ? 22 : 19, { weight: 400, color: mut });
+      }
+    } else if (tpl === 'banner') {
+      bg = ctxData.photos.length ? { type: 'photo', photoIndex: pIdx } : { type: 'color', color: 'primary' };
+      const fg = onP, wide = k === 'wide';
+      if (wide) {
+        const panelW = Math.round(W * 0.4), px = W - panelW + 44;
+        push({ type: 'rect', shape: 'rect', color: 'primary', wf: panelW / W, hf: 1, xf: (W - panelW / 2) / W, yf: 0.5, radius: 0 });
+        if (f.badge) badgeTL(f.badge, 36, 36, 22, 'accent');
+        let y = 220;
+        if (f.price) { leftText(f.price, px, y, 58, { weight: 800, font: priceFont('sans'), color: fg }); y += 54; }
+        if (f.address) { leftText(f.address, px, y, 25, { weight: 400, color: fg }); y += 40; }
+        push({ type: 'rect', shape: 'rect', color: 'accent', wf: 52 / W, hf: 4 / H, xf: (px + 26) / W, yf: (y - 8) / H, radius: 0 }); y += 36;
+        if (f.stats) leftText(f.stats, px, y, 20, { weight: 600, color: fg });
+        leftText(b.agentName || 'Your Name Here', px, H - 108, 24, { weight: 700, color: fg });
+        const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
+        if (sub) leftText(sub, px, H - 76, 18, { weight: 400, color: fg });
+      } else {
+        const bandH = k === 'story' ? 624 : 364, m = 56;
+        push({ type: 'rect', shape: 'rect', color: 'primary', wf: 1, hf: bandH / H, xf: 0.5, yf: (H - bandH / 2) / H, radius: 0 });
+        push({ type: 'rect', shape: 'rect', color: 'accent', wf: 1, hf: 6 / H, xf: 0.5, yf: (H - bandH + 3) / H, radius: 0 });
+        if (f.badge) badgeTL(f.badge, m - 8, 40, k === 'story' ? 30 : 26, 'accent');
+        let y = H - bandH + (k === 'story' ? 118 : 92);
+        if (f.price) { leftText(f.price, m, y, k === 'story' ? 104 : 80, { weight: 800, font: priceFont('sans'), color: fg }); y += k === 'story' ? 60 : 50; }
+        if (f.address) { leftText(f.address, m, y, k === 'story' ? 36 : 30, { weight: 400, color: fg }); y += k === 'story' ? 50 : 42; }
+        push({ type: 'rect', shape: 'rect', color: 'accent', wf: 56 / W, hf: 4 / H, xf: (m + 28) / W, yf: (y - 14) / H, radius: 0 }); y += 26;
+        if (f.stats) leftText(f.stats, m, y, k === 'story' ? 27 : 23, { weight: 600, color: fg });
+        const ry = H - (k === 'story' ? 70 : 54);
+        leftText(b.agentName || 'Your Name Here', m, ry, k === 'story' ? 30 : 26, { weight: 700, color: fg });
+        const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
+        if (sub) leftText(sub, m, ry + (k === 'story' ? 32 : 27), k === 'story' ? 22 : 19, { weight: 400, color: fg });
+        if (b.headImg && b.headImg.width) push({ type: 'image', src: 'head', shape: 'circle', wf: (k === 'story' ? 96 : 78) / W, xf: (W - m - 40) / W, yf: (ry - (k === 'story' ? 18 : 14)) / H });
+        else logoRight(W - m, ry, k === 'story' ? 64 : 52);
       }
     } else {   // bold
       bg = { type: 'gradient', c1: Visuals.shade(b.primary, 14), c2: Visuals.shade(b.primary, -34), angle: 90 };
