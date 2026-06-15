@@ -349,6 +349,7 @@
       });
       cell.querySelector('.photo-x').addEventListener('click', () => {
         if (p.url.startsWith('blob:')) URL.revokeObjectURL(p.url);
+        if (ohPhoto === p) { ohPhoto = null; if (activeTab === 'openhome') renderOpenHome(); }   // don't keep featuring a deleted photo
         const wasHero = photos[heroIndex];     // keep the ★ on the same photo (by reference)
         photos.splice(i, 1);
         heroIndex = photos.indexOf(wasHero);
@@ -468,10 +469,11 @@
     // flyer, sign board, copy) reflects "Home Open" — not just the Open Home tab.
     // Skip terminal statuses (sold/leased) where an open doesn't apply.
     const oh = openSchedule();
-    if (oh.set && !['sold', 'leased'].includes(f.badge)) {
-      f.openhouse = oh.when;
-      if (f.badge !== 'openhouse' && f.badge !== 'inspection') f.badge = f.mode === 'rent' ? 'inspection' : 'openhouse';
-    }
+    const terminal = ['sold', 'leased'].includes(f.badge);
+    f.openhouse = (oh.set && !terminal) ? oh.when : '';   // clean: set ONLY for a real, non-terminal open
+    // a generic status gives way to HOME OPEN; an explicit signal (New Price, Custom) is kept,
+    // and the open still shows everywhere via the date line (f.openhouse / d.ohLine)
+    if (oh.set && ['justlisted', 'forsale', 'forlease'].includes(f.badge)) f.badge = f.mode === 'rent' ? 'inspection' : 'openhouse';
     return f;
   };
 
@@ -506,8 +508,7 @@
 
   const vizData = () => {
     const d = readForm();
-    const inspectLine = (d.badge === 'openhouse' || d.badge === 'inspection') && d.openhouse
-      ? (d.mode === 'rent' ? 'Inspect ' : '') + d.openhouse : '';
+    const inspectLine = d.openhouse ? (d.mode === 'rent' ? 'Inspect ' : '') + d.openhouse : '';
     syncFcss();
     return {
       badgeText: Generator.badgeText(d),
@@ -634,7 +635,7 @@
     });
   };
 
-  const slug = () => ($('address').value.trim() || 'listing').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  const slug = () => ($('address').value.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'listing');
   const DL_NAME = { cvSquare: 'instagram-post', cvStory: 'story', cvWide: 'facebook' };
   const wireDownloads = () => {
     document.querySelectorAll('.dl').forEach((b) =>
@@ -691,12 +692,14 @@
       const d = vizData();
       const files = [];
 
+      // resilient per-asset render: a single failed draw is skipped, the rest still ship
+      const addAsset = async (name, drawFn) => {
+        try { const cv = offscreenCanvas(); drawFn(cv); const b = await canvasPNGBytes(cv); if (b) files.push({ name, data: b }); } catch (e) {}
+      };
+
       // 1) social graphics in the chosen template
       for (const [kind, name] of [['square', 'social/instagram-post.png'], ['story', 'social/story-reel.png'], ['wide', 'social/facebook-link.png']]) {
-        const cv = offscreenCanvas();
-        Visuals.render(brand.templateId, kind, cv, d);
-        const bytes = await canvasPNGBytes(cv);
-        if (bytes) files.push({ name, data: bytes });
+        await addAsset(name, (cv) => Visuals.render(brand.templateId, kind, cv, d));
       }
 
       // 2) carousel — cover + photo highlights + CTA (same composition as the tab)
@@ -706,32 +709,23 @@
         let fi = 0; carPhotos.forEach((p) => { if (p._caption == null) p._caption = feats[fi++] || ''; });
         const total = carPhotos.length + 2;
         let n = 0;
-        const push = async (cv, suffix) => { const b = await canvasPNGBytes(cv); if (b) files.push({ name: `carousel/${String(++n).padStart(2, '0')}-${suffix}.png`, data: b }); };
-        const cover = offscreenCanvas(); Visuals.render(brand.templateId, 'square', cover, d); await push(cover, 'cover');
+        await addAsset(`carousel/${String(++n).padStart(2, '0')}-cover.png`, (cv) => Visuals.render(brand.templateId, 'square', cv, d));
         for (let i = 0; i < carPhotos.length; i++) {
-          const cv = offscreenCanvas();
-          Visuals.featureSlide(cv, { photo: carPhotos[i], caption: carPhotos[i]._caption || '', brand, idx: i + 1, total });
-          await push(cv, 'photo');
+          await addAsset(`carousel/${String(++n).padStart(2, '0')}-photo.png`, (cv) => Visuals.featureSlide(cv, { photo: carPhotos[i], caption: carPhotos[i]._caption || '', brand, idx: i + 1, total }));
         }
-        const cta = offscreenCanvas(); Visuals.ctaSlide(cta, { brand, address: d.address, badgeText: d.badgeText, ohLine: d.ohLine }); await push(cta, 'cta');
+        await addAsset(`carousel/${String(++n).padStart(2, '0')}-cta.png`, (cv) => Visuals.ctaSlide(cv, { brand, address: d.address, badgeText: d.badgeText, ohLine: d.ohLine }));
       }
 
-      // 3) sign board (with QR if a link is set)
-      const sbCv = offscreenCanvas();
-      Visuals.signboard(sbCv, { brand, d, status: d.raw.mode === 'rent' ? 'FOR LEASE' : 'FOR SALE', qrUrl: ($('sbUrl').value.trim() || $('importUrl').value.trim()) });
-      const sbBytes = await canvasPNGBytes(sbCv);
-      if (sbBytes) files.push({ name: 'signboard.png', data: sbBytes });
+      // 3) sign board (with QR if a link is set; honours the status stamp)
+      const sbStatus = d.stamp ? '' : (d.ohLine ? d.badgeText : (d.raw.mode === 'rent' ? 'FOR LEASE' : 'FOR SALE'));
+      await addAsset('signboard.png', (cv) => Visuals.signboard(cv, { brand, d, status: sbStatus, qrUrl: ($('sbUrl').value.trim() || $('importUrl').value.trim()) }));
 
       // 3b) open-home post + directional sign (only when an inspection time is set)
       const hasOpen = hasOpenHome();
       if (hasOpen) {
         const when = openHomeWhen(), ohp = resolveOhPhoto();
-        for (const k of ['square', 'story']) {
-          const c = offscreenCanvas(); Visuals.openHomePost(c, k, { brand, d, when, photo: ohp });
-          const b = await canvasPNGBytes(c); if (b) files.push({ name: `open-home/open-home-post-${k}.png`, data: b });
-        }
-        const asCv = offscreenCanvas(); Visuals.arrowSign(asCv, { brand, d, when, dir: ohDir });
-        const asB = await canvasPNGBytes(asCv); if (asB) files.push({ name: 'open-home/directional-sign.png', data: asB });
+        for (const k of ['square', 'story']) await addAsset(`open-home/open-home-post-${k}.png`, (cv) => Visuals.openHomePost(cv, k, { brand, d, when, photo: ohp }));
+        await addAsset('open-home/directional-sign.png', (cv) => Visuals.arrowSign(cv, { brand, d, when, dir: ohDir }));
       }
 
       // 4) print-ready flyer — self-contained (photos baked in as data URLs so it works from the zip)
@@ -858,6 +852,7 @@
     if (activeTab === 'graphics') renderGraphics();
     if (activeTab === 'flyer') renderFlyer();
     if (activeTab === 'signboard') renderSignboard();
+    if (activeTab === 'openhome') renderOpenHome();
   };
 
   // ---- status stamp (SOLD / UNDER OFFER / PRICE REDUCED / LEASED) ----
@@ -998,7 +993,11 @@
       const caps = await AI.reelCaptions({ facts: aiFacts(), style: aiStyle(), count });
       if (!caps.length) { busy.finish('No captions returned — try again.', 'err'); return; }
       reelCaps = caps; renderReelCaps();
-      busy.finish('✓ AI captions ready — they’ll appear when you create the reel', 'ok');
+      let flags = 0;
+      try { const r = FairHousing.scan({ 'reel captions': caps.join('. ') }); if (r && !r.clear) flags = r.findings.length; } catch (e) {}
+      busy.finish(flags
+        ? `⚠ Captions ready — ${flags} wording risk${flags === 1 ? '' : 's'} flagged; review before creating the reel`
+        : '✓ AI captions ready — they’ll appear when you create the reel', flags ? 'err' : 'ok');
     } catch (e) { busy.finish(AI.explain(e), 'err'); }
     finally { btn.disabled = false; }
   };
@@ -1008,13 +1007,16 @@
     const d = vizData();
     const pics = d.photos.filter((p) => p.inCarousel !== false).slice(0, 6);
     const feats = Generator.flyerFeatures(d.raw, 8);
-    let fi = 0; pics.forEach((p, i) => { if (reelCaps && reelCaps[i]) p._caption = reelCaps[i]; else if (p._caption == null) p._caption = feats[fi++] || ''; });
+    // build captions for the reel WITHOUT mutating the shared photo._caption (which the
+    // carousel + flyer also read) — AI captions win, else the existing/feature caption
+    let fi = 0;
+    const caps = pics.map((p, i) => (reelCaps && reelCaps[i]) ? reelCaps[i] : (p._caption != null ? p._caption : (feats[fi++] || '')));
     const pace = parseFloat($('reelPace').value) || 2.6;
     const btn = $('reelMake'); btn.disabled = true;
     const st = $('reelStatus'); st.className = 'parse-note'; Progress.start();
     try {
       const res = await Reel.record({
-        canvas: $('cvReel'), brand, d, photos: pics, opts: { perPhoto: pace, fit: $('reelFit').checked },
+        canvas: $('cvReel'), brand, d, photos: pics, captions: caps, opts: { perPhoto: pace, fit: $('reelFit').checked },
         onProgress: (frac) => { st.textContent = `🎬 Rendering… ${Math.round(frac * 100)}% (recorded in real time)`; },
       });
       reelBlob = res.blob; reelExt = res.ext; reelURL = URL.createObjectURL(res.blob);
@@ -1042,7 +1044,7 @@
   const renderSignboard = () => {
     const d = vizData();
     if (!$('sbUrl').value.trim() && $('importUrl').value.trim()) $('sbUrl').value = $('importUrl').value.trim();   // prefill from the imported link
-    const status = d.ohLine ? d.badgeText : (d.raw.mode === 'rent' ? 'FOR LEASE' : 'FOR SALE');
+    const status = d.stamp ? '' : (d.ohLine ? d.badgeText : (d.raw.mode === 'rent' ? 'FOR LEASE' : 'FOR SALE'));
     Visuals.signboard($('cvSignboard'), { brand, d, status, qrUrl: $('sbUrl').value.trim() });
   };
 
@@ -1486,6 +1488,13 @@
     if ($('ohRoundupWrap')) $('ohRoundupWrap').hidden = true;
     reelCaps = null; if ($('reelCaps')) { $('reelCaps').hidden = true; $('reelCaps').innerHTML = ''; }
     resetReel();
+    // clear the buyer-match draft so one property's outreach email can't leak into the next
+    bmEmail = '';
+    if ($('bmReq')) $('bmReq').value = '';
+    if ($('bmOut')) { $('bmOut').textContent = ''; $('bmOut').hidden = true; }
+    if ($('bmActions')) $('bmActions').hidden = true;
+    if ($('bmStatus')) { $('bmStatus').textContent = ''; $('bmStatus').className = 'ai-status'; }
+    if ($('buyerMatch')) $('buyerMatch').open = false;
     outputs = null; report = null;
     // a cleared listing must not let Undo/Redo resurrect the previous property's copy
     history = { mls: [], instagram: [], facebook: [], email: [] };
@@ -1633,7 +1642,7 @@
     }
     if (d.features.length) L.push(`Features (use only these): ${d.features.join(', ')}`);
     if (d.neighborhood) L.push(`Location highlights: ${d.neighborhood}`);
-    if ((d.badge === 'openhouse' || d.badge === 'inspection') && d.openhouse) L.push(`${d.mode === 'rent' ? 'Inspection' : 'Home open'}: ${d.openhouse}`);
+    if (d.openhouse) L.push(`${d.mode === 'rent' ? 'Inspection' : 'Home open'}: ${d.openhouse}`);
     L.push(`Status: ${Generator.badgeText(d)}`);
     const contact = [d.agentName, d.brokerage, d.phone, d.email].filter(Boolean).join(', ');
     if (contact) L.push(`Agent (for sign-off): ${contact}`);
@@ -1741,7 +1750,12 @@
       bmEmail = await AI.buyerMatch({ facts: aiFacts(), style: aiStyle(), requirements: req, agent });
       if (!bmEmail) { busy.finish('No draft returned — try again.', 'err'); btn.disabled = false; return; }
       $('bmOut').textContent = bmEmail; $('bmOut').hidden = false; $('bmActions').hidden = false;
-      busy.finish('✓ Draft ready with ' + AI.modelLabel(), 'ok');
+      // backstop: even AI output goes through the fair-housing scan before it's sent
+      let flags = 0;
+      try { const r = FairHousing.scan({ 'buyer-match email': bmEmail, 'buyer notes': req }); if (r && !r.clear) flags = r.findings.length; } catch (e) {}
+      busy.finish(flags
+        ? `⚠ Draft ready — ${flags} wording risk${flags === 1 ? '' : 's'} flagged; review before sending`
+        : '✓ Draft ready with ' + AI.modelLabel(), flags ? 'err' : 'ok');
     } catch (e) { busy.finish(AI.explain(e), 'err'); }
     finally { btn.disabled = false; }
   };

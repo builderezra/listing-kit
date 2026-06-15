@@ -80,7 +80,7 @@ const Reel = (() => {
   };
 
   // record({canvas, brand, d, photos, opts, onProgress}) -> Promise<{blob, mime, ext}>
-  const record = ({ canvas, brand, d, photos, opts, onProgress }) => new Promise((resolve, reject) => {
+  const record = ({ canvas, brand, d, photos, captions, opts, onProgress }) => new Promise((resolve, reject) => {
     const mime = pickMime();
     if (!mime) return reject(new Error('Video recording isn’t supported in this browser.'));
     const o = Object.assign({ intro: 2.6, perPhoto: 2.6, outro: 3.0, xf: 0.5 }, opts || {});
@@ -96,7 +96,7 @@ const Reel = (() => {
 
     const pics = (photos || []).slice(0, 6);
     const scenes = [{ type: 'intro', dur: o.intro }];
-    pics.forEach((ph, i) => scenes.push({ type: 'photo', dur: o.perPhoto, photo: ph, caption: ph._caption || '', kb: i }));
+    pics.forEach((ph, i) => scenes.push({ type: 'photo', dur: o.perPhoto, photo: ph, caption: (captions && captions[i] != null) ? captions[i] : (ph._caption || ''), kb: i }));
     scenes.push({ type: 'outro', dur: o.outro });
     const total = scenes.reduce((s, sc) => s + sc.dur, 0);
 
@@ -140,7 +140,7 @@ const Reel = (() => {
     const FRAME_MS = 1000 / FPS;
     const nowMs = () => ((typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now());
     rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
-    rec.onerror = (e) => { if (!settled) { settled = true; reject((e && e.error) || new Error('Recording failed.')); } };
+    rec.onerror = (e) => { stopped = true; clearTimeout(watchdog); if (!settled) { settled = true; reject((e && e.error) || new Error('Recording failed.')); } };
     rec.onstop = () => {
       if (settled) return; settled = true;
       if (!chunks.length) reject(new Error('Your browser produced an empty video — try Chrome or Safari, and keep this tab in front while it renders.'));

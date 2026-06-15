@@ -402,8 +402,7 @@ const Generator = (() => {
     // closing CTA — register/inspect/apply for rent; arrange a viewing for sale
     const cta = [];
     const inspectLabel = d.mode === 'rent' ? 'Inspection' : ohLabel(d);
-    const inspectBadge = d.mode === 'rent' ? (d.badge === 'inspection') : (d.badge === 'openhouse');
-    if (inspectBadge && d.openhouse) {
+    if (d.openhouse) {
       cta.push(d.mode === 'rent'
         ? `Inspection ${d.openhouse} — register your interest to confirm a spot.`
         : pick([`${inspectLabel} ${d.openhouse} — come and walk it yourself.`, `See it in person: ${inspectLabel.toLowerCase()} ${d.openhouse}.`]));
@@ -454,7 +453,7 @@ const Generator = (() => {
     const lines = [];
     const noun = typeNoun(d.type, d.typeCustom);
     lines.push(`${pick(HOOK_EMOJI)} ${badgeText(d)} ${pick(HOOK_EMOJI)}`);
-    if (d.openhouse && (d.badge === 'openhouse' || d.badge === 'inspection')) lines.push(`🗓️ ${d.mode === 'rent' ? 'Inspection' : ohLabel(d)}: ${d.openhouse}`);
+    if (d.openhouse) lines.push(`🗓️ ${d.mode === 'rent' ? 'Inspection' : ohLabel(d)}: ${d.openhouse}`);
     lines.push(pick(d.mode === 'rent' ? [
       `Your next ${noun}, ready to lease.`,
       `This ${noun} is available now.`,
@@ -538,7 +537,7 @@ const Generator = (() => {
       `Excited to share my newest listing! 🎉`,
       `Just listed and I can’t wait to show it off 👇`,
     ]));
-    if (d.openhouse && (d.badge === 'openhouse' || d.badge === 'inspection')) parts.push(`🗓️ ${rent ? 'Inspection' : ohLabel(d)}: ${d.openhouse}`);
+    if (d.openhouse) parts.push(`🗓️ ${rent ? 'Inspection' : ohLabel(d)}: ${d.openhouse}`);
     parts.push('');
 
     const sentence = [];
@@ -663,11 +662,11 @@ const Generator = (() => {
         else if (d.furnished === 'part') bullets.push('Part-furnished');
         if (petPhrase(d.pets)) bullets.push(cap(petPhrase(d.pets)));
       }
-      if (d.openhouse && (d.badge === 'openhouse' || d.badge === 'inspection')) bullets.push(`${rent ? 'Inspection' : ohLabel(d)}: ${d.openhouse}`);
+      if (d.openhouse) bullets.push(`${rent ? 'Inspection' : ohLabel(d)}: ${d.openhouse}`);
       pickN(feats, Math.min(feats.length, 5)).forEach((f) => bullets.push(cap(f.text.replace(/^a |^an /, ''))));
       if (bullets.length) { body.push('At a glance:'); bullets.forEach((b) => body.push(`• ${b}`)); body.push(''); }
 
-      if (d.openhouse && (d.badge === 'openhouse' || d.badge === 'inspection')) {
+      if (d.openhouse) {
         body.push(`Come through the ${inspectWord} (${d.openhouse}), or reply and I’ll ${rent ? 'add you to the inspection list' : 'arrange a private viewing that suits you'}.`);
       } else {
         body.push(rent

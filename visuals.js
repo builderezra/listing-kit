@@ -796,8 +796,8 @@ const Visuals = (() => {
     ctx.fillStyle = b.primary; ctx.fillRect(0, 0, W, barH);
     ctx.fillStyle = fg; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
     ctx.font = font(800, 56); spacing(ctx, 3);
-    ctx.fillText(status || 'FOR SALE', 48, barH / 2 + 3); spacing(ctx, 0);
-    if (b.brokerage) { ctx.textAlign = 'right'; ctx.font = font(600, 30); ctx.globalAlpha = 0.92; ctx.fillText(b.brokerage, W - 48, barH / 2 + 2); ctx.globalAlpha = 1; ctx.textAlign = 'left'; }
+    ctx.fillText(status || (d.stamp ? '' : 'FOR SALE'), 48, barH / 2 + 3); spacing(ctx, 0);
+    if (b.brokerage && !d.stamp) { ctx.textAlign = 'right'; ctx.font = font(600, 30); ctx.globalAlpha = 0.92; ctx.fillText(b.brokerage, W - 48, barH / 2 + 2); ctx.globalAlpha = 1; ctx.textAlign = 'left'; }
     ctx.textBaseline = 'alphabetic';
 
     // hero photo band + accent rule
