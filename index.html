@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=49" />
+  <link rel="stylesheet" href="styles.css?v=50" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -649,6 +649,14 @@
           </div>
         </div>
         <div class="st-group">
+          <div class="st-group-title">✏️ Draw <span class="hint">— freehand pen on the canvas</span></div>
+          <div class="st-row"><button type="button" id="stDrawToggle">✏️ Start drawing</button></div>
+          <div id="stDrawOpts" hidden>
+            <div class="st-row" id="stDrawColors"></div>
+            <div class="st-slider"><span class="st-slk">Pen</span><input type="range" id="stDrawW" min="2" max="48" step="1" /><span class="st-slv" id="stDrawWV"></span></div>
+          </div>
+        </div>
+        <div class="st-group">
           <div class="st-group-title">Background</div>
           <div class="st-bg" id="stBg"></div>
           <div class="st-row">
@@ -842,16 +850,16 @@
     </div>
   </div>
 
-  <script src="generator.js?v=49"></script>
-  <script src="fairhousing.js?v=49"></script>
-  <script src="parser.js?v=49"></script>
-  <script src="importer.js?v=49"></script>
-  <script src="qr.js?v=49"></script>
-  <script src="visuals.js?v=49"></script>
-  <script src="flyer.js?v=49"></script>
-  <script src="ai.js?v=49"></script>
-  <script src="studio.js?v=49"></script>
-  <script src="tour.js?v=49"></script>
-  <script src="app.js?v=49"></script>
+  <script src="generator.js?v=50"></script>
+  <script src="fairhousing.js?v=50"></script>
+  <script src="parser.js?v=50"></script>
+  <script src="importer.js?v=50"></script>
+  <script src="qr.js?v=50"></script>
+  <script src="visuals.js?v=50"></script>
+  <script src="flyer.js?v=50"></script>
+  <script src="ai.js?v=50"></script>
+  <script src="studio.js?v=50"></script>
+  <script src="tour.js?v=50"></script>
+  <script src="app.js?v=50"></script>
 </body>
 </html>

@@ -311,6 +311,18 @@ const Studio = (() => {
         bw = dw; bh = dh;
       }
       ctx2d.filter = 'none';
+    } else if (L.type === 'draw') {
+      // a freehand pen stroke — pts are [fx,fy] fractions of the canvas, relative to the layer centre
+      const pts = L.pts || [];
+      ctx2d.strokeStyle = resolveColor(L.color); ctx2d.lineWidth = Math.max(1, (L.strokeWf || 0.012) * w);
+      ctx2d.lineJoin = 'round'; ctx2d.lineCap = 'round';
+      ctx2d.beginPath();
+      let minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9;
+      pts.forEach((p, i) => { const px = p[0] * w, py = p[1] * h; if (i) ctx2d.lineTo(px, py); else ctx2d.moveTo(px, py); if (px < minx) minx = px; if (px > maxx) maxx = px; if (py < miny) miny = py; if (py > maxy) maxy = py; });
+      if (pts.length === 1) { ctx2d.lineTo(pts[0][0] * w + 0.1, pts[0][1] * h); }   // a dot
+      ctx2d.stroke();
+      const pad2 = (L.strokeWf || 0.012) * w;
+      bw = (maxx - minx) + pad2; bh = (maxy - miny) + pad2;
     } else if (L.type === 'ribbon') {
       // a filled banner with centred text (rotate via L.rot to make a corner ribbon)
       ctx2d.font = `800 ${L.size}px ${SANS}`;
@@ -396,11 +408,22 @@ const Studio = (() => {
   };
   const handleR = () => W() * (COARSE ? 0.03 : 0.018);
 
+  // freehand pen state
+  let drawMode = false, drawing = false, curStroke = null, drawColor = 'accent', drawWidth = 0.012;
   const render = (showSel = true) => {
     cv.width = W(); cv.height = H();
     ctx2d.clearRect(0, 0, W(), H());
     drawBackground();
     layers.forEach(drawLayer);
+    // live pen preview (the stroke being drawn right now)
+    if (drawing && curStroke && curStroke.length) {
+      ctx2d.save();
+      ctx2d.strokeStyle = resolveColor(drawColor); ctx2d.lineWidth = Math.max(1, drawWidth * W());
+      ctx2d.lineJoin = 'round'; ctx2d.lineCap = 'round';
+      ctx2d.beginPath();
+      curStroke.forEach((p, i) => i ? ctx2d.lineTo(p[0], p[1]) : ctx2d.moveTo(p[0], p[1]));
+      ctx2d.stroke(); ctx2d.restore();
+    }
 
     // empty-state hint
     if (!layers.length) {
@@ -513,6 +536,10 @@ const Studio = (() => {
   let pinch = null;
   const touchSpread = (e) => { const a = e.touches[0], b = e.touches[1]; return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); };
   const onDown = (e) => {
+    // pen mode: capture a freehand stroke instead of moving layers
+    if (drawMode && !(e.touches && e.touches.length === 2)) {
+      const p = pt(e); drawing = true; curStroke = [[p.x, p.y]]; render(false); e.preventDefault(); return;
+    }
     // two fingers on the canvas = pinch-to-zoom the photo (crop). Works on the background
     // photo (modern) or a selected photo layer — the natural way to crop on a phone.
     if (e.touches && e.touches.length === 2) {
@@ -554,6 +581,7 @@ const Studio = (() => {
   };
   const SNAP = [0, 0.25, 0.5, 0.75, 1];
   const onMove = (e) => {
+    if (drawing) { const p = pt(e); curStroke.push([p.x, p.y]); render(false); e.preventDefault(); return; }
     if (pinch && e.touches && e.touches.length === 2) {
       const t = pinch.t;
       t.crop = t.crop || {};
@@ -599,6 +627,7 @@ const Studio = (() => {
     render(); e.preventDefault();
   };
   const onUp = (e) => {
+    if (drawing) { finishStroke(); e && e.preventDefault && e.preventDefault(); return; }
     if (pinch) { if (!e || !e.touches || e.touches.length < 2) { commit(); revealPhotoControls(); pinch = null; } return; }
     const wasTap = drag && !drag.moved;
     if (drag && drag.moved) { guides = []; commit(); }
@@ -606,6 +635,36 @@ const Studio = (() => {
     drag = null;
     // a tap that landed on a photo (layer or background) → bring its crop controls into view
     if (wasTap) revealPhotoControls();
+  };
+  // turn the just-drawn stroke into an editable 'draw' layer
+  const finishStroke = () => {
+    drawing = false;
+    const s = curStroke; curStroke = null;
+    if (!s || !s.length) { render(); return; }
+    let minx = 1e9, miny = 1e9, maxx = -1e9, maxy = -1e9;
+    s.forEach((p) => { if (p[0] < minx) minx = p[0]; if (p[0] > maxx) maxx = p[0]; if (p[1] < miny) miny = p[1]; if (p[1] > maxy) maxy = p[1]; });
+    const cxp = (minx + maxx) / 2, cyp = (miny + maxy) / 2;
+    const pts = s.map((p) => [(p[0] - cxp) / W(), (p[1] - cyp) / H()]);
+    layers.push({ id: uid++, type: 'draw', pts, color: drawColor, strokeWf: drawWidth, opacity: 1, rot: 0, xf: cxp / W(), yf: cyp / H() });
+    selId = null; commit();   // stay in pen mode so you can keep drawing
+  };
+  const DRAW_COLORS = ['accent', 'primary', '#ffffff', '#111111', '#e0498b', '#2ec16b', '#e8a33d', '#3b82f6'];
+  const renderDrawColors = () => {
+    const box = $('stDrawColors'); if (!box || box.childElementCount) return;
+    DRAW_COLORS.forEach((c) => {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'st-sw'; b.style.background = resolveColor(c); b.title = c;
+      if (c === drawColor) b.classList.add('active');
+      b.addEventListener('click', () => { drawColor = c; box.querySelectorAll('.st-sw').forEach((x) => x.classList.remove('active')); b.classList.add('active'); });
+      box.appendChild(b);
+    });
+  };
+  const setDrawMode = (on) => {
+    drawMode = on;
+    if (on) { selId = null; renderDrawColors(); }
+    const btn = $('stDrawToggle'); if (btn) { btn.textContent = on ? '✓ Done drawing' : '✏️ Start drawing'; btn.classList.toggle('on', on); }
+    const opts = $('stDrawOpts'); if (opts) opts.hidden = !on;
+    if (cv) cv.style.cursor = on ? 'crosshair' : 'move';
+    render(); syncPanel();
   };
   const onDblClick = (e) => {
     const L = hit(pt(e).x, pt(e).y);
@@ -809,6 +868,7 @@ const Studio = (() => {
   const layerLabel = (L) => {
     if (L.type === 'image') return L.src === 'logo' ? 'Logo' : 'Headshot';
     if (L.type === 'photo') return 'Photo';
+    if (L.type === 'draw') return 'Drawing';
     if (L.type === 'ribbon') return 'Ribbon: ' + String(L.text || '').slice(0, 12);
     if (L.type === 'statsstrip') return 'Stats strip';
     if (L.type === 'rect') {
@@ -1523,6 +1583,10 @@ const Studio = (() => {
     $('stAiGen').addEventListener('click', runAi);
     $('stAiEdit').addEventListener('click', runAiEdit);
     $('stAiVibe').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runAi(); } });
+    // freehand pen
+    $('stDrawToggle').addEventListener('click', () => setDrawMode(!drawMode));
+    $('stDrawW').value = Math.round(drawWidth * 1080); slv('stDrawWV', Math.round(drawWidth * 1080) + '');
+    $('stDrawW').addEventListener('input', () => { drawWidth = Math.max(1, Number($('stDrawW').value)) / 1080; slv('stDrawWV', $('stDrawW').value + ''); });
 
     // background: upload, gradient/solid, darken
     $('stUpload').addEventListener('change', (e) => { const files = [...(e.target.files || [])]; e.target.value = ''; if (files.length) uploadFiles(files); });
@@ -1690,6 +1754,7 @@ const Studio = (() => {
     $('stAddHead').disabled = !(ctxData.brand.headImg && ctxData.brand.headImg.width);
     renderBgPicker(); renderTplList(); render(); syncPanel(); renderLayersPanel();
     resetHistory(); dirty = false; guides = []; bgEdit = false;
+    drawing = false; curStroke = null; setDrawMode(false);
     $('stCheats').hidden = true;
     resetAi();
     // offer to restore the previous unsaved session if it's the same listing
