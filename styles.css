@@ -1,4 +1,7 @@
-/* Listing Kit v2 — styles. Offline-safe: system fonts only, no external assets. */
+/* Listing Kit v2 — styles. Offline-safe: self-hosted assets only. */
+/* embedded connecting signature font (Great Vibes, OFL) — renders an identical joined
+   signature on every device, no system font or network needed */
+@font-face { font-family: 'LK Signature'; src: url('signature.woff2?v=53') format('woff2'); font-weight: 400; font-style: normal; font-display: swap; }
 :root {
   --navy: #0f2e3d;
   --navy-2: #16404f;

@@ -30,8 +30,9 @@ const Studio = (() => {
   };
   const SANS = `-apple-system, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif`;
   const SERIF = `Georgia, 'Times New Roman', serif`;
-  // a connecting signature script (Snell Roundhand on Apple, Brush/Segoe Script on Windows)
-  const SCRIPT = `'Snell Roundhand', 'Savoye LET', 'Apple Chancery', 'Brush Script MT', 'Segoe Script', 'Lucida Handwriting', cursive`;
+  // a connecting signature script. 'LK Signature' is an embedded web font (works on EVERY
+  // device, offline); the rest are system connecting-scripts (Apple → Windows → generic).
+  const SCRIPT = `'LK Signature', 'Snell Roundhand', 'Zapfino', 'Savoye LET', 'Apple Chancery', 'Brush Script MT', 'Segoe Script', 'Lucida Calligraphy', cursive`;
   const FAMILY = (f) => f === 'serif' ? SERIF : f === 'script' ? SCRIPT : SANS;
   const COARSE = (() => { try { return matchMedia('(pointer:coarse)').matches; } catch (e) { return false; } })();
 
@@ -1765,6 +1766,8 @@ const Studio = (() => {
     $('stAddLogo').disabled = !(ctxData.brand.logoImg && ctxData.brand.logoImg.width);
     $('stAddHead').disabled = !(ctxData.brand.headImg && ctxData.brand.headImg.width);
     renderBgPicker(); renderTplList(); render(); syncPanel(); renderLayersPanel();
+    // make sure the embedded signature font is loaded, then re-render so any script text uses it
+    try { if (document.fonts && document.fonts.load) document.fonts.load("400 64px 'LK Signature'").then(() => { try { render(); } catch (e) {} }).catch(() => {}); } catch (e) {}
     resetHistory(); dirty = false; guides = []; bgEdit = false;
     drawing = false; curStroke = null; setDrawMode(false);
     $('stCheats').hidden = true;
