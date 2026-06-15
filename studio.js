@@ -257,12 +257,26 @@ const Studio = (() => {
         fill = g;
       }
       ctx2d.fillStyle = fill;
-      if (!L.noFill) {   // noFill = stroke-only (e.g. the classic frame)
-        if (L.shape === 'ellipse') { ctx2d.beginPath(); ctx2d.ellipse(0, 0, bw / 2, bh / 2, 0, 0, Math.PI * 2); ctx2d.fill(); }
-        else if (L.radius) { roundRect(x, y, bw, bh, L.radius); ctx2d.fill(); }
-        else ctx2d.fillRect(x, y, bw, bh);
+      const sh = L.shape;
+      if (sh === 'line') {
+        // a clean rule / line: a rounded-cap stroke whose thickness is the box height
+        ctx2d.strokeStyle = fill; ctx2d.lineWidth = Math.max(1, bh); ctx2d.lineCap = 'round';
+        ctx2d.beginPath(); ctx2d.moveTo(x + bh / 2, 0); ctx2d.lineTo(x + bw - bh / 2, 0); ctx2d.stroke();
+        ctx2d.lineCap = 'butt';
+      } else {
+        const trace = () => {
+          ctx2d.beginPath();
+          if (sh === 'ellipse') ctx2d.ellipse(0, 0, bw / 2, bh / 2, 0, 0, Math.PI * 2);
+          else if (sh === 'triangle') { ctx2d.moveTo(0, y); ctx2d.lineTo(bw / 2, bh / 2); ctx2d.lineTo(-bw / 2, bh / 2); ctx2d.closePath(); }
+          else if (sh === 'diamond') { ctx2d.moveTo(0, y); ctx2d.lineTo(bw / 2, 0); ctx2d.lineTo(0, bh / 2); ctx2d.lineTo(-bw / 2, 0); ctx2d.closePath(); }
+          else if (sh === 'arrow') { const hw = bh * 0.28; ctx2d.moveTo(x, -hw); ctx2d.lineTo(bw * 0.12, -hw); ctx2d.lineTo(bw * 0.12, y); ctx2d.lineTo(bw / 2, 0); ctx2d.lineTo(bw * 0.12, bh / 2); ctx2d.lineTo(bw * 0.12, hw); ctx2d.lineTo(x, hw); ctx2d.closePath(); }
+          else if (sh === 'star') { let a = -Math.PI / 2; const st = Math.PI / 5; ctx2d.moveTo(0, y); for (let i = 0; i < 5; i++) { a += st; ctx2d.lineTo(Math.cos(a) * bw * 0.21, Math.sin(a) * bh * 0.21); a += st; ctx2d.lineTo(Math.cos(a) * bw / 2, Math.sin(a) * bh / 2); } ctx2d.closePath(); }
+          else if (L.radius) roundRect(x, y, bw, bh, L.radius);
+          else ctx2d.rect(x, y, bw, bh);
+        };
+        if (!L.noFill) { trace(); ctx2d.fill(); }
+        if (L.stroke) { ctx2d.lineWidth = Math.max(1, L.strokeWf * w); ctx2d.strokeStyle = resolveColor(L.stroke); trace(); ctx2d.stroke(); }
       }
-      if (L.stroke) { ctx2d.lineWidth = Math.max(1, L.strokeWf * w); ctx2d.strokeStyle = resolveColor(L.stroke); if (L.shape === 'ellipse') { ctx2d.beginPath(); ctx2d.ellipse(0, 0, bw / 2, bh / 2, 0, 0, Math.PI * 2); ctx2d.stroke(); } else { roundRect(x, y, bw, bh, L.radius || 0); ctx2d.stroke(); } }
     } else if (L.type === 'image' || L.type === 'photo') {
       let img, draw, useFilter = '';
       if (L.type === 'photo') {
@@ -443,6 +457,11 @@ const Studio = (() => {
       statsstrip: { ...base, type: 'statsstrip', field: 'stats', text: f.stats || '4 BD · 2 BA · 2 CAR', color: 'primary', size: Math.round(w * 0.028), yf: 0.9, xf: 0.5, shadow: false },
       rect: { id: 0, type: 'rect', shape: 'rect', color: 'primary', xf: 0.5, yf: 0.88, wf: 1, hf: 0.16, radius: 0, opacity: 1, rot: 0 },
       ellipse: { id: 0, type: 'rect', shape: 'ellipse', color: 'accent', xf: 0.5, yf: 0.5, wf: 0.3, hf: 0.3, opacity: 1, rot: 0 },
+      line: { id: 0, type: 'rect', shape: 'line', color: 'primary', xf: 0.5, yf: 0.5, wf: 0.5, hf: 0.012, radius: 0, opacity: 1, rot: 0 },
+      triangle: { id: 0, type: 'rect', shape: 'triangle', color: 'accent', xf: 0.5, yf: 0.5, wf: 0.26, hf: 0.26, radius: 0, opacity: 1, rot: 0 },
+      diamond: { id: 0, type: 'rect', shape: 'diamond', color: 'accent', xf: 0.5, yf: 0.5, wf: 0.24, hf: 0.24, radius: 0, opacity: 1, rot: 0 },
+      arrow: { id: 0, type: 'rect', shape: 'arrow', color: 'accent', xf: 0.5, yf: 0.5, wf: 0.32, hf: 0.18, radius: 0, opacity: 1, rot: 0 },
+      star: { id: 0, type: 'rect', shape: 'star', color: 'accent', xf: 0.5, yf: 0.5, wf: 0.26, hf: 0.26, radius: 0, opacity: 1, rot: 0 },
       scrim: { id: 0, type: 'rect', shape: 'rect', color: 'dark', grad: 'up', xf: 0.5, yf: 0.84, wf: 1, hf: 0.5, radius: 0, opacity: 0.9, rot: 0 },
     };
   };
@@ -565,8 +584,8 @@ const Studio = (() => {
       const factor = Math.hypot(p.x - L._c.cx, p.y - L._c.cy) / drag.startDist;
       if (L.type === 'text' || L.type === 'badge') L.size = Math.max(12, Math.round(drag.startSize * factor));
       else if (L.type === 'rect') {
-        L.hf = Math.min(2, Math.max(0.02, drag.startHf * factor));
-        if (L.shape === 'ellipse') L.wf = Math.min(2, Math.max(0.02, drag.startWf * factor));   // keep the ellipse's aspect
+        L.hf = Math.min(2, Math.max(0.008, drag.startHf * factor));
+        if (L.shape !== 'rect') L.wf = Math.min(2, Math.max(0.02, drag.startWf * factor));   // ellipse/triangle/star/etc keep aspect
       } else { L.wf = Math.min(2, Math.max(0.04, drag.startWf * factor)); if (L.type === 'photo' && drag.startHf) L.hf = Math.min(2, Math.max(0.04, drag.startHf * factor)); }   // image/photo keep aspect (box photos scale both)
       render(); syncPanel(); e.preventDefault(); return;
     }
@@ -792,7 +811,11 @@ const Studio = (() => {
     if (L.type === 'photo') return 'Photo';
     if (L.type === 'ribbon') return 'Ribbon: ' + String(L.text || '').slice(0, 12);
     if (L.type === 'statsstrip') return 'Stats strip';
-    if (L.type === 'rect') return L.grad && L.grad !== 'none' ? 'Scrim' : (L.shape === 'ellipse' ? 'Ellipse' : 'Bar');
+    if (L.type === 'rect') {
+      const SHAPE_NAME = { ellipse: 'Ellipse', triangle: 'Triangle', diamond: 'Diamond', arrow: 'Arrow', star: 'Star', line: 'Line' };
+      if (SHAPE_NAME[L.shape]) return SHAPE_NAME[L.shape];
+      return L.grad && L.grad !== 'none' ? 'Scrim' : 'Bar';
+    }
     const t = (L.text || '').split('\n')[0];
     return (t.length > 18 ? t.slice(0, 18) + '…' : t) || 'Text';
   };
