@@ -173,7 +173,7 @@ const Visuals = (() => {
       circleImg(ctx, brand.headImg, xRight - d / 2, cy, d, alpha('#ffffff', 0.85));
       xRight -= d + h * 0.22;
     }
-    logoImg(ctx, brand.logoImg, xRight, cy, h * 0.52);
+    if (!brand.watermark) logoImg(ctx, brand.logoImg, xRight, cy, h * 0.52);   // watermark mode draws the logo top-right instead
     return h;
   };
 
@@ -366,7 +366,7 @@ const Visuals = (() => {
     const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
     if (sub) { ctx.globalAlpha = 0.8; ctx.font = font(400, kind === 'story' ? 24 : 21); ctx.fillText(sub, m + 16, rowY + (kind === 'story' ? 96 : 84)); ctx.globalAlpha = 1; }
     if (b.headImg && b.headImg.width) circleImg(ctx, b.headImg, W - m - 16 - 50, rowY + (kind === 'story' ? 72 : 64), kind === 'story' ? 110 : 96, b.accent);
-    else logoImg(ctx, b.logoImg, W - m - 16, rowY + (kind === 'story' ? 72 : 64), kind === 'story' ? 80 : 68);
+    else if (!b.watermark) logoImg(ctx, b.logoImg, W - m - 16, rowY + (kind === 'story' ? 72 : 64), kind === 'story' ? 80 : 68);
   };
 
   // =====================  MINIMAL — full-bleed photo + clean white card  ======
@@ -400,7 +400,7 @@ const Visuals = (() => {
     ctx.fillText(b.agentName || '', lx, ay);
     const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
     if (sub) { ctx.font = font(400, story ? 20 : 17); ctx.fillStyle = mut; ctx.fillText(sub, lx, ay + (story ? 30 : 26)); }
-    if (b.logoImg && b.logoImg.width) logoImg(ctx, b.logoImg, cardX + cardW - pad, ay - 6, story ? 56 : 46);
+    if (b.logoImg && b.logoImg.width && !b.watermark) logoImg(ctx, b.logoImg, cardX + cardW - pad, ay - 6, story ? 56 : 46);
     ctx.textAlign = 'left';
   };
 
@@ -477,7 +477,7 @@ const Visuals = (() => {
     ctx.font = font(700, story ? 30 : 26); ctx.fillStyle = fg; ctx.fillText(b.agentName || 'Your Name Here', m, ry);
     const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
     if (sub) { ctx.globalAlpha = 0.82; ctx.font = font(400, story ? 22 : 19); ctx.fillText(sub, m, ry + (story ? 32 : 27)); ctx.globalAlpha = 1; }
-    if (b.logoImg && b.logoImg.width) logoImg(ctx, b.logoImg, W - m, ry, story ? 64 : 52);
+    if (b.logoImg && b.logoImg.width && !b.watermark) logoImg(ctx, b.logoImg, W - m, ry, story ? 64 : 52);
     else if (b.headImg && b.headImg.width) circleImg(ctx, b.headImg, W - m - 40, ry - (story ? 18 : 14), story ? 96 : 78, b.accent);
   };
 

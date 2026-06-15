@@ -81,11 +81,8 @@
   };
 
   // ---------------- brand kit (persisted) ----------------
-  const loadBrand = () => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(BRAND_KEY) || '{}');
-      Object.assign(brand, saved);
-    } catch (e) {}
+  // populate the brand inputs + images from the in-memory `brand` (no storage read)
+  const syncBrandInputs = () => {
     $('agentName').value = brand.agentName; $('brokerage').value = brand.brokerage;
     $('phone').value = brand.phone; $('email').value = brand.email;
     $('brandPrimary').value = brand.primary; $('brandAccent').value = brand.accent;
@@ -109,23 +106,49 @@
     setImgPreview('logo', brand.logo); setImgPreview('head', brand.headshot);
     loadBrandImages();
     markTemplate();
+  };
+  const loadBrand = () => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(BRAND_KEY) || '{}');
+      Object.assign(brand, saved);
+    } catch (e) {}
+    syncBrandInputs();
     // first run: open the brand section so they set it up once
     if (!brand.agentName && !localStorage.getItem(BRAND_KEY)) $('brandSection').open = true;
   };
 
   const saveBrand = () => {
     const { logoImg, headImg, ...persist } = brand;
-    try { localStorage.setItem(BRAND_KEY, JSON.stringify(persist)); } catch (e) {}
+    try { localStorage.setItem(BRAND_KEY, JSON.stringify(persist)); return true; } catch (e) { return false; }
   };
+
+  // downscale an uploaded image to a capped data URL so brand kits + profiles
+  // stay small in localStorage (logos keep PNG transparency; headshots → JPEG)
+  const downscaleImageURL = (dataURL, maxPx, mime, quality) => new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const s = Math.min(1, maxPx / Math.max(img.width, img.height));
+      if (s >= 1 && mime === 'image/png') return resolve(dataURL);   // already small PNG — keep as-is
+      const cv = document.createElement('canvas');
+      cv.width = Math.max(1, Math.round(img.width * s));
+      cv.height = Math.max(1, Math.round(img.height * s));
+      cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+      try { resolve(cv.toDataURL(mime, quality)); } catch (e) { resolve(dataURL); }
+    };
+    img.onerror = () => resolve(dataURL);
+    img.src = dataURL;
+  });
 
   const loadBrandImages = () => {
     ['logo', 'headshot'].forEach((key) => {
       const prop = key === 'logo' ? 'logoImg' : 'headImg';
-      if (brand[key]) {
+      brand[prop] = null;            // clear the stale decoded image synchronously (no flash of the old logo on switch)
+      const src = brand[key];
+      if (src) {
         const img = new Image();
-        img.onload = () => { brand[prop] = img; rerenderVisuals(); };
-        img.src = brand[key];
-      } else brand[prop] = null;
+        img.onload = () => { if (brand[key] === src) { brand[prop] = img; rerenderVisuals(); } };   // ignore a late load for a since-changed logo
+        img.src = src;
+      }
     });
   };
 
@@ -148,10 +171,12 @@
       const f = e.target.files[0];
       if (!f) return;
       const reader = new FileReader();
-      reader.onload = () => {
-        brand[key] = reader.result;
-        setImgPreview(kind, reader.result);
-        saveBrand(); loadBrandImages();
+      reader.onload = async () => {
+        const url = await downscaleImageURL(reader.result, 512, key === 'logo' ? 'image/png' : 'image/jpeg', 0.85);
+        brand[key] = url;
+        setImgPreview(kind, url);
+        if (!saveBrand()) toast('Heads up — storage is nearly full; the image may not persist.');
+        loadBrandImages();
       };
       reader.readAsDataURL(f);
       e.target.value = '';
@@ -225,13 +250,14 @@
   const PROFILES_KEY = 'lk_profiles_v1';
   let profiles = [];
   try { const a = JSON.parse(localStorage.getItem(PROFILES_KEY) || '[]'); if (Array.isArray(a)) profiles = a.filter((p) => p && p.id && p.name && p.brand); } catch (e) {}
-  const saveProfiles = () => { try { localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); } catch (e) {} };
-  const snapshotBrand = () => { const { logoImg, headImg, ...persist } = brand; return persist; };
+  const saveProfiles = () => { try { localStorage.setItem(PROFILES_KEY, JSON.stringify(profiles)); return true; } catch (e) { return false; } };
+  const snapshotBrand = () => { const { logoImg, headImg, ...persist } = brand; return { ...persist, prefs: { ...(persist.prefs || {}) } }; };
   const applyProfile = (id) => {
     const pr = profiles.find((q) => q.id === id); if (!pr) return;
     Object.assign(brand, pr.brand);
-    saveBrand();    // persist the switched-in kit, then repopulate inputs + images from it
-    loadBrand();
+    brand.prefs = { ...(pr.brand.prefs || {}) };   // own copy so later house-style edits don't mutate the saved profile
+    saveBrand();
+    syncBrandInputs();   // repopulate from memory (a failed save can't revert the switch)
     rerenderVisuals();
     toast('Switched to “' + pr.name + '”');
   };
@@ -250,8 +276,10 @@
     add.addEventListener('click', () => {
       const name = (prompt('Name this brand profile (e.g. “Personal” or “Acme Realty”):', brand.brokerage || brand.agentName || 'My brand') || '').trim();
       if (!name) return;
+      if (profiles.length >= 12) { toast('Profile limit reached (12) — delete one first'); return; }
       profiles.push({ id: 'P' + Date.now() + Math.floor(Math.random() * 1e4), name: name.slice(0, 40), brand: snapshotBrand() });
-      saveProfiles(); renderProfiles(); toast('✓ Brand profile saved');
+      if (saveProfiles()) { renderProfiles(); toast('✓ Brand profile saved'); }
+      else { profiles.pop(); toast('Couldn’t save — storage may be full'); }
     });
     row.appendChild(add);
   };
@@ -534,14 +562,14 @@
     updateComplianceDot();
   };
 
-  const generate = () => {
+  const generate = (auto) => {
     const data = readForm();
     snapshotAll(); // so Undo can revert a Reword/regenerate
     outputs = Generator.applyPrefs(Generator.generate(data), brand.prefs || {});
     runScan();
     $('emptyState').hidden = true;
     renderTab(activeTab);
-    markDone('kit');
+    if (auto !== true) markDone('kit');   // don't auto-tick when re-generating a reopened listing
   };
 
   const vizData = () => {
@@ -1609,7 +1637,7 @@
   const saveCurrentListing = async () => {
     if (!$('address').value.trim() && !photos.length) { toast('Add an address or a photo first'); return; }
     const fields = {}; LISTING_FIELDS.forEach((id) => { fields[id] = $(id).value; });
-    const rec = { id: 'L' + Date.now() + Math.floor(Math.random() * 1e4), savedAt: Date.now(), title: ($('address').value.trim() || 'Untitled listing'), mode, heroIndex, fields, photos: photos.map((p) => ({ dataURL: photoToDataURL(p), name: p.name, filter: p.filter, focus: p.focus, inCarousel: p.inCarousel })).filter((p) => p.dataURL) };
+    const rec = { id: 'L' + Date.now() + Math.floor(Math.random() * 1e4), savedAt: Date.now(), title: ($('address').value.trim() || 'Untitled listing'), mode, heroIndex, fields, checklist: { ...checklist }, photos: photos.map((p) => ({ dataURL: photoToDataURL(p), name: p.name, filter: p.filter, focus: p.focus, inCarousel: p.inCarousel })).filter((p) => p.dataURL) };
     try { await libPut(rec); renderLibrary(); toast('✓ Saved to this device'); } catch (e) { toast('Couldn’t save — storage may be full or blocked'); }
   };
   const openListing = async (id) => {
@@ -1622,7 +1650,9 @@
     heroIndex = Math.min(Math.max(0, rec.heroIndex || 0), Math.max(0, photos.length - 1));
     syncFcss(); renderPhotoGrid(); clearMissingFlags();
     $('librarySection').open = false;
-    generate();
+    generate(true);   // re-generate without auto-ticking the checklist
+    checklist = (rec.checklist && typeof rec.checklist === 'object') ? rec.checklist : {};
+    renderChecklist();
     toast('Listing opened');
   };
   const cloneListing = async (id) => { const rec = await libGet(id); if (!rec) return; await libPut({ ...rec, id: 'L' + Date.now() + Math.floor(Math.random() * 1e4), savedAt: Date.now(), title: (rec.title || 'Listing') + ' (copy)' }); renderLibrary(); toast('Cloned'); };
