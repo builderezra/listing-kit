@@ -243,10 +243,12 @@ const Studio = (() => {
         fill = g;
       }
       ctx2d.fillStyle = fill;
-      if (L.shape === 'ellipse') { ctx2d.beginPath(); ctx2d.ellipse(0, 0, bw / 2, bh / 2, 0, 0, Math.PI * 2); ctx2d.fill(); }
-      else if (L.radius) { roundRect(x, y, bw, bh, L.radius); ctx2d.fill(); }
-      else ctx2d.fillRect(x, y, bw, bh);
-      if (L.stroke) { ctx2d.lineWidth = Math.max(1, L.strokeWf * w); ctx2d.strokeStyle = resolveColor(L.stroke); if (L.shape === 'ellipse') ctx2d.stroke(); else { roundRect(x, y, bw, bh, L.radius || 0); ctx2d.stroke(); } }
+      if (!L.noFill) {   // noFill = stroke-only (e.g. the classic frame)
+        if (L.shape === 'ellipse') { ctx2d.beginPath(); ctx2d.ellipse(0, 0, bw / 2, bh / 2, 0, 0, Math.PI * 2); ctx2d.fill(); }
+        else if (L.radius) { roundRect(x, y, bw, bh, L.radius); ctx2d.fill(); }
+        else ctx2d.fillRect(x, y, bw, bh);
+      }
+      if (L.stroke) { ctx2d.lineWidth = Math.max(1, L.strokeWf * w); ctx2d.strokeStyle = resolveColor(L.stroke); if (L.shape === 'ellipse') { ctx2d.beginPath(); ctx2d.ellipse(0, 0, bw / 2, bh / 2, 0, 0, Math.PI * 2); ctx2d.stroke(); } else { roundRect(x, y, bw, bh, L.radius || 0); ctx2d.stroke(); } }
     } else if (L.type === 'image' || L.type === 'photo') {
       let img, draw, useFilter = '';
       if (L.type === 'photo') {
@@ -258,7 +260,17 @@ const Studio = (() => {
       if (!img || !img.width) { ctx2d.restore(); L._c = { cx, cy, w: 0, h: 0, rot: L.rot || 0, pad: 0 }; return; }
       if (useFilter) { try { ctx2d.filter = useFilter; } catch (e) {} }
       const dw = L.wf * w;
-      if (L.shape === 'circle') {
+      if (L.type === 'photo' && L.hf) {
+        // cover-fit into a wf×hf box (used by the faithful template reproductions)
+        const bxw = L.wf * w, bxh = L.hf * h;
+        ctx2d.save();
+        if (L.shape === 'circle') { ctx2d.beginPath(); ctx2d.arc(0, 0, Math.min(bxw, bxh) / 2, 0, Math.PI * 2); ctx2d.clip(); }
+        else if (L.radius) { roundRect(-bxw / 2, -bxh / 2, bxw, bxh, L.radius); ctx2d.clip(); }
+        else { ctx2d.beginPath(); ctx2d.rect(-bxw / 2, -bxh / 2, bxw, bxh); ctx2d.clip(); }
+        drawCover(draw, -bxw / 2, -bxh / 2, bxw, bxh, L.focus, L.crop);
+        ctx2d.restore();
+        bw = bxw; bh = bxh;
+      } else if (L.shape === 'circle') {
         const d = dw, s = Math.max(d / draw.width, d / draw.height);
         ctx2d.save(); ctx2d.beginPath(); ctx2d.arc(0, 0, d / 2, 0, Math.PI * 2); ctx2d.clip();
         ctx2d.drawImage(draw, -draw.width * s / 2, -draw.height * s / 2, draw.width * s, draw.height * s);
@@ -489,7 +501,7 @@ const Studio = (() => {
       else if (L.type === 'rect') {
         L.hf = Math.min(2, Math.max(0.02, drag.startHf * factor));
         if (L.shape === 'ellipse') L.wf = Math.min(2, Math.max(0.02, drag.startWf * factor));   // keep the ellipse's aspect
-      } else L.wf = Math.min(2, Math.max(0.04, drag.startWf * factor));   // image/photo keep aspect (height derived)
+      } else { L.wf = Math.min(2, Math.max(0.04, drag.startWf * factor)); if (L.type === 'photo' && drag.startHf) L.hf = Math.min(2, Math.max(0.04, drag.startHf * factor)); }   // image/photo keep aspect (box photos scale both)
       render(); syncPanel(); e.preventDefault(); return;
     }
     let xf = Math.min(1, Math.max(0, (p.x - drag.dx) / W()));
@@ -577,6 +589,7 @@ const Studio = (() => {
     const f = t.filter;
     $('stPhTitle').childNodes[0].nodeValue = isBg ? 'Background photo ' : 'Photo ';
     $('stPhHint').textContent = isBg ? '— adjust, crop & reposition' : '— drag & corner-resize on the canvas';
+    const applyRow = $('stBgApplyRow'); if (applyRow) applyRow.hidden = !(isBg && ctxData && ctxData.onApplyPhotoAdjust);
     $('stPhShapeRow').style.display = isBg ? 'none' : '';
     if (!isBg) {
       $('stPhRect').classList.toggle('on', t.shape !== 'rounded' && t.shape !== 'circle');
@@ -777,6 +790,114 @@ const Studio = (() => {
     const ls = s.layers.map((k) => ({ ...p[k], id: uid++ }));
     if (s.tweak) s.tweak(ls);
     layers = ls; selId = null; renderBgPicker(); commit();
+  };
+
+  // ---- faithful, editable reproductions of the generated graphic styles ------
+  const rebuildStyle = (tpl) => {
+    const W = SIZES[sizeKey][0], H = SIZES[sizeKey][1];
+    const k = (sizeKey === 'portrait') ? 'square' : sizeKey;   // visuals styles are square/story/wide
+    const b = ctxData.brand, f = ctxData.fields;
+    const onP = Visuals.onColor(b.primary);
+    const serif = b.font === 'serif', sans = b.font === 'sans';
+    const priceFont = (def) => serif ? 'serif' : sans ? 'sans' : def;
+    const out = [];
+    const measureW = (t, wt, size, fam) => { ctx2d.font = `${wt} ${size}px ${fam === 'serif' ? SERIF : SANS}`; return ctx2d.measureText(String(t)).width; };
+    const push = (o) => { out.push({ id: uid++, opacity: 1, rot: 0, ...o }); return out[out.length - 1]; };
+    const leftText = (t, mpx, baseY, size, o = {}) => { const fam = o.font || 'sans', wt = o.weight || 400; const w = measureW(t, wt, size, fam); return push({ type: 'text', text: String(t), size, weight: wt, font: fam, color: o.color || '#ffffff', align: 'left', shadow: !!o.shadow, xf: (mpx + w / 2) / W, yf: (baseY - size * 0.35) / H }); };
+    const ctrText = (t, cxpx, baseY, size, o = {}) => push({ type: 'text', text: String(t), size, weight: o.weight || 400, font: o.font || 'sans', color: o.color || '#ffffff', align: 'center', shadow: !!o.shadow, xf: cxpx / W, yf: (baseY - size * 0.35) / H });
+    const badgeTL = (text, xpx, ypx, size, color) => { const bw = measureW(text, 800, size, 'sans') + size * 1.4, bh = size * 1.85; return push({ type: 'badge', text: String(text), size, weight: 800, color, font: 'sans', align: 'center', xf: (xpx + bw / 2) / W, yf: (ypx + bh / 2) / H }); };
+    const logoRight = (xRightPx, cyPx, maxH) => {
+      const img = b.logoImg; if (!img || !img.width) return;
+      const s = Math.min(maxH / img.height, 280 / img.width), lw = img.width * s;
+      push({ type: 'image', src: 'logo', shape: 'rect', wf: lw / W, xf: (xRightPx - lw / 2) / W, yf: cyPx / H });
+    };
+    const brandBarL = (barH) => {
+      push({ type: 'rect', shape: 'rect', color: 'primary', wf: 1, hf: barH / H, xf: 0.5, yf: (H - barH / 2) / H, radius: 0, grad: 'none' });
+      const pad = barH * 0.36, cy = H - barH / 2;
+      const name = b.agentName || 'Your Name Here';
+      const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
+      leftText(name, pad, cy - (sub ? barH * 0.06 : -barH * 0.1), barH * 0.3, { weight: 700, color: onP });
+      if (sub) leftText(sub, pad, cy + barH * 0.27 + barH * 0.11, barH * 0.22, { weight: 400, color: onP });
+      let xRight = W - pad;
+      if (b.headImg && b.headImg.width) { const dd = barH * 0.62; push({ type: 'image', src: 'head', shape: 'circle', wf: dd / W, xf: (xRight - dd / 2) / W, yf: cy / H }); xRight -= dd + barH * 0.22; }
+      logoRight(xRight, cy, barH * 0.52);
+    };
+
+    if (tpl === 'modern') {
+      bg = ctxData.photos.length ? { type: 'photo', photoIndex: (bg.type === 'photo' ? bg.photoIndex : 0) } : { type: 'color', color: 'primary' };
+      push({ type: 'rect', shape: 'rect', color: '#080e12', grad: 'up', wf: 1, hf: 0.6, xf: 0.5, yf: 0.7, opacity: 0.9, radius: 0 });
+      const m = k === 'wide' ? 40 : 48, badgeSize = k === 'wide' ? 22 : 28;
+      if (f.badge) badgeTL(f.badge, m, m, badgeSize, 'accent');
+      const barH = k === 'story' ? 130 : k === 'wide' ? 88 : 110;
+      brandBarL(barH);
+      const priceSize = k === 'story' ? 96 : k === 'wide' ? 60 : 84, addrSize = k === 'story' ? 40 : k === 'wide' ? 27 : 36, statSize = k === 'story' ? 30 : k === 'wide' ? 21 : 27;
+      let y = H - barH - m * 0.8;
+      if (f.stats) { leftText(f.stats, m, y, statSize, { weight: 600 }); y -= statSize * 1.7; }
+      if (f.address) { leftText(f.address, m, y, addrSize, { weight: 400 }); y -= addrSize * 1.45; }
+      if (f.price) leftText(f.price, m, y, priceSize, { weight: 800, font: priceFont('sans') });
+    } else if (tpl === 'classic') {
+      bg = { type: 'color', color: '#faf7f2' };
+      const ink = '#23333b', mut = '#5d6e75', m = 64;
+      push({ type: 'rect', shape: 'rect', color: '#faf7f2', noFill: true, stroke: 'accent', strokeWf: 2 / W, wf: (W - 52) / W, hf: (H - 52) / H, xf: 0.5, yf: 0.5, radius: 0 });
+      if (k === 'wide') {
+        const cX = (W + 640) / 2;
+        if (ctxData.photos.length) push({ type: 'photo', photoIndex: 0, shape: 'rect', wf: 596 / W, hf: (H - 88) / H, xf: (44 + 298) / W, yf: 0.5 });
+        if (f.badge) badgeTL(f.badge, 64, 64, 19, 'accent');
+        let y = 175;
+        if (f.price) { ctrText(f.price, cX, y + 40, 58, { weight: 700, font: priceFont('serif'), color: b.primary }); y += 95; }
+        if (f.address) { ctrText(f.address, cX, y + 10, 26, { weight: 400, color: ink }); y += 52; }
+        push({ type: 'rect', shape: 'rect', color: 'accent', wf: 90 / W, hf: 3 / H, xf: cX / W, yf: (y + 1.5) / H, radius: 0 }); y += 45;
+        if (f.stats) ctrText(f.stats, cX, y, 21, { weight: 600, color: ink });
+        ctrText(b.agentName || 'Your Name Here', cX, H - 124, 24, { weight: 700, color: ink });
+        const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
+        if (sub) ctrText(sub, cX, H - 88, 19, { weight: 400, color: mut });
+      } else {
+        const photoW = W - m * 2, mainH = k === 'story' ? 1010 : 590;
+        if (ctxData.photos.length) push({ type: 'photo', photoIndex: 0, shape: 'rect', wf: photoW / W, hf: mainH / H, xf: 0.5, yf: (m + mainH / 2) / H });
+        if (f.badge) badgeTL(f.badge, m + 22, m + 22, k === 'story' ? 26 : 22, 'accent');
+        let y = m + mainH + (k === 'story' ? 84 : 84);
+        if (f.price) { ctrText(f.price, W / 2, y, k === 'story' ? 88 : 72, { weight: 700, font: priceFont('serif'), color: b.primary }); y += 58; }
+        if (f.address) { ctrText(f.address, W / 2, y, k === 'story' ? 36 : 31, { weight: 400, color: ink }); y += 52; }
+        push({ type: 'rect', shape: 'rect', color: 'accent', wf: 90 / W, hf: 3 / H, xf: 0.5, yf: (y - 14) / H, radius: 0 }); y += 38;
+        if (f.stats) ctrText(f.stats, W / 2, y, k === 'story' ? 28 : 24, { weight: 600, color: ink });
+        const baseY = H - (k === 'story' ? 120 : 96);
+        if (b.headImg && b.headImg.width) push({ type: 'image', src: 'head', shape: 'circle', wf: (k === 'story' ? 120 : 92) / W, xf: 0.5, yf: (baseY - (k === 'story' ? 110 : 88)) / H });
+        ctrText(b.agentName || 'Your Name Here', W / 2, baseY, k === 'story' ? 30 : 26, { weight: 700, color: ink });
+        const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
+        if (sub) ctrText(sub, W / 2, baseY + (k === 'story' ? 38 : 32), k === 'story' ? 24 : 20, { weight: 400, color: mut });
+      }
+    } else {   // bold
+      bg = { type: 'gradient', c1: Visuals.shade(b.primary, 14), c2: Visuals.shade(b.primary, -34), angle: 90 };
+      const fg = onP, m = k === 'wide' ? 44 : 48;
+      if (k === 'wide') {
+        if (ctxData.photos.length) push({ type: 'photo', photoIndex: 0, shape: 'rounded', radius: 26, wf: 560 / W, hf: (H - m * 2) / H, xf: (W - 560 - m + 280) / W, yf: 0.5 });
+        const cX = m + 12;
+        if (f.badge) badgeTL(f.badge, cX, 72, 21, 'accent');
+        let y = 250;
+        if (f.price) { leftText(f.price, cX, y, 64, { weight: 800, font: priceFont('sans'), color: fg }); y += 52; }
+        if (f.address) { leftText(f.address, cX, y, 26, { weight: 400, color: fg }); y += 64; }
+        if (f.stats) push({ type: 'statsstrip', text: f.stats, color: 'accent', size: 20, xf: (cX + 150) / W, yf: (y + 20) / H, weight: 700 });
+        leftText(b.agentName || 'Your Name Here', cX, H - 108, 24, { weight: 700, color: fg });
+        const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
+        if (sub) leftText(sub, cX, H - 72, 19, { weight: 400, color: fg });
+      } else {
+        const photoH = k === 'story' ? 1100 : 540;
+        if (ctxData.photos.length) push({ type: 'photo', photoIndex: 0, shape: 'rounded', radius: 30, wf: (W - m * 2) / W, hf: photoH / H, xf: 0.5, yf: (m + photoH / 2) / H });
+        if (f.badge) push({ type: 'badge', text: f.badge, size: k === 'story' ? 30 : 26, weight: 800, color: 'accent', font: 'sans', align: 'center', rot: -8, xf: (m + 90) / W, yf: (m + photoH - 10) / H });
+        let y = m + photoH + (k === 'story' ? 150 : 110);
+        if (f.price) { leftText(f.price, m + 16, y, k === 'story' ? 104 : 88, { weight: 800, font: priceFont('sans'), color: fg }); y += k === 'story' ? 66 : 56; }
+        if (f.address) { leftText(f.address, m + 16, y, k === 'story' ? 38 : 33, { weight: 400, color: fg }); y += k === 'story' ? 84 : 66; }
+        if (f.stats) push({ type: 'statsstrip', text: f.stats, color: 'accent', size: k === 'story' ? 26 : 23, xf: 0.5, yf: (y + 20) / H, weight: 700 });
+        const rowY = H - (k === 'story' ? 150 : 130);
+        push({ type: 'rect', shape: 'rect', color: 'accent', wf: (W - (m + 16) * 2) / W, hf: 2 / H, xf: 0.5, yf: rowY / H, radius: 0, opacity: 0.55 });
+        leftText(b.agentName || 'Your Name Here', m + 16, rowY + (k === 'story' ? 58 : 50), k === 'story' ? 32 : 28, { weight: 700, color: fg });
+        const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
+        if (sub) leftText(sub, m + 16, rowY + (k === 'story' ? 96 : 84), k === 'story' ? 24 : 21, { weight: 400, color: fg });
+        if (b.headImg && b.headImg.width) push({ type: 'image', src: 'head', shape: 'circle', wf: (k === 'story' ? 110 : 96) / W, xf: (W - m - 16 - 50) / W, yf: (rowY + (k === 'story' ? 72 : 64)) / H });
+        else logoRight(W - m - 16, rowY + (k === 'story' ? 72 : 64), k === 'story' ? 80 : 68);
+      }
+    }
+    layers = out; selId = null; bgEdit = false; renderBgPicker(); commit();
   };
 
   // ---- my templates (save layout, reuse on any listing) ---------------------
@@ -1042,6 +1163,7 @@ const Studio = (() => {
     document.querySelectorAll('#stSizes button').forEach((b) => b.addEventListener('click', () => { sizeKey = b.dataset.size; document.querySelectorAll('#stSizes button').forEach((x) => x.classList.toggle('active', x === b)); commit(); }));
     document.querySelectorAll('#stAdd button').forEach((b) => b.addEventListener('click', () => add(b.dataset.add)));
     document.querySelectorAll('#stStarters button').forEach((b) => b.addEventListener('click', () => applyStarter(b.dataset.tpl)));
+    document.querySelectorAll('#stRebuild button').forEach((b) => b.addEventListener('click', () => rebuildStyle(b.dataset.style)));
     $('stAiGen').addEventListener('click', runAi);
     $('stAiVibe').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runAi(); } });
 
@@ -1062,6 +1184,7 @@ const Studio = (() => {
 
     // photo editing — applies to the selected photo LAYER or the BACKGROUND (bgEdit)
     $('stBgEdit').addEventListener('click', () => { if (bg.type !== 'photo') return; bgEdit = true; selId = null; bg.filter = bg.filter || {}; render(); syncPanel(); renderLayersPanel(); const pc = $('stPhotoCtl'); if (pc && pc.scrollIntoView) pc.scrollIntoView({ block: 'nearest' }); });
+    $('stBgApplyAll').addEventListener('click', () => { if (bgEdit && bg.type === 'photo' && ctxData.onApplyPhotoAdjust) ctxData.onApplyPhotoAdjust(bg.photoIndex, bg.filter || {}); });
     const ph = (fn) => () => { const t = photoT(); if (t) fn(t); };
     const phShape = (s) => ph((t) => { if (t !== bg) { t.shape = s; commit(); } });
     $('stPhRect').addEventListener('click', phShape('rect'));
@@ -1189,33 +1312,8 @@ const Studio = (() => {
       add('agent');
       if (f.address) { add('address'); const a = layers[layers.length - 1]; if (a) a.yf = 0.5; }
     } else {
-      // seed a layout that matches the brand's chosen design template
-      const tpl = ctxData.brand.templateId;
-      const serif = (ctxData.brand.font === 'serif') || (ctxData.brand.font === 'auto' && tpl === 'classic');
-      const seeded = [];
-      const seed = (k) => { add(k); const L = layers[layers.length - 1]; if (L) seeded.push(L); return L; };
-      if (tpl === 'classic') {
-        // editorial: serif, centred (mirrors the classic graphic)
-        if (f.badge) { const b = seed('badge'); b.xf = 0.5; b.yf = 0.16; }
-        if (f.price) { const p = seed('price'); p.yf = 0.46; }
-        if (f.address) { const a = seed('address'); a.yf = 0.56; }
-        if (f.stats) { const s = seed('stats'); s.yf = 0.62; }
-        seeded.forEach((L) => { L.font = 'serif'; });
-      } else if (tpl === 'bold') {
-        // colour-block, heavy weight
-        seed('scrim');
-        if (f.badge) seed('badge');
-        if (f.price) { const p = seed('price'); p.weight = 900; }
-        if (f.address) seed('address');
-        if (f.stats) seed('stats');
-        if (serif) seeded.forEach((L) => { if (L.type === 'text' || L.type === 'badge') L.font = 'serif'; });
-      } else {
-        // modern (default): photo + bottom text
-        if (f.badge) seed('badge');
-        if (f.price) seed('price');
-        if (f.address) seed('address');
-        if (serif) seeded.forEach((L) => { if (L.type === 'text' || L.type === 'badge') L.font = 'serif'; });
-      }
+      // faithfully reproduce the brand's chosen graphic style as editable layers
+      rebuildStyle(ctxData.brand.templateId || 'modern');
     }
     replaying = false;
     selId = null;

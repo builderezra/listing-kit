@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=28" />
+  <link rel="stylesheet" href="styles.css?v=30" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -568,6 +568,14 @@
           <button type="button" id="stRestoreNo" class="link">Start fresh</button>
         </div>
         <div class="st-group">
+          <div class="st-group-title">Rebuild a generated style <span class="hint">— recreate a graphic as editable layers (uses the size above)</span></div>
+          <div class="st-add" id="stRebuild">
+            <button type="button" data-style="modern">🎨 Modern</button>
+            <button type="button" data-style="classic">📜 Classic</button>
+            <button type="button" data-style="bold">⬛ Bold</button>
+          </div>
+        </div>
+        <div class="st-group">
           <div class="st-group-title">Quick start <span class="hint">— a ready-made layout you can tweak</span></div>
           <div class="st-add" id="stStarters">
             <button type="button" data-tpl="bar">Bottom bar</button>
@@ -631,6 +639,10 @@
         </div>
         <div class="st-group" id="stPhotoCtl" hidden>
           <div class="st-group-title" id="stPhTitle">Photo <span class="hint" id="stPhHint">— drag &amp; corner-resize on the canvas</span></div>
+          <div class="st-bg-apply" id="stBgApplyRow" hidden>
+            <span class="hint">These edits affect this design only.</span>
+            <button type="button" id="stBgApplyAll">Apply to all my graphics too</button>
+          </div>
           <div class="st-row" id="stPhShapeRow">
             <button type="button" id="stPhRect">▭ Rect</button>
             <button type="button" id="stPhRound">▢ Rounded</button>
@@ -797,15 +809,15 @@
     </div>
   </div>
 
-  <script src="generator.js?v=28"></script>
-  <script src="fairhousing.js?v=28"></script>
-  <script src="parser.js?v=28"></script>
-  <script src="importer.js?v=28"></script>
-  <script src="visuals.js?v=28"></script>
-  <script src="flyer.js?v=28"></script>
-  <script src="ai.js?v=28"></script>
-  <script src="studio.js?v=28"></script>
-  <script src="tour.js?v=28"></script>
-  <script src="app.js?v=28"></script>
+  <script src="generator.js?v=30"></script>
+  <script src="fairhousing.js?v=30"></script>
+  <script src="parser.js?v=30"></script>
+  <script src="importer.js?v=30"></script>
+  <script src="visuals.js?v=30"></script>
+  <script src="flyer.js?v=30"></script>
+  <script src="ai.js?v=30"></script>
+  <script src="studio.js?v=30"></script>
+  <script src="tour.js?v=30"></script>
+  <script src="app.js?v=30"></script>
 </body>
 </html>

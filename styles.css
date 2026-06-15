@@ -105,6 +105,11 @@ body {
   *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
 }
 
+/* "apply photo edits to all graphics" choice */
+.st-bg-apply { background: var(--hi); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; margin: 0 0 8px; display: flex; flex-direction: column; gap: 6px; }
+.st-bg-apply[hidden] { display: none; }
+.st-bg-apply button { font: 700 12px var(--sans); background: var(--teal); color: #fff; border: none; border-radius: 7px; padding: 7px 10px; cursor: pointer; }
+
 /* legibility warning chip in the studio */
 .st-contrast { font-size: 12px; background: #fdf3e3; color: #4a3410; border: 1px solid #f0d8a8; border-radius: 8px; padding: 7px 10px; margin: 0 0 10px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .st-contrast[hidden] { display: none; }

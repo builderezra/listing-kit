@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v28';
+  const APP_VERSION = 'v30';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -618,6 +618,14 @@
       seed: opt.seed || null,
       // lets the studio upload a photo straight into the listing gallery
       addPhoto: async (file) => { const ok = await addPhotoBlob(file, 'studio'); if (!ok) return null; syncFcss(); return photos[photos.length - 1]; },
+      // "Apply to all my graphics" — push the transferable basic adjustments to the real photo
+      onApplyPhotoAdjust: (idx, filter) => {
+        const p = photos[idx]; if (!p) return;
+        p.filter = { b: filter.b != null ? filter.b : 100, c: filter.c != null ? filter.c : 100, s: filter.s != null ? filter.s : 100, w: filter.sep || 0 };
+        syncFcss(); rerenderVisuals();
+        const adv = filter.highlights || filter.shadows || filter.tint || filter.vignette || filter.sharpness;
+        toast(adv ? 'Brightness/contrast applied to all graphics (the studio-only effects stay here)' : '✓ Applied to all your graphics');
+      },
       // closed with unsaved edits → point a friendly notifier at the launcher
       onClose: (wasDirty) => { if (wasDirty) showStudioHint(); },
     }, 'square');
