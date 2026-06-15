@@ -1364,6 +1364,44 @@ const Studio = (() => {
       aiStatus(typeof AI !== 'undefined' && AI.explain ? AI.explain(e) : 'AI design failed — try again.', 'err');
     } finally { btn.disabled = false; btn.textContent = 'Generate'; }
   };
+  // a readable summary of the current design so the AI can edit it (not start over)
+  const describeDesign = () => {
+    const bgDesc = bg.type === 'photo' ? 'a listing photo' : bg.type === 'gradient' ? `a ${bg.c1}→${bg.c2} gradient` : `a solid ${bg.color || 'brand'} colour`;
+    const at = (L) => `(${(L.xf || 0).toFixed(2)}, ${(L.yf || 0).toFixed(2)})`;
+    const lines = layers.map((L) => {
+      if (L.type === 'text' || L.type === 'badge') { const ref = L.field || (L.type === 'badge' ? 'badge' : 'label'); return `- ${L.type === 'badge' ? 'badge' : ref} "${String(L.text || '').replace(/\n/g, ' ').slice(0, 26)}" — size ${L.size}, ${L.color}, ${L.align}, at ${at(L)}`; }
+      if (L.type === 'statsstrip') return `- stats chips, ${L.color}, at ${at(L)}`;
+      if (L.type === 'rect') return `- ${L.shape || 'rect'} shape, ${L.color}${L.grad && L.grad !== 'none' ? ' gradient' : ''}, ${Math.round((L.wf || 0) * 100)}%×${Math.round((L.hf || 0) * 100)}%, at ${at(L)}`;
+      if (L.type === 'image') return `- ${L.src === 'logo' ? 'logo' : 'headshot'} at ${at(L)}`;
+      if (L.type === 'photo') return `- a photo block at ${at(L)}`;
+      return `- ${L.type} at ${at(L)}`;
+    });
+    return `Size: ${sizeKey}. Background: ${bgDesc}.\nLayers (back to front):\n${lines.join('\n') || '(none)'}`;
+  };
+  const runAiEdit = async () => {
+    if (typeof AI === 'undefined' || !AI.available()) { aiStatus('Add your Anthropic API key in “Your brand” (close the studio first) to use AI.', 'err'); return; }
+    const instruction = $('stAiVibe').value.trim();
+    if (!instruction) { aiStatus('Type the change you want first — e.g. “make the price bigger”, “darker & more upmarket”, “move the agent details up”.', 'err'); $('stAiVibe').focus(); return; }
+    if (!layers.length) { aiStatus('Nothing to restyle yet — Generate, or Rebuild a style, first.', 'err'); return; }
+    const btn = $('stAiEdit'), gen = $('stAiGen'); btn.disabled = true; gen.disabled = true; const old = btn.textContent; btn.textContent = '…';
+    aiVariations = []; renderAiPicker();
+    let secs = 0; aiStatus('Restyling…');
+    const tick = setInterval(() => { secs++; aiStatus(`Restyling… ${secs}s (usually 10–25s)`); }, 1000);
+    try {
+      const dims = SIZES[sizeKey];
+      aiVariations = await AI.editLayout({
+        size: sizeKey, w: dims[0], h: dims[1], n: 3, instruction, current: describeDesign(),
+        photoCount: ctxData.photos.length, facts: ctxData.fields, brand: ctxData.brand,
+        hasLogo: !!(ctxData.brand.logoImg && ctxData.brand.logoImg.width), hasHead: !!(ctxData.brand.headImg && ctxData.brand.headImg.width),
+      });
+      clearInterval(tick);
+      aiStatus(`✓ ${aiVariations.length} restyle${aiVariations.length === 1 ? '' : 's'} — tap one to apply (Undo to revert).`);
+      renderAiPicker();
+    } catch (e) {
+      clearInterval(tick);
+      aiStatus(typeof AI !== 'undefined' && AI.explain ? AI.explain(e) : 'AI restyle failed — try again.', 'err');
+    } finally { btn.disabled = false; gen.disabled = false; btn.textContent = old; }
+  };
   const resetAi = () => { aiVariations = []; renderAiPicker(); aiStatus(''); if ($('stAiVibe')) $('stAiVibe').value = ''; };
 
   // ---- quick actions: place on canvas, fit text, copy-to-clipboard, eyedropper
@@ -1483,6 +1521,7 @@ const Studio = (() => {
     document.querySelectorAll('#stStarters button').forEach((b) => b.addEventListener('click', () => applyStarter(b.dataset.tpl)));
     document.querySelectorAll('#stRebuild button').forEach((b) => b.addEventListener('click', () => rebuildStyle(b.dataset.style)));
     $('stAiGen').addEventListener('click', runAi);
+    $('stAiEdit').addEventListener('click', runAiEdit);
     $('stAiVibe').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); runAi(); } });
 
     // background: upload, gradient/solid, darken

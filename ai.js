@@ -182,6 +182,15 @@ Now produce the JSON.`;
     return designs;
   };
 
+  // ---- AI restyle: EDIT the current design per an instruction ---------------
+  const editLayout = async (ctx) => {
+    const sys = designSystem(ctx) + `\n\nYOU ARE EDITING AN EXISTING DESIGN, not starting from scratch. The design currently on the canvas is:\n${ctx.current}\n\nKeep its overall composition and everything the instruction does NOT mention; change only what the instruction asks (and anything required to keep it readable and on-brand). Every rule and the SAFETY line above still apply, and you must still bind text via textRef — never type a fact value.`;
+    const user = `Apply this change to the current design and return ${ctx.n} edited ${ctx.size} variation(s) as JSON (best first): "${String(ctx.instruction).slice(0, 240)}".`;
+    const designs = parseDesigns(await call(sys, user, 3000));
+    if (!designs.length) throw new Error('The AI didn’t return a usable restyle — try again.');
+    return designs;
+  };
+
   // ---- AI design styling (text-only → template + colours + font) ------------
   const STYLE_SYSTEM = [
     'You are a brand designer for real estate marketing. Given a vibe, choose a cohesive visual identity.',
@@ -255,5 +264,5 @@ Now produce the JSON.`;
     return e && e.message ? e.message : 'Something went wrong.';
   };
 
-  return { MODELS, available, getKey, setKey, getModel, setModel, modelLabel, polish, instruct, research, designStyle, designLayout, compliance, test, explain };
+  return { MODELS, available, getKey, setKey, getModel, setModel, modelLabel, polish, instruct, research, designStyle, designLayout, editLayout, compliance, test, explain };
 })();
