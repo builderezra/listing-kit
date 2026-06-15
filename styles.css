@@ -556,14 +556,23 @@ body.dark .mode-btn.active { background: var(--teal); color: #fff; }
 body.dark .chip, body.dark .filebtn, body.dark .copy-btn, body.dark .pe-presets button { color: var(--ink); }
 body.dark .copy-btn.ai { color: #3a2a12; }
 body.dark .pe-focus-btns button { background: #1d2127; color: var(--ink); }
-body.dark .finding { background: #1d2127; }
+body.dark .finding { background: #1d2127; border-color: #2c333b; }
+body.dark .finding-why { color: var(--ink); }
+body.dark .finding-fix, body.dark .finding-fix b { color: #79d3a4; }
+/* compliance summary: dark-tinted boxes + light text instead of bright pastels */
+body.dark .compliance-summary.clear { background: #16271d; border-color: #2c4a38; }
+body.dark .compliance-summary.warn  { background: #2a2410; border-color: #5a4a22; }
+body.dark .compliance-summary.alert { background: #2a1714; border-color: #5a302a; }
+body.dark .compliance-summary.clear h3 { color: #d9f0e2; } body.dark .compliance-summary.clear p { color: #a9c2b4; }
+body.dark .compliance-summary.warn h3 { color: #f0e2c0; }  body.dark .compliance-summary.warn p { color: #c9b993; }
+body.dark .compliance-summary.alert h3 { color: #f3d0c8; } body.dark .compliance-summary.alert p { color: #d0a59e; }
 body.dark .import-status:not(.ok):not(.err) { background: #23282e; color: var(--ink); }
 body.dark .howto kbd, body.dark .paste-hint kbd { background: #23282e; }
 body.dark .empty-art { filter: grayscale(.2); }
 body.dark .flyer-wrap { background: #3a3f45; }
 body.dark .tpl { background: #1d2127; color: var(--ink); }
 body.dark .mini-btn.ghost { background: #23282e; }
-body.dark .flag-phrase { color: #3a2f12; }
+body.dark .flag-phrase { background: #4a3f1a; color: #f0e2c0; }
 body.dark .import-title, body.dark .tab.active { color: var(--ink); }
 body.dark .import-box { background: #191d22; }
 body.dark .or-divider { color: var(--muted); }
@@ -596,7 +605,7 @@ body.dark .or-divider { color: var(--muted); }
 .st-slr { flex: 0 0 26px; width: 26px; height: 26px; padding: 0; border: 1px solid var(--line); background: var(--hi); color: var(--muted); border-radius: 7px; cursor: pointer; font-size: 13px; line-height: 1; }
 .st-slr:hover { border-color: var(--teal); color: var(--teal); }
 /* full-width range whose thumb reaches both ends */
-.st-slider input[type=range] { flex: 1; min-width: 0; -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; background: var(--line); cursor: pointer; margin: 0; }
+.st-slider input[type=range] { flex: 1; min-width: 0; -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px; background: var(--line); cursor: pointer; margin: 0; padding: 0; }
 .st-slider input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--teal); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); cursor: pointer; }
 .st-slider input[type=range]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--teal); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); cursor: pointer; }
 /* a centre notch for symmetric sliders (rotate) so 0 is visible */

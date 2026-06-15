@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v27';
+  const APP_VERSION = 'v28';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -518,14 +518,14 @@
     let fi = 0;
     slides.forEach((p) => { if (p._caption == null) p._caption = feats[fi++] || ''; });
 
-    const addSlide = (label, renderFn, photo) => {
+    const addSlide = (label, renderFn, photo, kind) => {
       const cell = document.createElement('div');
       cell.className = 'car-slide';
       const cv = document.createElement('canvas');
       renderFn(cv);
       cv.title = 'Click to zoom & edit';
       const n = carouselCanvases.length + 1;
-      cv.addEventListener('click', () => openLightbox(cv, photo || null, n));
+      cv.addEventListener('click', () => openLightbox(cv, photo || null, n, kind || 'photo'));
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'copy-btn dl-mini';
@@ -536,10 +536,10 @@
       carouselCanvases.push(cv);
     };
 
-    addSlide('1 · Cover', (cv) => Visuals.render(brand.templateId, 'square', cv, d));
+    addSlide('1 · Cover', (cv) => Visuals.render(brand.templateId, 'square', cv, d), null, 'cover');
     slides.forEach((p, i) =>
-      addSlide(`${i + 2} · Photo`, (cv) => Visuals.featureSlide(cv, { photo: p, caption: p._caption || '', brand, idx: i + 1, total }), p));
-    addSlide(`${total} · CTA`, (cv) => Visuals.ctaSlide(cv, { brand, address: d.address, badgeText: d.badgeText }));
+      addSlide(`${i + 2} · Photo`, (cv) => Visuals.featureSlide(cv, { photo: p, caption: p._caption || '', brand, idx: i + 1, total }), p, 'photo'));
+    addSlide(`${total} · CTA`, (cv) => Visuals.ctaSlide(cv, { brand, address: d.address, badgeText: d.badgeText }), null, 'cta');
   };
 
   // ---- native share (Web Share API, with download fallback) ----
@@ -554,9 +554,9 @@
   };
 
   // ---- carousel slide lightbox (zoom + edit) ----
-  let lbState = { photo: null, n: 1, cv: null };
-  const openLightbox = (cv, photo, n) => {
-    lbState = { photo, n, cv };
+  let lbState = { photo: null, n: 1, cv: null, kind: 'photo' };
+  const openLightbox = (cv, photo, n, kind) => {
+    lbState = { photo, n, cv, kind: kind || 'photo' };
     $('lbImg').src = cv.toDataURL('image/png');
     $('lightbox').hidden = false;
   };
@@ -565,7 +565,12 @@
     $('lbClose').addEventListener('click', closeLightbox);
     $('lightbox').addEventListener('click', (e) => { if (e.target === $('lightbox')) closeLightbox(); });
     $('lbDownload').addEventListener('click', () => { const a = document.createElement('a'); a.href = $('lbImg').src; a.download = `${slug()}-carousel-${String(lbState.n).padStart(2, '0')}.png`; a.click(); });
-    $('lbEdit').addEventListener('click', () => { closeLightbox(); openStudio(lbState.photo ? photos.indexOf(lbState.photo) : undefined); });
+    $('lbEdit').addEventListener('click', () => {
+      closeLightbox();
+      if (lbState.kind === 'cta') openStudio({ seed: 'cta' });            // the CTA card, not the hero photo
+      else if (lbState.photo) openStudio(photos.indexOf(lbState.photo));   // that photo as the background
+      else openStudio();                                                  // cover ≈ the default seed
+    });
     if (canShareFiles()) { $('lbShare').hidden = false; $('lbShare').addEventListener('click', async () => { if (lbState.cv) { const ok = await shareCanvas(lbState.cv, `${slug()}-carousel-${String(lbState.n).padStart(2, '0')}.png`, (outputs && outputs.instagram) || ''); if (!ok) $('lbDownload').click(); } }); }
     window.addEventListener('keydown', (e) => { if (!$('lightbox').hidden && e.key === 'Escape') closeLightbox(); });
   };
@@ -602,11 +607,15 @@
     return { photos: d.photos, fields: { price: d.price, address: d.address, stats, badge: d.badgeText } };
   };
   // open the design studio from anywhere (works before a kit is generated too)
-  const openStudio = (startPhotoIndex) => {
+  const openStudio = (arg) => {
+    const hint = $('studioHint'); if (hint) hint.hidden = true;   // clear the "saved" notifier on reopen
+    clearTimeout(studioHintTimer);
+    const opt = (arg && typeof arg === 'object') ? arg : { photoIndex: arg };
     const s = studioFields();
     Studio.open({
       photos: s.photos, brand, fields: s.fields,
-      startPhotoIndex: (typeof startPhotoIndex === 'number') ? startPhotoIndex : null,
+      startPhotoIndex: (typeof opt.photoIndex === 'number') ? opt.photoIndex : null,
+      seed: opt.seed || null,
       // lets the studio upload a photo straight into the listing gallery
       addPhoto: async (file) => { const ok = await addPhotoBlob(file, 'studio'); if (!ok) return null; syncFcss(); return photos[photos.length - 1]; },
       // closed with unsaved edits → point a friendly notifier at the launcher

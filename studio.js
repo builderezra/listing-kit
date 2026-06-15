@@ -72,6 +72,68 @@ const Studio = (() => {
     if (f.blur) p.push(`blur(${f.blur}px)`);
     return p.join(' ');
   };
+  // advanced (pixel-level) adjustments that CSS filters can't do
+  const ADV_KEYS = ['highlights', 'shadows', 'tint', 'vignette', 'sharpness'];
+  const hasAdv = (f) => !!f && ADV_KEYS.some((k) => f[k]);
+  const fKey = (f) => JSON.stringify(f || {});
+  const sharpen = (cx, w, h, amt) => {
+    const src = cx.getImageData(0, 0, w, h), out = cx.createImageData(w, h);
+    const s = src.data, o = out.data, k = amt * 0.9;
+    const wt = 1 + 4 * k;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      for (let c = 0; c < 3; c++) {
+        const up = y > 0 ? s[i - w * 4 + c] : s[i + c], dn = y < h - 1 ? s[i + w * 4 + c] : s[i + c];
+        const lf = x > 0 ? s[i - 4 + c] : s[i + c], rt = x < w - 1 ? s[i + 4 + c] : s[i + c];
+        const v = s[i + c] * wt - k * (up + dn + lf + rt);
+        o[i + c] = v < 0 ? 0 : v > 255 ? 255 : v;
+      }
+      o[i + 3] = s[i + 3];
+    }
+    cx.putImageData(out, 0, 0);
+  };
+  // bake CSS + pixel adjustments into a cached offscreen canvas; recompute only on change
+  const processed = (img, f, host) => {
+    if (!hasAdv(f)) return null;
+    const key = fKey(f);
+    if (host._procKey === key && host._procCv) return host._procCv;
+    const max = 1400, sc = Math.min(1, max / Math.max(img.width, img.height));
+    const w = Math.max(1, Math.round(img.width * sc)), h = Math.max(1, Math.round(img.height * sc));
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const c = cv.getContext('2d');
+    const css = photoFilterCSS(f); if (css) { try { c.filter = css; } catch (e) {} }
+    c.drawImage(img, 0, 0, w, h); c.filter = 'none';
+    let id; try { id = c.getImageData(0, 0, w, h); } catch (e) { host._procKey = key; host._procCv = cv; return cv; }
+    const d = id.data, hi = (f.highlights || 0) / 100, sh = (f.shadows || 0) / 100, tint = (f.tint || 0) / 100;
+    if (hi || sh || tint) {
+      for (let i = 0; i < d.length; i += 4) {
+        let r = d[i], g = d[i + 1], b = d[i + 2];
+        const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        if (sh) { const wgt = Math.max(0, 1 - lum * 1.4); const a = sh * 130 * wgt; r += a; g += a; b += a; }
+        if (hi) { const wgt = Math.max(0, (lum - 0.35) * 1.6); const a = hi * 130 * wgt; r += a; g += a; b += a; }
+        if (tint) { g += tint * 55; r -= tint * 28; b -= tint * 28; }   // green ↔ magenta
+        d[i] = r < 0 ? 0 : r > 255 ? 255 : r; d[i + 1] = g < 0 ? 0 : g > 255 ? 255 : g; d[i + 2] = b < 0 ? 0 : b > 255 ? 255 : b;
+      }
+    }
+    c.putImageData(id, 0, 0);
+    if (f.sharpness) sharpen(c, w, h, (f.sharpness || 0) / 100);
+    if (f.vignette) { const g = c.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.32, w / 2, h / 2, Math.max(w, h) * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${(f.vignette / 100) * 0.75})`); c.fillStyle = g; c.fillRect(0, 0, w, h); }
+    host._procKey = key; host._procCv = cv;
+    return cv;
+  };
+  // draw a source (img or canvas) covering a box, honouring focus + crop {zoom, ox, oy}
+  const drawCover = (src, bx, by, bw, bh, focus, crop) => {
+    const iw = src.width, ih = src.height;
+    const z = (crop && crop.zoom) ? crop.zoom : 1;
+    const s = Math.max(bw / iw, bh / ih) * z;
+    const dw = iw * s, dh = ih * s;
+    const fy = { top: 0, center: 0.5, bottom: 1 }[focus || 'center'];
+    const ox = (crop && crop.ox) || 0, oy = (crop && crop.oy) || 0;
+    let dx = bx + (bw - dw) / 2 + ox * (dw - bw) / 2;
+    let dy = by + (bh - dh) * fy + oy * (dh - bh) / 2;
+    dx = Math.min(bx, Math.max(bx + bw - dw, dx));
+    dy = Math.min(by, Math.max(by + bh - dh, dy));
+    ctx2d.drawImage(src, dx, dy, dw, dh);
+  };
   // build a linear (by angle) or radial gradient fill across the canvas
   // (resolveColor so brand tokens like 'primary' work, not just #hex)
   const gradFill = (g, w, h) => {
@@ -93,13 +155,10 @@ const Studio = (() => {
     if (bg.type === 'photo' && ctxData.photos[bg.photoIndex] && ctxData.photos[bg.photoIndex].img) {
       const p = ctxData.photos[bg.photoIndex];
       const img = p.img;
-      const s = Math.max(w / img.width, h / img.height);
-      const dw = img.width * s, dh = img.height * s;
-      const fy = { top: 0, center: 0.5, bottom: 1 }[p.focus || 'center'];
+      const proc = processed(img, bg.filter, bg);              // advanced ops baked (cached) when present
       ctx2d.save();
-      const f = p.fcss || photoFilterCSS(p.filter);
-      if (f) { try { ctx2d.filter = f; } catch (e) {} }
-      ctx2d.drawImage(img, (w - dw) / 2, (h - dh) * fy, dw, dh);
+      if (!proc) { const css = bg.filter ? photoFilterCSS(bg.filter) : (p.fcss || photoFilterCSS(p.filter)); if (css) { try { ctx2d.filter = css; } catch (e) {} } }
+      drawCover(proc || img, 0, 0, w, h, p.focus, bg.crop);
       ctx2d.restore();
       ctx2d.filter = 'none';
       if (bg.darken) { ctx2d.fillStyle = `rgba(0,0,0,${bg.darken})`; ctx2d.fillRect(0, 0, w, h); }
@@ -189,22 +248,26 @@ const Studio = (() => {
       else ctx2d.fillRect(x, y, bw, bh);
       if (L.stroke) { ctx2d.lineWidth = Math.max(1, L.strokeWf * w); ctx2d.strokeStyle = resolveColor(L.stroke); if (L.shape === 'ellipse') ctx2d.stroke(); else { roundRect(x, y, bw, bh, L.radius || 0); ctx2d.stroke(); } }
     } else if (L.type === 'image' || L.type === 'photo') {
-      let img, filt = '';
-      if (L.type === 'photo') { const p = ctxData.photos[L.photoIndex]; img = p && p.img; filt = photoFilterCSS(L.filter); }
-      else img = L.src === 'logo' ? ctxData.brand.logoImg : ctxData.brand.headImg;
+      let img, draw, useFilter = '';
+      if (L.type === 'photo') {
+        const p = ctxData.photos[L.photoIndex]; img = p && p.img;
+        const proc = img ? processed(img, L.filter, L) : null;   // advanced ops baked (cached)
+        draw = proc || img;
+        if (!proc) useFilter = photoFilterCSS(L.filter);
+      } else { img = L.src === 'logo' ? ctxData.brand.logoImg : ctxData.brand.headImg; draw = img; }
       if (!img || !img.width) { ctx2d.restore(); L._c = { cx, cy, w: 0, h: 0, rot: L.rot || 0, pad: 0 }; return; }
-      if (filt) { try { ctx2d.filter = filt; } catch (e) {} }
+      if (useFilter) { try { ctx2d.filter = useFilter; } catch (e) {} }
       const dw = L.wf * w;
       if (L.shape === 'circle') {
-        const d = dw, s = Math.max(d / img.width, d / img.height);
+        const d = dw, s = Math.max(d / draw.width, d / draw.height);
         ctx2d.save(); ctx2d.beginPath(); ctx2d.arc(0, 0, d / 2, 0, Math.PI * 2); ctx2d.clip();
-        ctx2d.drawImage(img, -img.width * s / 2, -img.height * s / 2, img.width * s, img.height * s);
+        ctx2d.drawImage(draw, -draw.width * s / 2, -draw.height * s / 2, draw.width * s, draw.height * s);
         ctx2d.restore();
         bw = d; bh = d;
       } else {
-        const dh = dw * (img.height / img.width);
-        if (L.shape === 'rounded' && L.radius) { ctx2d.save(); roundRect(-dw / 2, -dh / 2, dw, dh, L.radius); ctx2d.clip(); ctx2d.drawImage(img, -dw / 2, -dh / 2, dw, dh); ctx2d.restore(); }
-        else ctx2d.drawImage(img, -dw / 2, -dh / 2, dw, dh);
+        const dh = dw * (draw.height / draw.width);
+        if (L.shape === 'rounded' && L.radius) { ctx2d.save(); roundRect(-dw / 2, -dh / 2, dw, dh, L.radius); ctx2d.clip(); ctx2d.drawImage(draw, -dw / 2, -dh / 2, dw, dh); ctx2d.restore(); }
+        else ctx2d.drawImage(draw, -dw / 2, -dh / 2, dw, dh);
         bw = dw; bh = dh;
       }
       ctx2d.filter = 'none';
@@ -399,6 +462,7 @@ const Studio = (() => {
   };
   const sizeOf = (L) => (L.type === 'text' || L.type === 'badge') ? L.size : (L.type === 'rect' ? L.hf : L.wf);
   const onDown = (e) => {
+    bgEdit = false;   // interacting with the canvas leaves background-adjust mode
     const p = pt(e);
     const cur = layers.find((x) => x.id === selId);
     if (cur && cur._c && !cur.locked) {
@@ -502,17 +566,37 @@ const Studio = (() => {
   const recents = () => { try { return JSON.parse(localStorage.getItem(RECENT_LS) || '[]'); } catch (e) { return []; } };
   const pushRecent = (hex) => { let r = recents().filter((x) => x !== hex); r.unshift(hex); r = r.slice(0, 6); try { localStorage.setItem(RECENT_LS, JSON.stringify(r)); } catch (e) {} };
 
-  // photo colour-adjust + shape panel
-  const syncPhotoPanel = (L) => {
-    const f = L.filter || {};
-    $('stPhRect').classList.toggle('on', L.shape !== 'rounded' && L.shape !== 'circle');
-    $('stPhRound').classList.toggle('on', L.shape === 'rounded');
-    $('stPhCircle').classList.toggle('on', L.shape === 'circle');
-    $('stPhRadiusRow').style.display = L.shape === 'rounded' ? '' : 'none';
-    $('stPhRadius').value = L.radius || 0; slv('stPhRadiusV', Math.round(L.radius || 0) + '');
+  // photo editing can target a photo LAYER or the BACKGROUND photo
+  let bgEdit = false;
+  const photoT = () => { if (bgEdit && bg.type === 'photo') return bg; const L = sel(); return (L && L.type === 'photo') ? L : null; };
+
+  // photo colour-adjust + shape/crop panel (works for a layer or the background)
+  const syncPhotoPanel = (t) => {
+    const isBg = (t === bg);
+    t.filter = t.filter || (isBg ? {} : { b: 100, c: 100, s: 100, h: 0, sep: 0, blur: 0 });
+    const f = t.filter;
+    $('stPhTitle').childNodes[0].nodeValue = isBg ? 'Background photo ' : 'Photo ';
+    $('stPhHint').textContent = isBg ? '— adjust, crop & reposition' : '— drag & corner-resize on the canvas';
+    $('stPhShapeRow').style.display = isBg ? 'none' : '';
+    if (!isBg) {
+      $('stPhRect').classList.toggle('on', t.shape !== 'rounded' && t.shape !== 'circle');
+      $('stPhRound').classList.toggle('on', t.shape === 'rounded');
+      $('stPhCircle').classList.toggle('on', t.shape === 'circle');
+      $('stPhRadiusRow').style.display = t.shape === 'rounded' ? '' : 'none';
+      $('stPhRadius').value = t.radius || 0; slv('stPhRadiusV', Math.round(t.radius || 0) + '');
+    } else { $('stPhRadiusRow').style.display = 'none'; }
+    $('stPhCrop').hidden = !isBg;
     const set = (id, v, suf) => { $(id).value = v; slv(id + 'V', v + suf); };
+    if (isBg) {
+      const cr = t.crop || {};
+      set('stPhZoom', Math.round((cr.zoom || 1) * 100), '%');
+      set('stPhPanX', Math.round((cr.ox || 0) * 100), '');
+      set('stPhPanY', Math.round((cr.oy || 0) * 100), '');
+    }
     set('stPhB', f.b == null ? 100 : f.b, '%'); set('stPhC', f.c == null ? 100 : f.c, '%'); set('stPhS', f.s == null ? 100 : f.s, '%');
+    set('stPhHi', f.highlights || 0, ''); set('stPhSh', f.shadows || 0, '');
     set('stPhHue', f.h || 0, '°'); set('stPhSep', f.sep || 0, '%');
+    set('stPhTint', f.tint || 0, ''); set('stPhSharp', f.sharpness || 0, ''); set('stPhVig', f.vignette || 0, '');
   };
 
   // curated background colours + gradients
@@ -521,7 +605,7 @@ const Studio = (() => {
     return [
       { type: 'color', color: '#ffffff' },
       { type: 'color', color: '#111417' },
-      { type: 'color', color: b.primary },
+      { type: 'gradient', c1: '#4a4a4a', c2: '#000000', angle: 135 },   // dark black gradient (replaces solid brand tile)
       { type: 'gradient', c1: Visuals.shade(b.primary, 22), c2: Visuals.shade(b.primary, -30), angle: 135 },
       { type: 'gradient', c1: b.primary, c2: b.accent, angle: 135 },
       { type: 'gradient', c1: '#2193b0', c2: '#6dd5ed', angle: 135 },
@@ -631,11 +715,14 @@ const Studio = (() => {
 
   const syncPanel = () => {
     const L = sel();
+    if (bgEdit && bg.type !== 'photo') bgEdit = false;   // bg switched to colour/gradient → leave bg-edit
+    const pt = photoT();
     $('stLayerCtl').hidden = !L;
-    if (!L) return;
+    const pcEl = $('stPhotoCtl'); if (pcEl) pcEl.hidden = !pt;
+    if (pt) syncPhotoPanel(pt);
+    if (!L) { updateContrast(); return; }   // nothing selected (but bg panel may still show)
     const isText = L.type === 'text' || L.type === 'badge';
     const hasColor = isText || L.type === 'rect';
-    const isPhoto = L.type === 'photo';
     const show = (id, on) => { const el = $(id); if (el) el.style.display = on ? '' : 'none'; };
     show('stText', isText); show('stSizeRow', isText); show('stColorWrap', hasColor);
     show('stRowStyle', isText); show('stRowAlign', L.type === 'text'); show('stRowShape', L.type === 'rect');
@@ -644,8 +731,6 @@ const Studio = (() => {
     $('stTrack').value = L.tracking || 0; slv('stTrackV', (L.tracking || 0) + 'px');
     $('stLineh').value = Math.round((L.lineh || 1.25) * 100); slv('stLinehV', Math.round((L.lineh || 1.25) * 100) + '%');
     $('stBlend').value = L.blend || 'source-over';
-    const pc = $('stPhotoCtl'); if (pc) pc.hidden = !isPhoto;
-    if (isPhoto) syncPhotoPanel(L);
     if (isText) {
       $('stText').value = L.text;
       $('stSize').value = L.size; slv('stSizeV', L.size + 'px');
@@ -975,17 +1060,22 @@ const Studio = (() => {
     $('stBgDarken').addEventListener('change', () => { if (bg.type === 'photo') commit(); });
     $('stBgDarkenR').addEventListener('click', () => { if (bg.type === 'photo') { bg.darken = 0; renderBgPicker(); commit(); } });
 
-    // photo layer: shape + colour adjustments
-    const ph = (fn) => () => { const L = sel(); if (L && L.type === 'photo') fn(L); };
-    const phShape = (s) => ph((L) => { L.shape = s; commit(); });
+    // photo editing — applies to the selected photo LAYER or the BACKGROUND (bgEdit)
+    $('stBgEdit').addEventListener('click', () => { if (bg.type !== 'photo') return; bgEdit = true; selId = null; bg.filter = bg.filter || {}; render(); syncPanel(); renderLayersPanel(); const pc = $('stPhotoCtl'); if (pc && pc.scrollIntoView) pc.scrollIntoView({ block: 'nearest' }); });
+    const ph = (fn) => () => { const t = photoT(); if (t) fn(t); };
+    const phShape = (s) => ph((t) => { if (t !== bg) { t.shape = s; commit(); } });
     $('stPhRect').addEventListener('click', phShape('rect'));
     $('stPhRound').addEventListener('click', phShape('rounded'));
     $('stPhCircle').addEventListener('click', phShape('circle'));
-    $('stPhRadius').addEventListener('input', ph((L) => { L.radius = Number($('stPhRadius').value); slv('stPhRadiusV', L.radius + ''); render(); }));
+    $('stPhRadius').addEventListener('input', ph((t) => { if (t !== bg) { t.radius = Number($('stPhRadius').value); slv('stPhRadiusV', t.radius + ''); render(); } }));
     $('stPhRadius').addEventListener('change', commit);
-    const phFilter = (id, key, suf) => { const live = ph((L) => { L.filter = L.filter || {}; L.filter[key] = Number($(id).value); slv(id + 'V', $(id).value + suf); render(); }); $(id).addEventListener('input', live); $(id).addEventListener('change', commit); };
+    const phFilter = (id, key, suf) => { const live = ph((t) => { t.filter = t.filter || {}; t.filter[key] = Number($(id).value); slv(id + 'V', $(id).value + suf); render(); }); $(id).addEventListener('input', live); $(id).addEventListener('change', commit); };
     phFilter('stPhB', 'b', '%'); phFilter('stPhC', 'c', '%'); phFilter('stPhS', 's', '%'); phFilter('stPhHue', 'h', '°'); phFilter('stPhSep', 'sep', '%');
-    $('stPhReset').addEventListener('click', ph((L) => { L.filter = { b: 100, c: 100, s: 100, h: 0, sep: 0, blur: 0 }; commit(); }));
+    phFilter('stPhHi', 'highlights', ''); phFilter('stPhSh', 'shadows', ''); phFilter('stPhTint', 'tint', ''); phFilter('stPhSharp', 'sharpness', ''); phFilter('stPhVig', 'vignette', '');
+    // crop / position (background only)
+    const phCrop = (id, key, div) => { const live = ph((t) => { if (t === bg) { t.crop = t.crop || {}; t.crop[key] = Number($(id).value) / div; slv(id + 'V', $(id).value + (div === 100 && key === 'zoom' ? '%' : '')); render(); } }); $(id).addEventListener('input', live); $(id).addEventListener('change', commit); };
+    phCrop('stPhZoom', 'zoom', 100); phCrop('stPhPanX', 'ox', 100); phCrop('stPhPanY', 'oy', 100);
+    $('stPhReset').addEventListener('click', ph((t) => { t.filter = (t === bg) ? {} : { b: 100, c: 100, s: 100, h: 0, sep: 0, blur: 0 }; if (t === bg) t.crop = { zoom: 1, ox: 0, oy: 0 }; commit(); }));
 
     const cur = () => sel();
     $('stText').addEventListener('input', () => { const L = cur(); if (L) { L.text = $('stText').value; L.edited = true; render(); renderLayersPanel(); } });
@@ -1088,19 +1178,51 @@ const Studio = (() => {
     sizeKey = startSize && SIZES[startSize] ? startSize : 'square';
     document.querySelectorAll('#stSizes button').forEach((x) => x.classList.toggle('active', x.dataset.size === sizeKey));
     const startIdx = (typeof ctxData.startPhotoIndex === 'number' && ctxData.photos[ctxData.startPhotoIndex]) ? ctxData.startPhotoIndex : 0;
-    bg = ctxData.photos.length ? { type: 'photo', photoIndex: startIdx } : { type: 'color' };
+    const ctaSeed = ctxData.seed === 'cta';
+    // CTA card edits open on a brand-colour background (not the hero photo)
+    bg = ctaSeed ? { type: 'color', color: 'primary' } : (ctxData.photos.length ? { type: 'photo', photoIndex: startIdx } : { type: 'color' });
     layers = []; selId = null;
     const f = ctxData.fields;
     replaying = true;            // seed starter layers without touching history / autosave
-    if (f.badge) add('badge');
-    if (f.price) add('price');
-    if (f.address) add('address');
+    if (ctaSeed) {
+      add('badge'); const b = layers[layers.length - 1]; if (b) { b.text = 'BOOK A VIEWING'; b.xf = 0.5; b.yf = 0.6; b.color = 'accent'; }
+      add('agent');
+      if (f.address) { add('address'); const a = layers[layers.length - 1]; if (a) a.yf = 0.5; }
+    } else {
+      // seed a layout that matches the brand's chosen design template
+      const tpl = ctxData.brand.templateId;
+      const serif = (ctxData.brand.font === 'serif') || (ctxData.brand.font === 'auto' && tpl === 'classic');
+      const seeded = [];
+      const seed = (k) => { add(k); const L = layers[layers.length - 1]; if (L) seeded.push(L); return L; };
+      if (tpl === 'classic') {
+        // editorial: serif, centred (mirrors the classic graphic)
+        if (f.badge) { const b = seed('badge'); b.xf = 0.5; b.yf = 0.16; }
+        if (f.price) { const p = seed('price'); p.yf = 0.46; }
+        if (f.address) { const a = seed('address'); a.yf = 0.56; }
+        if (f.stats) { const s = seed('stats'); s.yf = 0.62; }
+        seeded.forEach((L) => { L.font = 'serif'; });
+      } else if (tpl === 'bold') {
+        // colour-block, heavy weight
+        seed('scrim');
+        if (f.badge) seed('badge');
+        if (f.price) { const p = seed('price'); p.weight = 900; }
+        if (f.address) seed('address');
+        if (f.stats) seed('stats');
+        if (serif) seeded.forEach((L) => { if (L.type === 'text' || L.type === 'badge') L.font = 'serif'; });
+      } else {
+        // modern (default): photo + bottom text
+        if (f.badge) seed('badge');
+        if (f.price) seed('price');
+        if (f.address) seed('address');
+        if (serif) seeded.forEach((L) => { if (L.type === 'text' || L.type === 'badge') L.font = 'serif'; });
+      }
+    }
     replaying = false;
     selId = null;
     $('stAddLogo').disabled = !(ctxData.brand.logoImg && ctxData.brand.logoImg.width);
     $('stAddHead').disabled = !(ctxData.brand.headImg && ctxData.brand.headImg.width);
     renderBgPicker(); renderTplList(); render(); syncPanel(); renderLayersPanel();
-    resetHistory(); dirty = false; guides = [];
+    resetHistory(); dirty = false; guides = []; bgEdit = false;
     $('stCheats').hidden = true;
     resetAi();
     // offer to restore the previous unsaved session if it's the same listing

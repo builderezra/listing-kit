@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=27" />
+  <link rel="stylesheet" href="styles.css?v=28" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -626,22 +626,34 @@
           </div>
           <div id="stBgPhoto" hidden>
             <div class="st-slider"><span class="st-slk">Darken</span><input type="range" id="stBgDarken" min="0" max="70" step="1" /><span class="st-slv" id="stBgDarkenV"></span><button type="button" class="st-slr" id="stBgDarkenR" title="Reset">⟲</button></div>
+            <div class="st-row"><button type="button" id="stBgEdit">✎ Adjust &amp; crop background photo</button></div>
           </div>
         </div>
         <div class="st-group" id="stPhotoCtl" hidden>
-          <div class="st-group-title">Photo <span class="hint">— drag &amp; corner-resize on the canvas</span></div>
-          <div class="st-row">
+          <div class="st-group-title" id="stPhTitle">Photo <span class="hint" id="stPhHint">— drag &amp; corner-resize on the canvas</span></div>
+          <div class="st-row" id="stPhShapeRow">
             <button type="button" id="stPhRect">▭ Rect</button>
             <button type="button" id="stPhRound">▢ Rounded</button>
             <button type="button" id="stPhCircle">⬤ Circle</button>
           </div>
           <div class="st-slider" id="stPhRadiusRow"><span class="st-slk">Round</span><input type="range" id="stPhRadius" min="0" max="180" step="2" /><span class="st-slv" id="stPhRadiusV"></span></div>
+          <div id="stPhCrop" hidden>
+            <div class="st-sub">Crop &amp; position</div>
+            <div class="st-slider"><span class="st-slk">Zoom</span><input type="range" id="stPhZoom" min="100" max="300" step="1" /><span class="st-slv" id="stPhZoomV"></span></div>
+            <div class="st-slider"><span class="st-slk">Pan X</span><input type="range" id="stPhPanX" class="st-centered" min="-100" max="100" step="1" /><span class="st-slv" id="stPhPanXV"></span></div>
+            <div class="st-slider"><span class="st-slk">Pan Y</span><input type="range" id="stPhPanY" class="st-centered" min="-100" max="100" step="1" /><span class="st-slv" id="stPhPanYV"></span></div>
+          </div>
           <div class="st-sub">Adjust colour</div>
           <div class="st-slider"><span class="st-slk">Bright</span><input type="range" id="stPhB" min="40" max="180" step="1" /><span class="st-slv" id="stPhBV"></span></div>
           <div class="st-slider"><span class="st-slk">Contrast</span><input type="range" id="stPhC" min="40" max="180" step="1" /><span class="st-slv" id="stPhCV"></span></div>
           <div class="st-slider"><span class="st-slk">Saturate</span><input type="range" id="stPhS" min="0" max="200" step="1" /><span class="st-slv" id="stPhSV"></span></div>
+          <div class="st-slider"><span class="st-slk">Highlights</span><input type="range" id="stPhHi" class="st-centered" min="-100" max="100" step="1" /><span class="st-slv" id="stPhHiV"></span></div>
+          <div class="st-slider"><span class="st-slk">Shadows</span><input type="range" id="stPhSh" class="st-centered" min="-100" max="100" step="1" /><span class="st-slv" id="stPhShV"></span></div>
           <div class="st-slider"><span class="st-slk">Hue</span><input type="range" id="stPhHue" class="st-centered" min="-180" max="180" step="1" /><span class="st-slv" id="stPhHueV"></span></div>
           <div class="st-slider"><span class="st-slk">Warmth</span><input type="range" id="stPhSep" min="0" max="100" step="1" /><span class="st-slv" id="stPhSepV"></span></div>
+          <div class="st-slider"><span class="st-slk">Tint</span><input type="range" id="stPhTint" class="st-centered" min="-100" max="100" step="1" /><span class="st-slv" id="stPhTintV"></span></div>
+          <div class="st-slider"><span class="st-slk">Sharpness</span><input type="range" id="stPhSharp" min="0" max="100" step="1" /><span class="st-slv" id="stPhSharpV"></span></div>
+          <div class="st-slider"><span class="st-slk">Vignette</span><input type="range" id="stPhVig" min="0" max="100" step="1" /><span class="st-slv" id="stPhVigV"></span></div>
           <div class="st-row"><button type="button" id="stPhReset">Reset adjustments</button></div>
         </div>
         <div class="st-group" id="stLayerCtl" hidden>
@@ -785,15 +797,15 @@
     </div>
   </div>
 
-  <script src="generator.js?v=27"></script>
-  <script src="fairhousing.js?v=27"></script>
-  <script src="parser.js?v=27"></script>
-  <script src="importer.js?v=27"></script>
-  <script src="visuals.js?v=27"></script>
-  <script src="flyer.js?v=27"></script>
-  <script src="ai.js?v=27"></script>
-  <script src="studio.js?v=27"></script>
-  <script src="tour.js?v=27"></script>
-  <script src="app.js?v=27"></script>
+  <script src="generator.js?v=28"></script>
+  <script src="fairhousing.js?v=28"></script>
+  <script src="parser.js?v=28"></script>
+  <script src="importer.js?v=28"></script>
+  <script src="visuals.js?v=28"></script>
+  <script src="flyer.js?v=28"></script>
+  <script src="ai.js?v=28"></script>
+  <script src="studio.js?v=28"></script>
+  <script src="tour.js?v=28"></script>
+  <script src="app.js?v=28"></script>
 </body>
 </html>
