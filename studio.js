@@ -911,6 +911,88 @@ const Studio = (() => {
     layers = out; selId = null; bgEdit = false; rebuiltFrom = tpl; renderBgPicker(); commit(); inRebuild = false;
   };
 
+  // ---- faithful carousel-slide reproduction ---------------------------------
+  // Rebuilds ONE carousel slide (a feature photo+caption slide, or the closing
+  // CTA card) as editable layers that match visuals.js featureSlide/ctaSlide
+  // pixel-for-pixel on the 1080² square. The cover slide is just the brand
+  // template card, so it routes through rebuildStyle instead (see open()).
+  const buildSlide = (slide) => {
+    inRebuild = true;
+    const W = SIZES.square[0], H = SIZES.square[1];     // carousel slides are always 1080²
+    const b = ctxData.brand, f = ctxData.fields;
+    const serif = b.font === 'serif';
+    const capFont = serif ? 'serif' : 'sans';           // mirrors priceFam(brand, SANS): serif only when brand.font==='serif'
+    const out = [];
+    const push = (o) => { out.push({ id: uid++, opacity: 1, rot: 0, ...o }); return out[out.length - 1]; };
+    const measureW = (t, wt, size, fam) => { ctx2d.font = `${wt} ${size}px ${fam === 'serif' ? SERIF : SANS}`; return ctx2d.measureText(String(t)).width; };
+    // text whose alphabetic baseline sits at baseY, anchored left / centre / right
+    const leftText = (t, mpx, baseY, size, o = {}) => { const fam = o.font || 'sans', wt = o.weight || 400; const w = measureW(t, wt, size, fam); return push({ type: 'text', text: String(t), size, weight: wt, font: fam, color: o.color || '#ffffff', align: 'left', shadow: !!o.shadow, locked: !!o.locked, tracking: o.tracking || 0, opacity: o.opacity == null ? 1 : o.opacity, xf: (mpx + w / 2) / W, yf: (baseY - size * 0.35) / H }); };
+    const rightText = (t, rpx, baseY, size, o = {}) => { const fam = o.font || 'sans', wt = o.weight || 400; const w = measureW(t, wt, size, fam); return push({ type: 'text', text: String(t), size, weight: wt, font: fam, color: o.color || '#ffffff', align: 'right', shadow: !!o.shadow, opacity: o.opacity == null ? 1 : o.opacity, xf: (rpx - w / 2) / W, yf: (baseY - size * 0.35) / H }); };
+    const ctrText = (t, cxpx, baseY, size, o = {}) => push({ type: 'text', text: String(t), size, weight: o.weight || 400, font: o.font || 'sans', color: o.color || '#ffffff', align: 'center', shadow: !!o.shadow, tracking: o.tracking || 0, opacity: o.opacity == null ? 1 : o.opacity, xf: cxpx / W, yf: (baseY - size * 0.35) / H });
+
+    if (slide.kind === 'cta') {
+      // mirror visuals.ctaSlide(canvas, { brand, address }) — visuals.js:419
+      const fg = Visuals.onColor(b.primary);
+      bg = { type: 'gradient', c1: Visuals.shade(b.primary, 16), c2: Visuals.shade(b.primary, -32), angle: 90 };
+      // decorative ring, centre (960,140) r190 → stroked ellipse @ accent 0.35
+      push({ type: 'rect', shape: 'ellipse', noFill: true, stroke: 'accent', strokeWf: 3 / W, color: 'accent', wf: 380 / W, hf: 380 / H, xf: 960 / W, yf: 140 / H, opacity: 0.35, locked: true });
+      // headshot (dia 230) OR centred logo (max-h 150) near y=270
+      if (b.headImg && b.headImg.width) push({ type: 'image', src: 'head', shape: 'circle', wf: 230 / W, xf: 0.5, yf: 270 / H });
+      else if (b.logoImg && b.logoImg.width) { const s = Math.min(150 / b.logoImg.height, 280 / b.logoImg.width), lw = b.logoImg.width * s; push({ type: 'image', src: 'logo', shape: 'rect', wf: lw / W, xf: 0.5, yf: 270 / H }); }
+      ctrText('Like what you see?', 540, 460, 66, { weight: 700, font: capFont, color: fg });
+      // pill CTA (badge auto-sizes; letter-spacing 4)
+      push({ type: 'badge', text: 'BOOK YOUR PRIVATE VIEWING', size: 30, weight: 800, color: 'accent', font: 'sans', align: 'center', tracking: 4, xf: 0.5, yf: (520 + 39) / H });
+      ctrText(b.agentName || 'Your Name Here', 540, 708, 40, { weight: 700, color: fg });
+      let yy = 708;
+      if (b.brokerage) { yy += 48; ctrText(b.brokerage, 540, yy, 28, { weight: 400, color: fg, opacity: 0.85 }); }
+      const contact = [b.phone, b.email].filter(Boolean).join('   ·   ');
+      if (contact) { yy += 44; ctrText(contact, 540, yy, 28, { weight: 400, color: fg, opacity: 0.85 }); }
+      if (f.address) ctrText(String(f.address).toUpperCase(), 540, 1008, 24, { weight: 600, color: 'accent', opacity: 0.95, tracking: 2 });
+      layers = out; selId = null; bgEdit = false; rebuiltFrom = null; renderBgPicker(); commit(); inRebuild = false;
+      return;
+    }
+
+    // ---- feature slide: photo + caption — mirror visuals.featureSlide (visuals.js:378)
+    const pIdx = (typeof slide.photoIndex === 'number' && ctxData.photos[slide.photoIndex]) ? slide.photoIndex : 0;
+    bg = ctxData.photos.length ? { type: 'photo', photoIndex: pIdx } : { type: 'color', color: 'dark' };
+    // bottom legibility gradient: dark, fading up; y 594→1080 reaching alpha 0.85
+    push({ type: 'rect', shape: 'rect', color: '#080e12', grad: 'up', wf: 1, hf: 486 / H, xf: 0.5, yf: (594 + 243) / H, opacity: 0.85, radius: 0, locked: true });
+
+    const caption = slide.caption || '';
+    if (caption) {
+      // replicate wrapText(caption, W-128=952, max 2 lines) to find line count + widest line
+      ctx2d.font = `700 46px ${capFont === 'serif' ? SERIF : SANS}`;
+      const words = String(caption).split(/\s+/);
+      let line = '', lines = [];
+      for (const wd of words) {
+        const t = line ? line + ' ' + wd : wd;
+        if (ctx2d.measureText(t).width > 952 && line) { lines.push(line); line = wd; if (lines.length === 2) break; }
+        else line = t;
+      }
+      if (lines.length < 2 && line) lines.push(line);
+      const nLines = Math.max(1, Math.min(2, lines.length));
+      let textW = 0; lines.forEach((l) => { textW = Math.max(textW, ctx2d.measureText(l).width); });
+      const firstBaseline = 1080 - 96 - (nLines - 1) * 58;   // visuals: y = H-96-(lines-1)*58
+      // block centre keeps the codebase's baseline→centre convention (size*0.35) per line
+      const blockCentreY = firstBaseline + (nLines - 1) * 29 - 46 * 0.35;
+      push({ type: 'text', text: caption, size: 46, weight: 700, font: capFont, color: '#ffffff', align: 'left', wrapf: 952 / W, lineh: 58 / 46, xf: (64 + Math.min(textW, 952) / 2) / W, yf: blockCentreY / H });
+      // accent tick: 56×5 bar at (64, firstBaseline-58)
+      push({ type: 'rect', shape: 'rect', color: 'accent', wf: 56 / W, hf: 5 / H, xf: (64 + 28) / W, yf: ((firstBaseline - 58) + 2.5) / H, radius: 0, locked: true });
+    }
+
+    // footer: agent name (left) + counter (right), 600/24 @ white 0.75
+    if (b.agentName) leftText(b.agentName, 64, 1044, 24, { weight: 600, color: 'rgba(255,255,255,0.75)' });
+    rightText(`${(slide.idx || 0) + 1}/${slide.total || 1}`, 1028, 1044, 24, { weight: 600, color: 'rgba(255,255,255,0.75)' });
+
+    // position dots, top-right (locked decoration, r6.5, 26px apart)
+    const total = slide.total || 1, active = slide.idx || 0;
+    for (let i = 0; i < total; i++) {
+      push({ type: 'rect', shape: 'ellipse', wf: 13 / W, hf: 13 / H, xf: (1080 - 52 - (total - 1 - i) * 26) / W, yf: 52 / H, color: i === active ? '#ffffff' : 'rgba(255,255,255,0.45)', locked: true });
+    }
+
+    layers = out; selId = null; bgEdit = false; rebuiltFrom = null; renderBgPicker(); commit(); inRebuild = false;
+  };
+
   // ---- my templates (save layout, reuse on any listing) ---------------------
   const TPL_LS = 'lk_studio_templates';
   const loadTpls = () => { try { return JSON.parse(localStorage.getItem(TPL_LS) || '[]'); } catch (e) { return []; } };
@@ -1312,18 +1394,20 @@ const Studio = (() => {
     sizeKey = startSize && SIZES[startSize] ? startSize : 'square';
     document.querySelectorAll('#stSizes button').forEach((x) => x.classList.toggle('active', x.dataset.size === sizeKey));
     const startIdx = (typeof ctxData.startPhotoIndex === 'number' && ctxData.photos[ctxData.startPhotoIndex]) ? ctxData.startPhotoIndex : 0;
-    const ctaSeed = ctxData.seed === 'cta';
-    // CTA card edits open on a brand-colour background (not the hero photo)
+    const seed = ctxData.seed;
+    const ctaSeed = seed === 'cta', featureSeed = seed === 'feature';
+    // CTA card edits open on a brand-colour bg; feature/cover edits feature the slide's photo
     bg = ctaSeed ? { type: 'color', color: 'primary' } : (ctxData.photos.length ? { type: 'photo', photoIndex: startIdx } : { type: 'color' });
     layers = []; selId = null;
-    const f = ctxData.fields;
     replaying = true;            // seed starter layers without touching history / autosave
     if (ctaSeed) {
-      add('badge'); const b = layers[layers.length - 1]; if (b) { b.text = 'BOOK A VIEWING'; b.xf = 0.5; b.yf = 0.6; b.color = 'accent'; }
-      add('agent');
-      if (f.address) { add('address'); const a = layers[layers.length - 1]; if (a) a.yf = 0.5; }
+      // faithfully reproduce the closing CTA carousel slide
+      buildSlide({ kind: 'cta' });
+    } else if (featureSeed) {
+      // faithfully reproduce the clicked photo+caption carousel slide
+      buildSlide({ kind: 'feature', photoIndex: startIdx, caption: ctxData.caption || '', idx: ctxData.idx || 0, total: ctxData.total || 1 });
     } else {
-      // faithfully reproduce the brand's chosen graphic style as editable layers
+      // cover slide / default: reproduce the brand's chosen graphic style as editable layers
       rebuildStyle(ctxData.brand.templateId || 'modern');
     }
     replaying = false;

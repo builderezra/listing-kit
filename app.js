@@ -520,14 +520,14 @@
     let fi = 0;
     slides.forEach((p) => { if (p._caption == null) p._caption = feats[fi++] || ''; });
 
-    const addSlide = (label, renderFn, photo, kind) => {
+    const addSlide = (label, renderFn, photo, kind, meta) => {
       const cell = document.createElement('div');
       cell.className = 'car-slide';
       const cv = document.createElement('canvas');
       renderFn(cv);
       cv.title = 'Click to zoom & edit';
       const n = carouselCanvases.length + 1;
-      cv.addEventListener('click', () => openLightbox(cv, photo || null, n, kind || 'photo'));
+      cv.addEventListener('click', () => openLightbox(cv, photo || null, n, kind || 'photo', meta));
       const btn = document.createElement('button');
       btn.type = 'button';
       btn.className = 'copy-btn dl-mini';
@@ -540,7 +540,7 @@
 
     addSlide('1 · Cover', (cv) => Visuals.render(brand.templateId, 'square', cv, d), null, 'cover');
     slides.forEach((p, i) =>
-      addSlide(`${i + 2} · Photo`, (cv) => Visuals.featureSlide(cv, { photo: p, caption: p._caption || '', brand, idx: i + 1, total }), p, 'photo'));
+      addSlide(`${i + 2} · Photo`, (cv) => Visuals.featureSlide(cv, { photo: p, caption: p._caption || '', brand, idx: i + 1, total }), p, 'photo', { idx: i + 1, total }));
     addSlide(`${total} · CTA`, (cv) => Visuals.ctaSlide(cv, { brand, address: d.address, badgeText: d.badgeText }), null, 'cta');
   };
 
@@ -556,9 +556,9 @@
   };
 
   // ---- carousel slide lightbox (zoom + edit) ----
-  let lbState = { photo: null, n: 1, cv: null, kind: 'photo' };
-  const openLightbox = (cv, photo, n, kind) => {
-    lbState = { photo, n, cv, kind: kind || 'photo' };
+  let lbState = { photo: null, n: 1, cv: null, kind: 'photo', idx: 0, total: 1 };
+  const openLightbox = (cv, photo, n, kind, meta) => {
+    lbState = { photo, n, cv, kind: kind || 'photo', idx: (meta && meta.idx) || 0, total: (meta && meta.total) || 1 };
     $('lbImg').src = cv.toDataURL('image/png');
     $('lightbox').hidden = false;
   };
@@ -570,8 +570,8 @@
     $('lbEdit').addEventListener('click', () => {
       closeLightbox();
       if (lbState.kind === 'cta') openStudio({ seed: 'cta' });            // the CTA card, not the hero photo
-      else if (lbState.photo) openStudio(orderedPhotos().indexOf(lbState.photo));   // SAME index space the studio uses
-      else openStudio();                                                  // cover ≈ the default seed
+      else if (lbState.photo) openStudio({ seed: 'feature', photoIndex: orderedPhotos().indexOf(lbState.photo), caption: lbState.photo._caption || '', idx: lbState.idx, total: lbState.total });   // reproduce THIS slide (photo + caption + dots)
+      else openStudio({ seed: 'cover', photoIndex: 0 });                  // cover ≈ the template card on the hero
     });
     if (canShareFiles()) { $('lbShare').hidden = false; $('lbShare').addEventListener('click', async () => { if (lbState.cv) { const ok = await shareCanvas(lbState.cv, `${slug()}-carousel-${String(lbState.n).padStart(2, '0')}.png`, (outputs && outputs.instagram) || ''); if (!ok) $('lbDownload').click(); } }); }
     window.addEventListener('keydown', (e) => { if (!$('lightbox').hidden && e.key === 'Escape') closeLightbox(); });
@@ -623,6 +623,10 @@
       photos: s.photos, brand, fields: s.fields,
       startPhotoIndex: (typeof opt.photoIndex === 'number') ? opt.photoIndex : null,
       seed: opt.seed || null,
+      // carousel slide reproduction: the clicked slide's caption + position
+      caption: opt.caption || null,
+      idx: (typeof opt.idx === 'number') ? opt.idx : null,
+      total: (typeof opt.total === 'number') ? opt.total : null,
       // lets the studio upload a photo straight into the listing gallery
       addPhoto: async (file) => { const ok = await addPhotoBlob(file, 'studio'); if (!ok) return null; syncFcss(); return photos[photos.length - 1]; },
       // "Apply to all my graphics" — push the transferable basic adjustments to the real photo
