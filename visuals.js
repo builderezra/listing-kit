@@ -84,6 +84,7 @@ const Visuals = (() => {
 
   // pill badge; returns its width
   const badge = (ctx, x, y, text, bg, fg, size = 28, r = 999) => {
+    if (!text) return { w: 0, h: 0 };   // empty status (e.g. replaced by a corner stamp) → draw nothing
     ctx.font = font(800, size);
     spacing(ctx, size * 0.18);
     const padX = size * 0.85, padY = size * 0.52;
@@ -396,7 +397,7 @@ const Visuals = (() => {
     ctx.fillStyle = '#14110e'; ctx.fillRect(0, 0, W, H);
     ctx.strokeStyle = alpha(b.accent, 0.55); ctx.lineWidth = 1.5;
     ctx.strokeRect(24, 24, W - 48, H - 48);
-    const kicker = (d.badgeText || 'FOR SALE').toUpperCase();
+    const kicker = (d.badgeText || (d.stamp ? '' : 'FOR SALE')).toUpperCase();
     if (wide) {
       cover(ctx, d.hero, 44, 44, Math.round(W * 0.5) - 44, H - 88, 0, b, d.heroFocus, d.heroFilter);
       const cx = Math.round(W * 0.5) + (W - Math.round(W * 0.5) - 44) / 2;
@@ -762,7 +763,9 @@ const Visuals = (() => {
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
     ctx.clearRect(0, 0, W, H);
-    (TEMPLATES[templateId] || modern)(ctx, W, H, d, kind);
+    // a status stamp REPLACES the small status badge — blank it so the two don't clash
+    const td = (d && d.stamp) ? Object.assign({}, d, { badgeText: '' }) : d;
+    (TEMPLATES[templateId] || modern)(ctx, W, H, td, kind);
     if (d && d.stamp) cornerSash(ctx, W, H, d.stamp);
   };
 

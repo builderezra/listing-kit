@@ -173,22 +173,47 @@
     ['#33415c', '#8fb8de'], // slate & sky
     ['#4a2c2a', '#d9c5a0'], // espresso & cream
   ];
+  // custom palettes the agent saves from the current colours (persisted on-device)
+  const PAL_KEY = 'lk_palettes_v1';
+  let customPals = [];
+  try { const a = JSON.parse(localStorage.getItem(PAL_KEY) || '[]'); if (Array.isArray(a)) customPals = a.filter((x) => Array.isArray(x) && /^#[0-9a-f]{3,8}$/i.test(x[0]) && /^#[0-9a-f]{3,8}$/i.test(x[1])).slice(0, 40); } catch (e) {}
+  const savePals = () => { try { localStorage.setItem(PAL_KEY, JSON.stringify(customPals)); } catch (e) {} };
+  const applyPal = (p, a) => {
+    brand.primary = p; brand.accent = a;
+    $('brandPrimary').value = p; $('brandAccent').value = a;
+    saveBrand(); rerenderVisuals();
+  };
   const renderPalettes = () => {
     const row = $('palRow');
     row.innerHTML = '';
-    PALETTES.forEach(([p, a]) => {
+    const swatch = (p, a, custom, idx) => {
+      const wrap = document.createElement('span');
+      wrap.className = 'pal-wrap';
       const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'pal';
-      b.title = `${p} / ${a}`;
+      b.type = 'button'; b.className = 'pal'; b.title = `${p} / ${a}`;
       b.style.background = `linear-gradient(135deg, ${p} 50%, ${a} 50%)`;
-      b.addEventListener('click', () => {
-        brand.primary = p; brand.accent = a;
-        $('brandPrimary').value = p; $('brandAccent').value = a;
-        saveBrand(); rerenderVisuals();
-      });
-      row.appendChild(b);
+      b.addEventListener('click', () => applyPal(p, a));
+      wrap.appendChild(b);
+      if (custom) {
+        const x = document.createElement('button');
+        x.type = 'button'; x.className = 'pal-del'; x.title = 'Delete this palette'; x.textContent = '×';
+        x.addEventListener('click', (e) => { e.stopPropagation(); customPals.splice(idx, 1); savePals(); renderPalettes(); });
+        wrap.appendChild(x);
+      }
+      row.appendChild(wrap);
+    };
+    PALETTES.forEach(([p, a]) => swatch(p, a, false));
+    customPals.forEach(([p, a], i) => swatch(p, a, true, i));
+    // "+" — save the current brand colours as a new palette
+    const add = document.createElement('button');
+    add.type = 'button'; add.className = 'pal pal-add'; add.title = 'Save the current colours as a palette'; add.textContent = '+';
+    add.addEventListener('click', () => {
+      const p = (brand.primary || '').toLowerCase(), a = (brand.accent || '').toLowerCase();
+      if (!p || !a) return;
+      if ([...PALETTES, ...customPals].some(([cp, ca]) => cp.toLowerCase() === p && ca.toLowerCase() === a)) { toast('That palette is already saved'); return; }
+      customPals.push([brand.primary, brand.accent]); savePals(); renderPalettes(); toast('✓ Palette saved');
     });
+    row.appendChild(add);
   };
 
   // ---------------- design import / export ----------------
