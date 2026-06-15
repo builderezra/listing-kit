@@ -78,6 +78,51 @@ const Reel = (() => {
     if (line && lines.length < maxLines) lines.push(line);
     return lines;
   };
+  const easeOut = (t) => 1 - Math.pow(1 - t, 3);
+
+  // one cinematic photo scene: Ken-Burns image + vignette + bottom scrim + an
+  // animated lower-third (accent bar + caption that slides up & fades in/out).
+  const paintPhotoScene = (ctx, o2) => {
+    const { img, fcss, caption, kb, p, dur, counter, brokerage, acc, fit } = o2;
+    coverKB(ctx, img, p, kb || 0, fcss, fit);
+    const vg = ctx.createRadialGradient(W / 2, H * 0.42, H * 0.22, W / 2, H * 0.5, H * 0.78);
+    vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.30)');
+    ctx.fillStyle = vg; ctx.fillRect(0, 0, W, H);
+    const g = ctx.createLinearGradient(0, H * 0.5, 0, H);
+    g.addColorStop(0, 'rgba(8,12,16,0)'); g.addColorStop(1, 'rgba(8,12,16,0.92)');
+    ctx.fillStyle = g; ctx.fillRect(0, H * 0.5, W, H * 0.5);
+    const localT = p * dur;
+    if (caption) {
+      const appear = easeOut(clamp01(localT / 0.5));
+      const alpha = Math.min(appear, clamp01((dur - localT) / 0.35));
+      const slide = (1 - appear) * 48;
+      ctx.save(); ctx.globalAlpha = alpha; ctx.textAlign = 'left';
+      ctx.font = `800 62px ${SANS}`;
+      const lines = wrap(ctx, caption, W - 168, 2);
+      const baseY = H - 156 + slide - (lines.length - 1) * 74;
+      ctx.fillStyle = acc; ctx.fillRect(74, baseY - 88, 72, 7);
+      ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = 16; ctx.shadowOffsetY = 2;
+      ctx.fillStyle = '#fff';
+      lines.forEach((l, i) => ctx.fillText(l, 74, baseY + i * 74));
+      ctx.restore();
+    }
+    ctx.save(); ctx.shadowColor = 'rgba(0,0,0,0.4)'; ctx.shadowBlur = 8;
+    if (brokerage) { ctx.textAlign = 'left'; ctx.font = `600 28px ${SANS}`; ctx.fillStyle = 'rgba(255,255,255,0.74)'; ctx.fillText(brokerage, 74, H - 64); }
+    if (counter) { ctx.textAlign = 'right'; ctx.font = `700 26px ${SANS}`; ctx.fillStyle = 'rgba(255,255,255,0.82)'; ctx.fillText(counter, W - 64, H - 64); }
+    ctx.restore();
+  };
+
+  // story-style segmented progress bar across the top
+  const drawProgress = (ctx, n, idx, p) => {
+    if (n < 1) return;
+    const m = 40, gap = 8, y = 28, h = 5, segW = (W - m * 2 - gap * (n - 1)) / n;
+    for (let s = 0; s < n; s++) {
+      const x = m + s * (segW + gap);
+      ctx.fillStyle = 'rgba(255,255,255,0.30)'; ctx.fillRect(x, y, segW, h);
+      const f = s < idx ? 1 : (s === idx ? clamp01(p) : 0);
+      if (f > 0) { ctx.fillStyle = 'rgba(255,255,255,0.95)'; ctx.fillRect(x, y, segW * f, h); }
+    }
+  };
 
   // record({canvas, brand, d, photos, opts, onProgress}) -> Promise<{blob, mime, ext}>
   const record = ({ canvas, brand, d, photos, captions, opts, onProgress }) => new Promise((resolve, reject) => {
@@ -102,34 +147,30 @@ const Reel = (() => {
 
     const paint = (sc, p) => {
       if (sc.type === 'intro') {
-        const z = 1 + 0.05 * easeInOut(p), dw = W * z, dh = H * z;
+        const z = 1 + 0.06 * easeInOut(p), dw = W * z, dh = H * z;
         if (introImg.width) ctx.drawImage(introImg, (W - dw) / 2, (H - dh) / 2, dw, dh);
+        const fin = clamp01(p * sc.dur / 0.45);               // open with a fade-in from black
+        if (fin < 1) { ctx.fillStyle = `rgba(0,0,0,${1 - fin})`; ctx.fillRect(0, 0, W, H); }
         return;
       }
       if (sc.type === 'outro') {
         const g = ctx.createLinearGradient(0, 0, 0, H);
         g.addColorStop(0, Visuals.shade(brand.primary, 16)); g.addColorStop(1, Visuals.shade(brand.primary, -34));
         ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
-        if (ctaImg.width) { const z = 1 + 0.05 * easeInOut(p), cw = W * z; ctx.drawImage(ctaImg, (W - cw) / 2, (H - cw) / 2, cw, cw); }
+        if (ctaImg.width) {
+          const cardA = easeOut(clamp01(p * sc.dur / 0.45)), z = 1.03 - 0.03 * cardA, cw = W * z;
+          ctx.save(); ctx.globalAlpha = cardA; ctx.drawImage(ctaImg, (W - cw) / 2, (H - cw) / 2, cw, cw); ctx.restore();
+        }
+        const localT = p * sc.dur, fout = clamp01((localT - (sc.dur - 0.4)) / 0.4);   // close with a fade-to-black
+        if (fout > 0) { ctx.fillStyle = `rgba(0,0,0,${fout})`; ctx.fillRect(0, 0, W, H); }
         return;
       }
-      // photo scene
-      coverKB(ctx, sc.photo && sc.photo.img, p, sc.kb, sc.photo && sc.photo.fcss, o.fit);
-      const g = ctx.createLinearGradient(0, H * 0.58, 0, H);
-      g.addColorStop(0, 'rgba(8,14,18,0)'); g.addColorStop(1, 'rgba(8,14,18,0.84)');
-      ctx.fillStyle = g; ctx.fillRect(0, H * 0.58, W, H * 0.42);
-      ctx.textAlign = 'left';
-      let y = H - 150;
-      if (sc.caption) {
-        ctx.font = `800 60px ${SANS}`;
-        const lines = wrap(ctx, sc.caption, W - 150, 3);
-        y = H - 150 - (lines.length - 1) * 70;
-        ctx.fillStyle = acc; ctx.fillRect(72, y - 78, 64, 6);
-        ctx.fillStyle = '#fff';
-        lines.forEach((l, i) => ctx.fillText(l, 72, y + i * 70));
-      }
-      if (brand.brokerage) { ctx.font = `600 30px ${SANS}`; ctx.fillStyle = 'rgba(255,255,255,0.8)'; ctx.fillText(brand.brokerage, 72, H - 70); }
-      ctx.textAlign = 'left';
+      // cinematic photo scene
+      paintPhotoScene(ctx, {
+        img: sc.photo && sc.photo.img, fcss: sc.photo && sc.photo.fcss, caption: sc.caption,
+        kb: sc.kb, p, dur: sc.dur, counter: `${(sc.kb || 0) + 1} / ${pics.length}`,
+        brokerage: brand.brokerage, acc, fit: o.fit,
+      });
     };
 
     let stream, rec;
@@ -163,6 +204,7 @@ const Reel = (() => {
       ctx.globalAlpha = 1; paint(sc, p);
       const remain = sc.dur - localT;
       if (remain < o.xf && i + 1 < scenes.length) { ctx.globalAlpha = clamp01((o.xf - remain) / o.xf); paint(scenes[i + 1], 0); ctx.globalAlpha = 1; }
+      drawProgress(ctx, scenes.length, i, p);
       setTimeout(frame, FRAME_MS);
     };
     try { rec.start(1000); } catch (e) { return reject(e); }
@@ -173,6 +215,15 @@ const Reel = (() => {
   const previewFrame = (canvas, brand, d) => {
     canvas.width = W; canvas.height = H;
     const ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, W, H);
+    const hero = d && d.hero;
+    if (hero && hero.width) {   // show a real cinematic photo frame so the preview reflects the reel
+      const n = Math.max(1, ((d.photos || []).filter((x) => x.inCarousel !== false).length) || 1);
+      const cap = d.price ? (d.price + (d.address ? '  ·  ' + d.address : '')) : (d.address || 'Your next home');
+      paintPhotoScene(ctx, { img: hero, fcss: d.heroFilter, caption: cap, kb: 0, p: 0.62, dur: 2.6, counter: '01 / ' + n, brokerage: brand.brokerage, acc: brand.accent || '#c08a3e', fit: false });
+      drawProgress(ctx, n + 2, 1, 0.5);
+      return;
+    }
     const off = document.createElement('canvas');
     try { Visuals.render(brand.templateId, 'story', off, d); ctx.drawImage(off, 0, 0); } catch (e) {}
   };
