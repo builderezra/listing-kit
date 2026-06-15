@@ -1019,6 +1019,57 @@ const Studio = (() => {
         const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
         if (sub) ctrText(sub, W / 2, baseY + (k === 'story' ? 38 : 32), k === 'story' ? 24 : 20, { weight: 400, color: mut });
       }
+    } else if (tpl === 'minimal') {
+      bg = ctxData.photos.length ? { type: 'photo', photoIndex: pIdx } : { type: 'color', color: 'primary' };
+      const wide = k === 'wide', m = wide ? 34 : 48, pad = wide ? 30 : 40;
+      if (f.badge) badgeTL(f.badge, m, m, wide ? 20 : 26, '#ffffff');
+      const cardW = wide ? Math.min(560, Math.round(W * 0.5)) : W - m * 2;
+      const cardH = k === 'story' ? 384 : wide ? 250 : 300;
+      const cardX = wide ? W - m - cardW : m, cardY = H - m - cardH, lx = cardX + pad;
+      push({ type: 'rect', shape: 'rect', color: '#ffffff', wf: cardW / W, hf: cardH / H, xf: (cardX + cardW / 2) / W, yf: (cardY + cardH / 2) / H, radius: 20 });
+      const ink = '#1b2a30', mut = '#717c84';
+      let y = cardY + pad + (k === 'story' ? 78 : wide ? 56 : 66);
+      if (f.price) { leftText(f.price, lx, y, k === 'story' ? 92 : wide ? 54 : 74, { weight: 700, font: priceFont('sans'), color: ink }); y += k === 'story' ? 58 : wide ? 44 : 48; }
+      if (f.address) { leftText(f.address, lx, y, k === 'story' ? 34 : wide ? 23 : 30, { weight: 400, color: mut }); y += k === 'story' ? 50 : 42; }
+      push({ type: 'rect', shape: 'rect', color: 'accent', wf: 54 / W, hf: 4 / H, xf: (lx + 27) / W, yf: (y - 14) / H, radius: 0 }); y += 26;
+      if (f.stats) leftText(f.stats, lx, y, k === 'story' ? 26 : wide ? 20 : 22, { weight: 600, color: ink });
+      const ay = cardY + cardH - pad;
+      leftText(b.agentName || 'Your Name Here', lx, ay, k === 'story' ? 26 : wide ? 20 : 22, { weight: 700, color: ink });
+      const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
+      if (sub) leftText(sub, lx, ay + (k === 'story' ? 30 : 26), k === 'story' ? 20 : 17, { weight: 400, color: mut });
+      if (b.logoImg && b.logoImg.width) logoRight(cardX + cardW - pad, ay - 6, k === 'story' ? 56 : 46);
+    } else if (tpl === 'luxe') {
+      bg = { type: 'color', color: '#14110e' };
+      const ink = '#f3ece0', mut = 'rgba(243,236,224,0.62)', wide = k === 'wide';
+      push({ type: 'rect', shape: 'rect', noFill: true, stroke: 'accent', strokeWf: 1.5 / W, color: 'accent', wf: (W - 48) / W, hf: (H - 48) / H, xf: 0.5, yf: 0.5, radius: 0, opacity: 0.55 });
+      const kicker = (f.badge || 'FOR SALE').toUpperCase();
+      if (wide) {
+        const half = Math.round(W * 0.5);
+        if (ctxData.photos.length) push({ type: 'photo', photoIndex: pIdx, shape: 'rect', wf: (half - 44) / W, hf: (H - 88) / H, xf: (44 + (half - 44) / 2) / W, yf: 0.5 });
+        const cX = half + (W - half - 44) / 2;
+        let y = 200;
+        ctrText(kicker, cX, y, 18, { weight: 600, color: 'accent', tracking: 6 }); y += 78;
+        if (f.price) { ctrText(f.price, cX, y, 62, { weight: 500, font: 'serif', color: ink }); y += 56; }
+        push({ type: 'rect', shape: 'rect', color: 'accent', wf: 84 / W, hf: 2 / H, xf: cX / W, yf: (y - 8) / H, radius: 0 }); y += 44;
+        if (f.address) { ctrText(f.address, cX, y, 26, { weight: 400, color: mut }); y += 52; }
+        if (f.stats) ctrText(f.stats, cX, y, 20, { weight: 500, color: ink });
+        ctrText(b.agentName || 'Your Name Here', cX, H - 104, 24, { weight: 500, font: 'serif', color: ink });
+        const sub = [b.brokerage, b.phone].filter(Boolean).join('   ·   ');
+        if (sub) ctrText(sub, cX, H - 74, 18, { weight: 400, color: mut });
+      } else {
+        const mm = 56, photoTop = mm + (k === 'story' ? 36 : 26), photoH = k === 'story' ? 1060 : 624;
+        if (ctxData.photos.length) push({ type: 'photo', photoIndex: pIdx, shape: 'rect', wf: (W - mm * 2) / W, hf: photoH / H, xf: 0.5, yf: (photoTop + photoH / 2) / H });
+        let y = photoTop + photoH + (k === 'story' ? 116 : 92);
+        ctrText(kicker, W / 2, y - (k === 'story' ? 66 : 58), k === 'story' ? 22 : 19, { weight: 600, color: 'accent', tracking: 6 });
+        if (f.price) { ctrText(f.price, W / 2, y, k === 'story' ? 92 : 76, { weight: 500, font: 'serif', color: ink }); y += k === 'story' ? 60 : 52; }
+        push({ type: 'rect', shape: 'rect', color: 'accent', wf: 88 / W, hf: 2 / H, xf: 0.5, yf: (y - 10) / H, radius: 0 }); y += 40;
+        if (f.address) { ctrText(f.address, W / 2, y, k === 'story' ? 34 : 30, { weight: 400, color: mut }); y += k === 'story' ? 52 : 46; }
+        if (f.stats) ctrText(f.stats, W / 2, y, k === 'story' ? 26 : 23, { weight: 500, color: ink });
+        const baseY = H - (k === 'story' ? 104 : 84);
+        ctrText(b.agentName || 'Your Name Here', W / 2, baseY, k === 'story' ? 30 : 26, { weight: 500, font: 'serif', color: ink });
+        const sub = [b.brokerage, b.phone].filter(Boolean).join('   ·   ');
+        if (sub) ctrText(sub, W / 2, baseY + (k === 'story' ? 34 : 30), k === 'story' ? 22 : 19, { weight: 400, color: mut });
+      }
     } else {   // bold
       bg = { type: 'gradient', c1: Visuals.shade(b.primary, 14), c2: Visuals.shade(b.primary, -34), angle: 90 };
       const fg = onP, m = k === 'wide' ? 44 : 48;

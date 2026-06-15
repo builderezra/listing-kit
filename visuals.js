@@ -354,6 +354,80 @@ const Visuals = (() => {
     else logoImg(ctx, b.logoImg, W - m - 16, rowY + (kind === 'story' ? 72 : 64), kind === 'story' ? 80 : 68);
   };
 
+  // =====================  MINIMAL — full-bleed photo + clean white card  ======
+  const minimal = (ctx, W, H, d, kind) => {
+    const b = d.brand, story = kind === 'story', wide = kind === 'wide';
+    cover(ctx, d.hero, 0, 0, W, H, 0, b, d.heroFocus, d.heroFilter);
+    let g = ctx.createLinearGradient(0, 0, 0, 220);
+    g.addColorStop(0, 'rgba(0,0,0,0.32)'); g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, 220);
+    const m = wide ? 34 : 44;
+    badge(ctx, m, m, d.badgeText, '#ffffff', '#1c2b30', wide ? 20 : 26);
+    if (d.ohLine) { ctx.font = font(600, wide ? 18 : 22); ctx.fillStyle = '#fff'; ctx.fillText(d.ohLine, m + 4, m + (wide ? 52 : 64)); }
+    const pad = wide ? 30 : 40;
+    const cardW = wide ? Math.min(560, Math.round(W * 0.5)) : W - m * 2;
+    const cardH = story ? 384 : wide ? 250 : 300;
+    const cardX = wide ? W - m - cardW : m, cardY = H - m - cardH;
+    ctx.save();
+    ctx.shadowColor = 'rgba(0,0,0,0.30)'; ctx.shadowBlur = 34; ctx.shadowOffsetY = 10;
+    ctx.fillStyle = '#ffffff'; rr(ctx, cardX, cardY, cardW, cardH, 20); ctx.fill();
+    ctx.restore();
+    const ink = '#1b2a30', mut = '#717c84', lx = cardX + pad;
+    ctx.textAlign = 'left';
+    let y = cardY + pad + (story ? 78 : wide ? 56 : 66);
+    if (d.price) { ctx.font = font(700, story ? 92 : wide ? 54 : 74, priceFam(b, SANS)); ctx.fillStyle = ink; ctx.fillText(d.price, lx, y); y += story ? 58 : wide ? 44 : 48; }
+    if (d.address) { ctx.font = font(400, story ? 34 : wide ? 23 : 30); ctx.fillStyle = mut; ctx.fillText(d.address, lx, y); y += story ? 50 : 42; }
+    ctx.fillStyle = b.accent; ctx.fillRect(lx, y - 16, 54, 4); y += 26;
+    const stats = statText(d);
+    if (stats) { ctx.font = font(600, story ? 26 : wide ? 20 : 22); ctx.fillStyle = ink; spacing(ctx, 2); ctx.fillText(stats, lx, y); spacing(ctx, 0); }
+    const ay = cardY + cardH - pad;
+    ctx.font = font(700, story ? 26 : wide ? 20 : 22); ctx.fillStyle = ink;
+    ctx.fillText(b.agentName || '', lx, ay);
+    const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
+    if (sub) { ctx.font = font(400, story ? 20 : 17); ctx.fillStyle = mut; ctx.fillText(sub, lx, ay + (story ? 30 : 26)); }
+    if (b.logoImg && b.logoImg.width) logoImg(ctx, b.logoImg, cardX + cardW - pad, ay - 6, story ? 56 : 46);
+    ctx.textAlign = 'left';
+  };
+
+  // =====================  LUXE — dark editorial, serif, gold hairlines  ========
+  const luxe = (ctx, W, H, d, kind) => {
+    const b = d.brand, story = kind === 'story', wide = kind === 'wide';
+    const ink = '#f3ece0', mut = 'rgba(243,236,224,0.62)';
+    ctx.fillStyle = '#14110e'; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = alpha(b.accent, 0.55); ctx.lineWidth = 1.5;
+    ctx.strokeRect(24, 24, W - 48, H - 48);
+    const kicker = (d.badgeText || 'FOR SALE').toUpperCase();
+    if (wide) {
+      cover(ctx, d.hero, 44, 44, Math.round(W * 0.5) - 44, H - 88, 0, b, d.heroFocus, d.heroFilter);
+      const cx = Math.round(W * 0.5) + (W - Math.round(W * 0.5) - 44) / 2;
+      ctx.textAlign = 'center';
+      let y = 200;
+      ctx.font = font(600, 18); spacing(ctx, 6); ctx.fillStyle = b.accent; ctx.fillText(kicker, cx, y); spacing(ctx, 0); y += 78;
+      if (d.price) { ctx.font = font(500, 62, SERIF); ctx.fillStyle = ink; ctx.fillText(d.price, cx, y); y += 56; }
+      ctx.strokeStyle = alpha(b.accent, 0.85); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx - 42, y - 8); ctx.lineTo(cx + 42, y - 8); ctx.stroke(); y += 44;
+      if (d.address) { ctx.font = font(400, 26); ctx.fillStyle = mut; ctx.fillText(d.address, cx, y); y += 52; }
+      const stats = statText(d); if (stats) { ctx.font = font(500, 20); spacing(ctx, 3); ctx.fillStyle = ink; ctx.fillText(stats, cx, y); spacing(ctx, 0); }
+      ctx.font = font(500, 24, SERIF); ctx.fillStyle = ink; ctx.fillText(b.agentName || 'Your Name Here', cx, H - 104);
+      const sub = [b.brokerage, b.phone].filter(Boolean).join('   ·   '); if (sub) { ctx.font = font(400, 18); ctx.fillStyle = mut; ctx.fillText(sub, cx, H - 74); }
+      ctx.textAlign = 'left'; return;
+    }
+    const mm = 56, photoTop = mm + (story ? 36 : 26);
+    const photoH = story ? 1060 : 624;
+    cover(ctx, d.hero, mm, photoTop, W - mm * 2, photoH, 0, b, d.heroFocus, d.heroFilter);
+    ctx.textAlign = 'center';
+    let y = photoTop + photoH + (story ? 116 : 92);
+    ctx.font = font(600, story ? 22 : 19); spacing(ctx, 6); ctx.fillStyle = b.accent;
+    ctx.fillText(kicker, W / 2, y - (story ? 66 : 58)); spacing(ctx, 0);
+    if (d.price) { ctx.font = font(500, story ? 92 : 76, SERIF); ctx.fillStyle = ink; ctx.fillText(d.price, W / 2, y); y += story ? 60 : 52; }
+    ctx.strokeStyle = alpha(b.accent, 0.85); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(W / 2 - 44, y - 10); ctx.lineTo(W / 2 + 44, y - 10); ctx.stroke(); y += 40;
+    if (d.address) { ctx.font = font(400, story ? 34 : 30); ctx.fillStyle = mut; ctx.fillText(d.address, W / 2, y); y += story ? 52 : 46; }
+    const stats = statText(d); if (stats) { ctx.font = font(500, story ? 26 : 23); spacing(ctx, 3); ctx.fillStyle = ink; ctx.fillText(stats, W / 2, y); spacing(ctx, 0); }
+    const baseY = H - (story ? 104 : 84);
+    ctx.font = font(500, story ? 30 : 26, SERIF); ctx.fillStyle = ink; ctx.fillText(b.agentName || 'Your Name Here', W / 2, baseY);
+    const sub = [b.brokerage, b.phone].filter(Boolean).join('   ·   '); if (sub) { ctx.font = font(400, story ? 22 : 19); ctx.fillStyle = mut; ctx.fillText(sub, W / 2, baseY + (story ? 34 : 30)); }
+    ctx.textAlign = 'left';
+  };
+
   // =====================  CAROUSEL SLIDES (1080×1080)  =========================
   // wrap text to maxWidth, at most `maxLines` lines (ellipsis on overflow)
   const wrapText = (ctx, text, maxWidth, maxLines) => {
@@ -475,7 +549,7 @@ const Visuals = (() => {
 
   // ---- public API ------------------------------------------------------------
   const SIZES = { square: [1080, 1080], story: [1080, 1920], wide: [1200, 630] };
-  const TEMPLATES = { modern, classic, bold };
+  const TEMPLATES = { modern, classic, bold, minimal, luxe };
 
   const render = (templateId, kind, canvas, d) => {
     const [W, H] = SIZES[kind];
