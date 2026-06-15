@@ -184,6 +184,12 @@ const Generator = (() => {
       'A well-positioned {noun} ready to perform from day one.',
       'Value, condition, and location align in this {noun}.',
     ],
+    firsthome: [
+      'A smart, low-fuss first step onto the property ladder — and a {noun} you’ll genuinely love.',
+      'Getting started has never looked better than this move-in-ready {noun}.',
+      'An easy-care {noun} that makes a first purchase feel within reach.',
+      'The hard part is done — this {noun} is ready to simply move into and enjoy.',
+    ],
     classic: [
       'Proudly presenting this well-appointed {noun}.',
       'A wonderful opportunity to own this classic {noun}.',
@@ -197,6 +203,7 @@ const Generator = (() => {
     warm: ['with room for every rhythm of daily life', 'and every inch of it feels like home', 'with space to spread out and settle in'],
     modern: ['planned for flexibility and everyday flow', 'with a footprint that adapts to how you actually live', 'and not a wasted square foot among them'],
     investor: ['with a layout that shows well and holds value', 'and the kind of floor plan that stays in demand', 'with broad appeal to today’s buyers'],
+    firsthome: ['with low-maintenance living that just works', 'and an easy footprint to settle straight into', 'with nothing left to do but move in'],
     classic: ['with comfortable, practical flow throughout', 'thoughtfully arranged for everyday living', 'with a classic layout that simply works'],
   };
 
@@ -205,6 +212,7 @@ const Generator = (() => {
     warm: ['Come see it for yourself — schedule a tour today.', 'We’d love to show you around. Reach out anytime.', 'Come stand in the kitchen and you’ll get it — schedule a showing today.'],
     modern: ['Book your tour and see it in person.', 'Ready when you are — schedule a showing today.', 'See it live — reach out to tour.'],
     investor: ['Run the numbers, then come take a look.', 'Serious inquiries welcome — reach out for the full breakdown.', 'Let’s talk — schedule a walkthrough today.'],
+    firsthome: ['Take the first step — book a viewing today.', 'Ready to get started? Reach out for a time to look through.', 'Let’s make it yours — message me to arrange a viewing.'],
     classic: ['Call today to schedule your private showing.', 'Don’t miss this one — schedule a tour today.', 'Contact us today for a showing.'],
   };
 
@@ -237,6 +245,7 @@ const Generator = (() => {
     luxury: ['A Statement Address in {sub}', 'Where Design Meets Lifestyle', 'Quietly Exceptional, {sub}', 'Crafted for the Way You Live'],
     modern: ['Smart Living, {sub} Style', 'Fresh, Functional and Ready', 'Designed for Right Now', 'Clean Lines, Easy Living in {sub}'],
     investor: ['An Opportunity That Stacks Up in {sub}', 'Solid Returns, Smart Address', 'Set, Forget and Watch {sub} Work', 'The Numbers Make Sense Here'],
+    firsthome: ['Your First Move Starts in {sub}', 'Move-In Ready in {sub}', 'An Easy First Step in {sub}', 'Start Here, in {sub}'],
     classic: ['Space, Comfort and Convenience in {sub}', 'Your Next Chapter Starts in {sub}', 'Position, Potential and Polish', 'All the Right Boxes in {sub}'],
   };
   // rent headlines focus on availability + lifestyle, not ownership
@@ -252,6 +261,7 @@ const Generator = (() => {
     luxury: ['It’s an address that does the quiet bragging for you.', 'The setting completes the picture — composed, connected, considered.'],
     modern: ['Everything you actually use is minutes away — no wasted commutes.', 'The location works as hard as the floor plan does.'],
     investor: ['Low-fuss ownership in a location that does the heavy lifting.', 'The address takes care of demand — the property takes care of itself.'],
+    firsthome: ['Low-maintenance living that leaves your weekends free.', 'Everything’s sorted — just bring your bags and settle in.'],
     classic: ['A location that simply makes day-to-day life easier.', 'Convenience like this never goes out of style.'],
   };
 
@@ -483,15 +493,26 @@ const Generator = (() => {
     return lines.join('\n');
   };
 
+  // Suburb- and region-aware hashtag pack. High-intent local tags (the suburb,
+  // its real-estate tag, the market region) are ALWAYS kept; broad-reach tags
+  // fill the rest for discovery. Suburb tags are where local buyers actually
+  // search, so they’re guaranteed rather than left to the random fill.
   const hashtags = (d) => {
-    const tags = d.mode === 'rent'
-      ? ['#forlease', '#forrent', '#rental', '#rentals', '#propertyforrent', '#newlisting', '#realestate', '#renting']
-      : ['#justlisted', '#realestate', '#forsale', '#newlisting', '#homeforsale', '#dreamhome', '#realtor', '#housetour', '#hometour'];
+    const clean = (s) => '#' + String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const rent = d.mode === 'rent';
+    const must = [rent ? '#forlease' : '#justlisted', rent ? '#forrent' : '#forsale'];
+    if (d.city) { must.push(clean(d.city), clean(d.city) + (rent ? 'rentals' : 'realestate')); }
+    const regionTags = { au: ['#australianproperty', '#realestateau'], us: ['#realestateusa', '#usrealestate'], uk: ['#ukproperty', '#ukrealestate'] }[d.region] || [];
+    must.push(...regionTags);
     const typeTag = { single: '#familyhome', apartment: '#apartmentliving', villa: '#villaliving', condo: '#condoliving', townhouse: '#townhome', multi: '#investmentproperty', land: '#landforsale', luxury: '#luxuryrealestate' }[d.type];
-    if (typeTag) tags.push(typeTag);
-    if (d.mode !== 'rent' && priceTier(d.price) === 'luxury') tags.push('#luxuryhomes', '#luxurylisting');
-    if (d.city) tags.push('#' + d.city.toLowerCase().replace(/[^a-z0-9]/g, '') + (d.mode === 'rent' ? 'rentals' : 'realestate'));
-    return pickN(tags, Math.min(tags.length, 9)).join(' ');
+    if (typeTag) must.push(typeTag);
+    if (!rent && priceTier(d.price) === 'luxury') must.push('#luxuryhomes', '#luxuryrealestate');
+    const extra = rent
+      ? ['#rental', '#rentals', '#propertyforrent', '#newlisting', '#realestate', '#renting', '#houseforrent', '#rentalproperty']
+      : ['#realestate', '#newlisting', '#homeforsale', '#dreamhome', '#realtor', '#housetour', '#hometour', '#property', '#openforinspection'];
+    const out = [], seen = new Set();
+    [...must, ...pickN(extra, extra.length)].forEach((t) => { const k = t.toLowerCase(); if (t.length > 1 && !seen.has(k)) { seen.add(k); out.push(t); } });
+    return out.slice(0, 12).join(' ');
   };
 
   // ---- Facebook post --------------------------------------------------------
