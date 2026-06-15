@@ -532,6 +532,7 @@ const Studio = (() => {
   // commit a finished mutation: redraw, push history, autosave, refresh panels
   const commit = () => {
     render(); syncPanel(); renderLayersPanel();
+    if (!inRebuild) rebuiltFrom = null;   // any manual edit detaches from the rebuilt style
     if (replaying) return;
     dirty = true;
     history = history.slice(0, hidx + 1);
@@ -580,6 +581,7 @@ const Studio = (() => {
 
   // photo editing can target a photo LAYER or the BACKGROUND photo
   let bgEdit = false;
+  let rebuiltFrom = null, inRebuild = false;   // track if the current design came straight from a style rebuild
   const photoT = () => { if (bgEdit && bg.type === 'photo') return bg; const L = sel(); return (L && L.type === 'photo') ? L : null; };
 
   // photo colour-adjust + shape/crop panel (works for a layer or the background)
@@ -794,8 +796,11 @@ const Studio = (() => {
 
   // ---- faithful, editable reproductions of the generated graphic styles ------
   const rebuildStyle = (tpl) => {
+    inRebuild = true;
     const W = SIZES[sizeKey][0], H = SIZES[sizeKey][1];
-    const k = (sizeKey === 'portrait') ? 'square' : sizeKey;   // visuals styles are square/story/wide
+    const k = (sizeKey === 'portrait') ? 'square' : sizeKey;   // portrait borrows the square layout, with taller photo metrics
+    const port = sizeKey === 'portrait';
+    const pIdx = (bg.type === 'photo' && ctxData.photos[bg.photoIndex]) ? bg.photoIndex : 0;   // which photo to feature (carousel edit picks this)
     const b = ctxData.brand, f = ctxData.fields;
     const onP = Visuals.onColor(b.primary);
     const serif = b.font === 'serif', sans = b.font === 'sans';
@@ -841,7 +846,7 @@ const Studio = (() => {
       push({ type: 'rect', shape: 'rect', color: '#faf7f2', noFill: true, stroke: 'accent', strokeWf: 2 / W, wf: (W - 52) / W, hf: (H - 52) / H, xf: 0.5, yf: 0.5, radius: 0 });
       if (k === 'wide') {
         const cX = (W + 640) / 2;
-        if (ctxData.photos.length) push({ type: 'photo', photoIndex: 0, shape: 'rect', wf: 596 / W, hf: (H - 88) / H, xf: (44 + 298) / W, yf: 0.5 });
+        if (ctxData.photos.length) push({ type: 'photo', photoIndex: pIdx, shape: 'rect', wf: 596 / W, hf: (H - 88) / H, xf: (44 + 298) / W, yf: 0.5 });
         if (f.badge) badgeTL(f.badge, 64, 64, 19, 'accent');
         let y = 175;
         if (f.price) { ctrText(f.price, cX, y + 40, 58, { weight: 700, font: priceFont('serif'), color: b.primary }); y += 95; }
@@ -852,8 +857,8 @@ const Studio = (() => {
         const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
         if (sub) ctrText(sub, cX, H - 88, 19, { weight: 400, color: mut });
       } else {
-        const photoW = W - m * 2, mainH = k === 'story' ? 1010 : 590;
-        if (ctxData.photos.length) push({ type: 'photo', photoIndex: 0, shape: 'rect', wf: photoW / W, hf: mainH / H, xf: 0.5, yf: (m + mainH / 2) / H });
+        const photoW = W - m * 2, mainH = k === 'story' ? 1010 : (port ? Math.round(H * 0.6) : 590);
+        if (ctxData.photos.length) push({ type: 'photo', photoIndex: pIdx, shape: 'rect', wf: photoW / W, hf: mainH / H, xf: 0.5, yf: (m + mainH / 2) / H });
         if (f.badge) badgeTL(f.badge, m + 22, m + 22, k === 'story' ? 26 : 22, 'accent');
         let y = m + mainH + (k === 'story' ? 84 : 84);
         if (f.price) { ctrText(f.price, W / 2, y, k === 'story' ? 88 : 72, { weight: 700, font: priceFont('serif'), color: b.primary }); y += 58; }
@@ -870,7 +875,7 @@ const Studio = (() => {
       bg = { type: 'gradient', c1: Visuals.shade(b.primary, 14), c2: Visuals.shade(b.primary, -34), angle: 90 };
       const fg = onP, m = k === 'wide' ? 44 : 48;
       if (k === 'wide') {
-        if (ctxData.photos.length) push({ type: 'photo', photoIndex: 0, shape: 'rounded', radius: 26, wf: 560 / W, hf: (H - m * 2) / H, xf: (W - 560 - m + 280) / W, yf: 0.5 });
+        if (ctxData.photos.length) push({ type: 'photo', photoIndex: pIdx, shape: 'rounded', radius: 26, wf: 560 / W, hf: (H - m * 2) / H, xf: (W - 560 - m + 280) / W, yf: 0.5 });
         const cX = m + 12;
         if (f.badge) badgeTL(f.badge, cX, 72, 21, 'accent');
         let y = 250;
@@ -881,8 +886,8 @@ const Studio = (() => {
         const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
         if (sub) leftText(sub, cX, H - 72, 19, { weight: 400, color: fg });
       } else {
-        const photoH = k === 'story' ? 1100 : 540;
-        if (ctxData.photos.length) push({ type: 'photo', photoIndex: 0, shape: 'rounded', radius: 30, wf: (W - m * 2) / W, hf: photoH / H, xf: 0.5, yf: (m + photoH / 2) / H });
+        const photoH = k === 'story' ? 1100 : (port ? Math.round(H * 0.62) : 540);
+        if (ctxData.photos.length) push({ type: 'photo', photoIndex: pIdx, shape: 'rounded', radius: 30, wf: (W - m * 2) / W, hf: photoH / H, xf: 0.5, yf: (m + photoH / 2) / H });
         if (f.badge) push({ type: 'badge', text: f.badge, size: k === 'story' ? 30 : 26, weight: 800, color: 'accent', font: 'sans', align: 'center', rot: -8, xf: (m + 90) / W, yf: (m + photoH - 10) / H });
         let y = m + photoH + (k === 'story' ? 150 : 110);
         if (f.price) { leftText(f.price, m + 16, y, k === 'story' ? 104 : 88, { weight: 800, font: priceFont('sans'), color: fg }); y += k === 'story' ? 66 : 56; }
@@ -897,7 +902,7 @@ const Studio = (() => {
         else logoRight(W - m - 16, rowY + (k === 'story' ? 72 : 64), k === 'story' ? 80 : 68);
       }
     }
-    layers = out; selId = null; bgEdit = false; renderBgPicker(); commit();
+    layers = out; selId = null; bgEdit = false; rebuiltFrom = tpl; renderBgPicker(); commit(); inRebuild = false;
   };
 
   // ---- my templates (save layout, reuse on any listing) ---------------------
@@ -1160,7 +1165,7 @@ const Studio = (() => {
     cv.addEventListener('mousedown', onDown); window.addEventListener('mousemove', onMove); window.addEventListener('mouseup', onUp);
     cv.addEventListener('dblclick', onDblClick);
     cv.addEventListener('touchstart', onDown, { passive: false }); cv.addEventListener('touchmove', onMove, { passive: false }); cv.addEventListener('touchend', onUp);
-    document.querySelectorAll('#stSizes button').forEach((b) => b.addEventListener('click', () => { sizeKey = b.dataset.size; document.querySelectorAll('#stSizes button').forEach((x) => x.classList.toggle('active', x === b)); commit(); }));
+    document.querySelectorAll('#stSizes button').forEach((b) => b.addEventListener('click', () => { sizeKey = b.dataset.size; document.querySelectorAll('#stSizes button').forEach((x) => x.classList.toggle('active', x === b)); if (rebuiltFrom) rebuildStyle(rebuiltFrom); else commit(); }));
     document.querySelectorAll('#stAdd button').forEach((b) => b.addEventListener('click', () => add(b.dataset.add)));
     document.querySelectorAll('#stStarters button').forEach((b) => b.addEventListener('click', () => applyStarter(b.dataset.tpl)));
     document.querySelectorAll('#stRebuild button').forEach((b) => b.addEventListener('click', () => rebuildStyle(b.dataset.style)));

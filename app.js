@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v30';
+  const APP_VERSION = 'v31';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -352,6 +352,7 @@
     });
   };
   const openPhotoEditor = (i) => {
+    const h = $('studioHint'); if (h) h.hidden = true; clearTimeout(studioHintTimer);   // clear the "saved" notifier
     editIdx = i;
     const p = photos[i]; if (!p) return;
     $('pePreview').src = p.url;
@@ -568,7 +569,7 @@
     $('lbEdit').addEventListener('click', () => {
       closeLightbox();
       if (lbState.kind === 'cta') openStudio({ seed: 'cta' });            // the CTA card, not the hero photo
-      else if (lbState.photo) openStudio(photos.indexOf(lbState.photo));   // that photo as the background
+      else if (lbState.photo) openStudio(orderedPhotos().indexOf(lbState.photo));   // SAME index space the studio uses
       else openStudio();                                                  // cover ≈ the default seed
     });
     if (canShareFiles()) { $('lbShare').hidden = false; $('lbShare').addEventListener('click', async () => { if (lbState.cv) { const ok = await shareCanvas(lbState.cv, `${slug()}-carousel-${String(lbState.n).padStart(2, '0')}.png`, (outputs && outputs.instagram) || ''); if (!ok) $('lbDownload').click(); } }); }
@@ -928,8 +929,18 @@
   };
 
   // ---------------- link import ----------------
+  // live elapsed + "usually 15–40s" estimate while an import is running
+  let importT0 = 0, importIv = null, importMsg = '';
+  const renderImportBusy = () => {
+    const el = $('importStatus'), s = Math.round((Date.now() - importT0) / 1000);
+    el.hidden = false; el.className = 'import-status busy';
+    el.innerHTML = `<span class="spin" aria-hidden="true"></span><span>${importMsg} ${s}s · usually 15–40s</span>`;
+  };
+  const importStart = () => { importT0 = Date.now(); Progress.start(); importIv = setInterval(() => { if (importMsg) renderImportBusy(); }, 1000); };
+  const importStop = () => { if (importIv) clearInterval(importIv); importIv = null; importT0 = 0; importMsg = ''; Progress.stop(); };
   const setImportStatus = (msg, kind) => {
     const el = $('importStatus');
+    if (!kind && importT0) { importMsg = msg; renderImportBusy(); return; }   // in-progress during import → spinner + elapsed + estimate
     el.hidden = !msg;
     el.textContent = msg || '';
     el.className = 'import-status' + (kind ? ' ' + kind : '');
@@ -962,7 +973,7 @@
     if (!/^https?:\/\//i.test(url)) { setImportStatus('That doesn’t look like a link — it should start with https://', 'err'); return; }
     const btn = $('importBtn');
     btn.disabled = true; btn.textContent = '…';
-    Progress.start();
+    importStart();
     try {
       // direct image link → just add the photo
       if (Importer.isImageURL(url) && !/reiwa\.com\.au\/[a-z]/i.test(url)) {
@@ -1043,7 +1054,7 @@
       setImportStatus('Import failed unexpectedly — paste the listing text below instead.', 'err');
     } finally {
       importBar(null);
-      Progress.stop();
+      importStop();
       btn.disabled = false; btn.textContent = 'Import';
     }
   };

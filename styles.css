@@ -196,6 +196,14 @@ input, select, textarea {
   background: #fff; border: 1px solid var(--line); border-radius: 9px;
   padding: 9px 11px; width: 100%; transition: border-color .15s, box-shadow .15s;
 }
+/* every range slider, app-wide: no inherited padding (so the thumb reaches both ends) + consistent look */
+input[type="range"] {
+  -webkit-appearance: none; appearance: none; height: 6px; border-radius: 999px;
+  background: var(--line); border: none; padding: 0; cursor: pointer;
+}
+input[type="range"]::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--teal); border: 2px solid #fff; box-shadow: 0 1px 3px rgba(0,0,0,.3); cursor: pointer; }
+input[type="range"]::-moz-range-thumb { width: 16px; height: 16px; border-radius: 50%; background: var(--teal); border: none; box-shadow: 0 1px 3px rgba(0,0,0,.3); cursor: pointer; }
+body.dark input[type="range"] { background: #3a4047; }
 input:focus, select:focus, textarea:focus {
   outline: none; border-color: var(--teal); box-shadow: 0 0 0 3px rgba(44,122,123,.14);
 }
@@ -708,10 +716,13 @@ body.dark .st-restore { background: #2a2410; border-color: #6b5a22; }
 .import-progress > i { display: block; height: 100%; width: 0; background: var(--teal); transition: width .25s ease; }
 
 /* ============ studio launcher (a CTA, not a tab) ============ */
+/* Design Studio launcher lives in its own header row, NOT in the tab strip */
+.out-header { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; }
+.out-header-label { font: 600 13px var(--sans); color: var(--muted); }
 .studio-launch {
-  margin-left: 10px; flex: 0 0 auto; align-self: center;
+  flex: 0 0 auto;
   font: 700 13px var(--sans); color: #fff; white-space: nowrap;
   background: linear-gradient(120deg, var(--teal), var(--navy-2));
-  border: none; border-radius: 999px; padding: 8px 15px; cursor: pointer; margin-right: 6px;
+  border: none; border-radius: 999px; padding: 8px 15px; cursor: pointer;
 }
 .studio-launch:hover { filter: brightness(1.08); }
