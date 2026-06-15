@@ -605,6 +605,114 @@
         setTimeout(() => Visuals.download(cv, `${slug()}-carousel-${String(i + 1).padStart(2, '0')}.png`), i * 350));
     });
     $('openStudio').addEventListener('click', openStudio);
+    if ($('dlPack')) $('dlPack').addEventListener('click', downloadCampaignPack);
+  };
+
+  // ---------------- campaign pack (one click → every asset in one ZIP) ----------------
+  const saveBlob = (blob, filename) => {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = filename;
+    a.click();
+    setTimeout(() => URL.revokeObjectURL(a.href), 8000);
+  };
+  const offscreenCanvas = () => document.createElement('canvas');
+  const canvasPNGBytes = (cv) => new Promise((resolve) => {
+    cv.toBlob(async (blob) => {
+      if (!blob) return resolve(null);
+      try { resolve(new Uint8Array(await blob.arrayBuffer())); } catch (e) { resolve(null); }
+    }, 'image/png');
+  });
+  const packCopyText = (d) => {
+    const addr = d.address || 'Listing';
+    const out = [addr, '='.repeat(Math.max(6, addr.length)), ''];
+    [['LISTING DESCRIPTION', outputs && outputs.mls], ['INSTAGRAM CAPTION', outputs && outputs.instagram],
+      ['FACEBOOK POST', outputs && outputs.facebook], ['EMAIL', outputs && outputs.email]].forEach(([t, txt]) => {
+        if (!txt) return;
+        out.push('## ' + t, '', String(txt).trim(), '', '');
+      });
+    return out.join('\n');
+  };
+  // build & download a ZIP of all the graphics, the carousel, the sign board,
+  // a self-contained print flyer, and every piece of written copy — all on-device.
+  const downloadCampaignPack = async () => {
+    if (!outputs) generate();
+    if (!outputs) { toast('Add a listing first'); return; }
+    if (typeof Zip === 'undefined') { toast('ZIP export unavailable'); return; }
+    const btn = $('dlPack'); const label = btn ? btn.textContent : '';
+    if (btn) btn.disabled = true;
+    const setLbl = (s) => { if (btn) btn.textContent = s; };
+    Progress.start();
+    setLbl('📦 Building pack…');
+    try {
+      const d = vizData();
+      const files = [];
+
+      // 1) social graphics in the chosen template
+      for (const [kind, name] of [['square', 'social/instagram-post.png'], ['story', 'social/story-reel.png'], ['wide', 'social/facebook-link.png']]) {
+        const cv = offscreenCanvas();
+        Visuals.render(brand.templateId, kind, cv, d);
+        const bytes = await canvasPNGBytes(cv);
+        if (bytes) files.push({ name, data: bytes });
+      }
+
+      // 2) carousel — cover + photo highlights + CTA (same composition as the tab)
+      const carPhotos = d.photos.filter((p) => p.inCarousel !== false).slice(0, 6);
+      if (carPhotos.length) {
+        const feats = Generator.flyerFeatures(d.raw, 8);
+        let fi = 0; carPhotos.forEach((p) => { if (p._caption == null) p._caption = feats[fi++] || ''; });
+        const total = carPhotos.length + 2;
+        let n = 0;
+        const push = async (cv, suffix) => { const b = await canvasPNGBytes(cv); if (b) files.push({ name: `carousel/${String(++n).padStart(2, '0')}-${suffix}.png`, data: b }); };
+        const cover = offscreenCanvas(); Visuals.render(brand.templateId, 'square', cover, d); await push(cover, 'cover');
+        for (let i = 0; i < carPhotos.length; i++) {
+          const cv = offscreenCanvas();
+          Visuals.featureSlide(cv, { photo: carPhotos[i], caption: carPhotos[i]._caption || '', brand, idx: i + 1, total });
+          await push(cv, 'photo');
+        }
+        const cta = offscreenCanvas(); Visuals.ctaSlide(cta, { brand, address: d.address, badgeText: d.badgeText }); await push(cta, 'cta');
+      }
+
+      // 3) sign board (with QR if a link is set)
+      const sbCv = offscreenCanvas();
+      Visuals.signboard(sbCv, { brand, d, status: d.raw.mode === 'rent' ? 'FOR LEASE' : 'FOR SALE', qrUrl: ($('sbUrl').value.trim() || $('importUrl').value.trim()) });
+      const sbBytes = await canvasPNGBytes(sbCv);
+      if (sbBytes) files.push({ name: 'signboard.png', data: sbBytes });
+
+      // 4) print-ready flyer — self-contained (photos baked in as data URLs so it works from the zip)
+      try {
+        const fo = flyerOpts();
+        const flyerPhotos = fo.photos.map((p) => ({ url: photoToDataURL(p) || '', fcss: p.fcss || '' })).filter((p) => p.url);
+        files.push({ name: 'flyer-print.html', data: Flyer.buildHTML({ ...fo, photos: flyerPhotos, print: true }) });
+      } catch (e) {}
+
+      // 5) all written copy
+      const copy = packCopyText(d);
+      if (copy.trim()) files.push({ name: 'copy.txt', data: copy });
+
+      // 6) readme
+      const hasQR = !!($('sbUrl').value.trim() || $('importUrl').value.trim());
+      files.push({ name: 'README.txt', data:
+        'Listing Kit — campaign pack\n' +
+        'Listing: ' + (d.address || '(no address)') + '\n' +
+        'Created: ' + new Date().toLocaleString() + '\n\n' +
+        'Inside:\n' +
+        '  social/           Instagram post, story / reel cover, Facebook / link image\n' +
+        (carPhotos.length ? '  carousel/         Instagram carousel — post the files in number order\n' : '') +
+        '  signboard.png     Photo sign board' + (hasQR ? ' (with QR code)' : '') + '\n' +
+        '  flyer-print.html  Open in a browser, then Print → Save as PDF (A4 / Letter)\n' +
+        '  copy.txt          Listing description + Instagram / Facebook / email copy\n\n' +
+        'Everything was generated on your device. Nothing was uploaded.\n' });
+
+      if (!files.length) { toast('Nothing to pack yet'); return; }
+      saveBlob(Zip.build(files), `${slug()}-campaign-pack.zip`);
+      toast(`📦 Campaign pack ready — ${files.length} files`);
+    } catch (e) {
+      toast('Couldn’t build the pack — try again');
+    } finally {
+      Progress.stop();
+      if (btn) { btn.disabled = false; btn.textContent = label || '📦 Download campaign pack'; }
+    }
   };
 
   // the listing facts the studio binds its price/address/stats/badge layers to
@@ -1624,7 +1732,7 @@
   $('verLine').textContent = 'Listing Kit ' + APP_VERSION;
 
   // integration/test hook
-  window.ListingKit = { addPhotoDataURL, generate, importFromLink };
+  window.ListingKit = { addPhotoDataURL, generate, importFromLink, downloadCampaignPack };
 
   // register service worker for offline / installable use
   if ('serviceWorker' in navigator) {

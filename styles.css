@@ -486,6 +486,10 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 }
 .gfx-foot span { font-size: 12px; color: var(--muted); }
 .dl-all { margin-top: 16px; width: 100%; padding: 11px; font-size: 14px; }
+/* campaign pack — the headline "download everything" action */
+.copy-btn.pack { margin-top: 18px; background: var(--teal); border-color: var(--teal); color: #fff; font-weight: 700; }
+.copy-btn.pack:hover { filter: brightness(1.06); }
+.copy-btn.pack:disabled { opacity: .65; cursor: wait; }
 
 /* missing after auto-fill: red ring + one pulse until the agent fills it */
 @keyframes missing-pulse {
