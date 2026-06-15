@@ -694,6 +694,11 @@ body.dark .st-slider input[type=range] { background: #3a4047; }
   .lb-actions .mini-btn, .lb-actions button { width: 100%; }
   /* let the AI-polish input own a full row instead of fighting the Apply button */
   .ai-bar input { min-width: 0; flex: 1 1 100%; }
+  /* copy-tab header: char count on its own line, the Undo/Redo/Reword/Polish/Copy
+     buttons wrap below on a full-width row so Copy is never pushed off-screen */
+  .content-head { flex-wrap: wrap; gap: 8px; }
+  .content-btns { flex-wrap: wrap; width: 100%; gap: 6px; }
+  .content-btns .copy-btn { flex: 1 1 auto; }
   /* dock the studio keyboard cheat-sheet to the bottom, clear of the canvas */
   .st-cheats { left: 8px; right: 8px; max-width: none; top: auto; bottom: 12px; }
   /* photo-editor sliders: label above a full-width track */
