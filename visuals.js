@@ -734,6 +734,45 @@ const Visuals = (() => {
     ctx.textAlign = 'left';
   };
 
+  // client testimonial / review post (square or story), in the agent's brand colours
+  const testimonial = (canvas, kind, { brand, quote, author, role, rating }) => {
+    const story = kind === 'story';
+    const [W, H] = story ? [1080, 1920] : [1080, 1080];
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const prim = brand.primary, acc = brand.accent, fg = onColor(prim);
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, shade(prim, 14)); g.addColorStop(1, shade(prim, -34));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.strokeStyle = alpha(acc, 0.5); ctx.lineWidth = 2; ctx.strokeRect(42, 42, W - 84, H - 84);
+    ctx.textAlign = 'center';
+
+    ctx.fillStyle = alpha(acc, 0.92); ctx.font = font(800, story ? 230 : 196, SERIF);
+    ctx.fillText('“', W / 2, story ? 380 : 312);
+
+    const r = Math.max(1, Math.min(5, Math.round(rating || 5)));
+    const starSize = story ? 60 : 54, starsY = story ? 470 : 392;
+    ctx.font = font(400, starSize);
+    const sw = ctx.measureText('★').width, gap = starSize * 0.16, totalW = 5 * sw + 4 * gap;
+    let sx = W / 2 - totalW / 2 + sw / 2;
+    for (let i = 0; i < 5; i++) { ctx.fillStyle = i < r ? acc : alpha(fg, 0.25); ctx.fillText('★', sx, starsY); sx += sw + gap; }
+
+    const q = String(quote || 'Add a client review to create a testimonial post.').trim();
+    ctx.fillStyle = fg; ctx.font = font(500, story ? 56 : 50, SERIF);
+    const lines = wrapText(ctx, q, W - 200, story ? 7 : 5);
+    const lh = story ? 76 : 66;
+    const qy = story ? 600 : 480;
+    lines.forEach((l, i) => ctx.fillText(l, W / 2, qy + i * lh));
+    let y = qy + (lines.length - 1) * lh;
+
+    if (author) { y += story ? 112 : 94; ctx.font = font(700, story ? 42 : 38, priceFam(brand, SANS)); ctx.fillStyle = acc; ctx.fillText('— ' + author, W / 2, y); }
+    if (role) { y += story ? 48 : 42; ctx.font = font(400, story ? 28 : 26); ctx.fillStyle = alpha(fg, 0.82); ctx.fillText(role, W / 2, y); }
+
+    const foot = [brand.agentName, brand.brokerage].filter(Boolean).join('   ·   ');
+    if (foot) { ctx.font = font(600, story ? 30 : 27); ctx.fillStyle = alpha(fg, 0.9); ctx.fillText(foot, W / 2, H - (story ? 96 : 72)); }
+    ctx.textAlign = 'left';
+  };
+
   // diagonal corner banner ("SOLD" / "UNDER OFFER" …) stamped over any graphic.
   // Drawn as a post-render overlay so it works on every template uniformly.
   const STAMP_COLORS = {
@@ -861,5 +900,5 @@ const Visuals = (() => {
     if (d && d.stamp) cornerSash(ctx, W, H, d.stamp);
   };
 
-  return { render, download, SIZES, onColor, shade, featureSlide, ctaSlide, signboard, openHomePost, arrowSign, opensRoundup };
+  return { render, download, SIZES, onColor, shade, featureSlide, ctaSlide, signboard, openHomePost, arrowSign, opensRoundup, testimonial };
 })();

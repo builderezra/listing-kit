@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v34';
+  const APP_VERSION = 'v70';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -1109,6 +1109,29 @@
     $('reelPace').addEventListener('change', () => { resetReel(); renderReel(); });
   };
 
+  // ---- testimonial / review post (brand content, not tied to a listing) ----
+  let tmFormat = 'square';
+  const renderTestimonial = () => {
+    if (typeof Visuals === 'undefined' || !Visuals.testimonial) return;
+    Visuals.testimonial($('cvTestimonial'), tmFormat, {
+      brand,
+      quote: $('tmQuote').value,
+      author: $('tmAuthor').value.trim(),
+      role: $('tmRole').value.trim(),
+      rating: parseInt($('tmRating').value, 10) || 5,
+    });
+  };
+  const wireTestimonial = () => {
+    ['tmQuote', 'tmAuthor', 'tmRole'].forEach((id) => $(id).addEventListener('input', () => { if (activeTab === 'testimonial') renderTestimonial(); }));
+    $('tmRating').addEventListener('change', () => { if (activeTab === 'testimonial') renderTestimonial(); });
+    document.querySelectorAll('#tmFmtRow .fmt-btn').forEach((b) => b.addEventListener('click', () => {
+      tmFormat = b.dataset.fmt || 'square';
+      document.querySelectorAll('#tmFmtRow .fmt-btn').forEach((x) => x.classList.toggle('active', x === b));
+      if (activeTab === 'testimonial') renderTestimonial();
+    }));
+    document.querySelectorAll('#testimonialContent .dlc').forEach((b) => b.addEventListener('click', () => Visuals.download($(b.dataset.canvas), `${slug()}-${b.dataset.name}.png`)));
+  };
+
   // ---------------- tabs ----------------
   // ---- sign board (with QR code) ----
   const renderSignboard = () => {
@@ -1121,7 +1144,16 @@
   const renderTab = (tab) => {
     activeTab = tab;
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === tab));
-    if (!outputs) return;
+    // testimonials are brand content, not tied to a generated listing — show anytime
+    if (tab === 'testimonial') {
+      ['graphicsContent', 'flyerContent', 'content', 'complianceContent', 'signboardContent', 'openhomeContent', 'reelContent'].forEach((id) => { if ($(id)) $(id).hidden = true; });
+      $('emptyState').hidden = true;
+      $('testimonialContent').hidden = false;
+      renderTestimonial();
+      return;
+    }
+    if ($('testimonialContent')) $('testimonialContent').hidden = true;
+    if (!outputs) { $('emptyState').hidden = false; return; }
 
     ['graphicsContent', 'flyerContent', 'content', 'complianceContent', 'signboardContent', 'openhomeContent', 'reelContent'].forEach((id) => ($(id).hidden = true));
 
@@ -2079,6 +2111,7 @@
   wireStamps();
   wireOpenHome();
   wireReel();
+  wireTestimonial();
   wireDropZone();
   wireDownloads();
   wireLightbox();

@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=69" />
+  <link rel="stylesheet" href="styles.css?v=70" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -37,10 +37,10 @@
         <span class="theme-pick-label">Colour theme</span>
         <div class="theme-dots" id="themeDots">
           <button type="button" class="theme-dot" data-theme="coastal" title="Coastal" style="background:linear-gradient(135deg,#16404f 50%,#2c7a7b 50%)"></button>
-          <button type="button" class="theme-dot" data-theme="forest" title="Forest" style="background:linear-gradient(135deg,#1f4d38 50%,#2f8f5b 50%)"></button>
-          <button type="button" class="theme-dot" data-theme="plum" title="Plum" style="background:linear-gradient(135deg,#3a3056 50%,#8268c9 50%)"></button>
-          <button type="button" class="theme-dot" data-theme="ocean" title="Ocean" style="background:linear-gradient(135deg,#1f5279 50%,#2f86b8 50%)"></button>
-          <button type="button" class="theme-dot" data-theme="charcoal" title="Charcoal &amp; brass" style="background:linear-gradient(135deg,#2c333d 50%,#b9893f 50%)"></button>
+          <button type="button" class="theme-dot" data-theme="forest" title="Forest" style="background:linear-gradient(135deg,#1f4d38 50%,#2a7a4d 50%)"></button>
+          <button type="button" class="theme-dot" data-theme="plum" title="Plum" style="background:linear-gradient(135deg,#3a3056 50%,#6a50ac 50%)"></button>
+          <button type="button" class="theme-dot" data-theme="ocean" title="Ocean" style="background:linear-gradient(135deg,#1f5279 50%,#2c76a0 50%)"></button>
+          <button type="button" class="theme-dot" data-theme="charcoal" title="Charcoal &amp; brass" style="background:linear-gradient(135deg,#2c333d 50%,#8a611f 50%)"></button>
         </div>
       </div>
       <p class="muted" id="verLine"></p>
@@ -474,6 +474,7 @@
         <button class="tab" data-tab="signboard" role="tab">🪧 Sign board</button>
         <button class="tab" data-tab="openhome" role="tab">🏠 Open home</button>
         <button class="tab" data-tab="reel" role="tab">🎬 Reel</button>
+        <button class="tab" data-tab="testimonial" role="tab">💬 Review</button>
         <button class="tab compliance-tab" data-tab="compliance" role="tab">⚖️ <span class="dot" id="complianceDot"></span></button>
         <button type="button" class="studio-launch" id="studioLaunch" title="Open the full-screen design editor">✏️ Design Studio ↗</button>
       </nav>
@@ -618,6 +619,40 @@
           </div>
           <div class="reel-caps" id="reelCaps" hidden></div>
           <p class="parse-note" id="reelStatus"></p>
+        </article>
+
+        <article class="panel-content" id="testimonialContent" hidden>
+          <div class="oh-form">
+            <div class="field">
+              <label for="tmQuote">Client review / testimonial</label>
+              <textarea id="tmQuote" rows="3" placeholder="e.g. “Ezra made selling our home effortless — sold above reserve in the first week. Couldn’t recommend him more highly.”"></textarea>
+            </div>
+            <div class="row">
+              <div class="field"><label for="tmAuthor">Client name</label><input type="text" id="tmAuthor" placeholder="The Nguyen Family" /></div>
+              <div class="field"><label for="tmRole">Role / suburb</label><input type="text" id="tmRole" placeholder="Sellers · Scarborough" /></div>
+            </div>
+            <div class="row">
+              <div class="field">
+                <label for="tmRating">Rating</label>
+                <select id="tmRating">
+                  <option value="5">★★★★★</option>
+                  <option value="4">★★★★</option>
+                  <option value="3">★★★</option>
+                </select>
+              </div>
+              <div class="field">
+                <label>Post format</label>
+                <div class="oh-fmt" id="tmFmtRow">
+                  <button type="button" class="fmt-btn active" data-fmt="square">▢ Square</button>
+                  <button type="button" class="fmt-btn" data-fmt="story">▯ Story</button>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="gfx-card">
+            <canvas id="cvTestimonial"></canvas>
+            <div class="gfx-foot"><span>Testimonial · your brand colours</span><button type="button" class="copy-btn dlc" data-canvas="cvTestimonial" data-name="testimonial">Download</button></div>
+          </div>
         </article>
 
         <article class="panel-content" id="openhomeContent" hidden>
@@ -982,18 +1017,18 @@
     </div>
   </div>
 
-  <script src="generator.js?v=69"></script>
-  <script src="fairhousing.js?v=69"></script>
-  <script src="parser.js?v=69"></script>
-  <script src="importer.js?v=69"></script>
-  <script src="qr.js?v=69"></script>
-  <script src="visuals.js?v=69"></script>
-  <script src="flyer.js?v=69"></script>
-  <script src="ai.js?v=69"></script>
-  <script src="studio.js?v=69"></script>
-  <script src="tour.js?v=69"></script>
-  <script src="zip.js?v=69"></script>
-  <script src="reel.js?v=69"></script>
-  <script src="app.js?v=69"></script>
+  <script src="generator.js?v=70"></script>
+  <script src="fairhousing.js?v=70"></script>
+  <script src="parser.js?v=70"></script>
+  <script src="importer.js?v=70"></script>
+  <script src="qr.js?v=70"></script>
+  <script src="visuals.js?v=70"></script>
+  <script src="flyer.js?v=70"></script>
+  <script src="ai.js?v=70"></script>
+  <script src="studio.js?v=70"></script>
+  <script src="tour.js?v=70"></script>
+  <script src="zip.js?v=70"></script>
+  <script src="reel.js?v=70"></script>
+  <script src="app.js?v=70"></script>
 </body>
 </html>

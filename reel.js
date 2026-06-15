@@ -204,7 +204,10 @@ const Reel = (() => {
       ctx.globalAlpha = 1; paint(sc, p);
       const remain = sc.dur - localT;
       if (remain < o.xf && i + 1 < scenes.length) { ctx.globalAlpha = clamp01((o.xf - remain) / o.xf); paint(scenes[i + 1], 0); ctx.globalAlpha = 1; }
-      drawProgress(ctx, scenes.length, i, p);
+      // fade the progress bar with the intro fade-in / outro fade-out so it doesn't pop over black
+      const lt = p * sc.dur;
+      const barFade = sc.type === 'intro' ? clamp01(lt / 0.45) : (sc.type === 'outro' ? 1 - clamp01((lt - (sc.dur - 0.4)) / 0.4) : 1);
+      ctx.globalAlpha = barFade; drawProgress(ctx, scenes.length, i, p); ctx.globalAlpha = 1;
       setTimeout(frame, FRAME_MS);
     };
     try { rec.start(1000); } catch (e) { return reject(e); }
