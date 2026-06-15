@@ -1392,7 +1392,8 @@ const Studio = (() => {
     $('stOpacity').addEventListener('change', commit);
     $('stOpacity').addEventListener('dblclick', () => { const L = cur(); if (L) { L.opacity = 1; commit(); } });
     $('stOpacityR').addEventListener('click', () => { const L = cur(); if (L) { L.opacity = 1; commit(); } });
-    $('stRot').addEventListener('input', () => { const L = cur(); if (L) { const v = snapTo(Number($('stRot').value), [-180, -135, -90, -45, 0, 45, 90, 135, 180], 4); $('stRot').value = v; L.rot = v; slv('stRotV', v + '°'); render(); } });
+    // no angle snapping — allow any slight tilt (e.g. 2–3°). Use the ↺ reset or double-click for exactly level.
+    $('stRot').addEventListener('input', () => { const L = cur(); if (L) { const v = Number($('stRot').value); L.rot = v; slv('stRotV', v + '°'); render(); } });
     $('stRot').addEventListener('change', commit);
     $('stRot').addEventListener('dblclick', () => { const L = cur(); if (L) { L.rot = 0; commit(); } });
     $('stRotR').addEventListener('click', () => { const L = cur(); if (L) { L.rot = 0; commit(); } });
