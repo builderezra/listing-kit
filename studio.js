@@ -491,7 +491,16 @@ const Studio = (() => {
     return null;
   };
   const sizeOf = (L) => (L.type === 'text' || L.type === 'badge') ? L.size : (L.type === 'rect' ? L.hf : L.wf);
+  let pinch = null;
+  const touchSpread = (e) => { const a = e.touches[0], b = e.touches[1]; return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); };
   const onDown = (e) => {
+    // two fingers on the canvas = pinch-to-zoom the photo (crop). Works on the background
+    // photo (modern) or a selected photo layer — the natural way to crop on a phone.
+    if (e.touches && e.touches.length === 2) {
+      const t = pinchTarget();
+      if (t) { ensureCropCenter(t); pinch = { t, d0: touchSpread(e), z0: (t.crop && t.crop.zoom) || 1 }; drag = null; render(); syncPanel(); renderLayersPanel(); }
+      e.preventDefault(); return;
+    }
     const p = pt(e);
     const cur = layers.find((x) => x.id === selId);
     if (cur && cur._c && !cur.locked) {
@@ -526,6 +535,13 @@ const Studio = (() => {
   };
   const SNAP = [0, 0.25, 0.5, 0.75, 1];
   const onMove = (e) => {
+    if (pinch && e.touches && e.touches.length === 2) {
+      const t = pinch.t;
+      t.crop = t.crop || {};
+      t.crop.zoom = Math.min(4, Math.max(1, pinch.z0 * (touchSpread(e) / pinch.d0)));
+      render(); syncPanel();
+      e.preventDefault(); return;
+    }
     if (!drag) return;
     drag.moved = true;
     const p = pt(e);
@@ -563,7 +579,8 @@ const Studio = (() => {
     L.xf = xf; L.yf = yf;
     render(); e.preventDefault();
   };
-  const onUp = () => {
+  const onUp = (e) => {
+    if (pinch) { if (!e || !e.touches || e.touches.length < 2) { commit(); revealPhotoControls(); pinch = null; } return; }
     const wasTap = drag && !drag.moved;
     if (drag && drag.moved) { guides = []; commit(); }
     else if (drag) guides = [];
@@ -644,6 +661,25 @@ const Studio = (() => {
     if (!panel || !el || el.hidden) return;
     const delta = el.getBoundingClientRect().top - panel.getBoundingClientRect().top - 8;
     if (Math.abs(delta) > 16) panel.scrollTop += delta;
+  };
+  // seed a crop's visible-centre (cx,cy) from the focus cover-centre so zoom never drifts.
+  const ensureCropCenter = (t) => {
+    t.crop = t.crop || {};
+    if (t.crop.cx != null && t.crop.cy != null) return;
+    const isBg = (t === bg);
+    const box = isBg ? { w: W(), h: H() } : { w: (t.wf || 0.5) * W(), h: (t.hf || 0.5) * H() };
+    const pObj = ctxData.photos[isBg ? bg.photoIndex : t.photoIndex];
+    const im = pObj && pObj.img;
+    const c = (im && im.width) ? coverCenter(im.width, im.height, box.w, box.h, pObj.focus) : { cx: 0.5, cy: 0.5 };
+    if (t.crop.cx == null) t.crop.cx = c.cx;
+    if (t.crop.cy == null) t.crop.cy = c.cy;
+  };
+  // the photo we should pinch-zoom: a selected photo LAYER, else the background photo
+  // (auto-entering background-edit so pinching the modern full-bleed photo just works).
+  const pinchTarget = () => {
+    const L = sel(); if (L && L.type === 'photo') return L;
+    if (bg.type === 'photo') { bgEdit = true; selId = null; return bg; }
+    return null;
   };
 
   // photo colour-adjust + shape/crop panel (works for a layer or the background)
@@ -815,6 +851,14 @@ const Studio = (() => {
     $('stLayerCtl').hidden = !L;
     const pcEl = $('stPhotoCtl'); if (pcEl) pcEl.hidden = !pt;
     if (pt) syncPhotoPanel(pt);
+    // obvious "crop the photo" entry, shown whenever the background is a photo
+    const fab = $('stCropFab');
+    if (fab) {
+      const cropping = bgEdit && bg.type === 'photo';
+      fab.hidden = bg.type !== 'photo';
+      fab.classList.toggle('on', cropping);
+      fab.textContent = cropping ? '✓ Cropping — drag · pinch · sliders below' : '✎ Crop / reposition photo';
+    }
     if (!L) { updateContrast(); return; }   // nothing selected (but bg panel may still show)
     const isText = L.type === 'text' || L.type === 'badge';
     const hasColor = isText || L.type === 'rect';
@@ -1365,18 +1409,6 @@ const Studio = (() => {
     phFilter('stPhHi', 'highlights', ''); phFilter('stPhSh', 'shadows', ''); phFilter('stPhTint', 'tint', ''); phFilter('stPhSharp', 'sharpness', ''); phFilter('stPhVig', 'vignette', '');
     // crop / position (background only)
     // crop: zoom keeps the current view centred; Pan X/Y move the visible-centre point.
-    // ensure cx/cy exist (seeded from the focus cover-centre) so zoom never drifts to a corner.
-    const ensureCropCenter = (t) => {
-      t.crop = t.crop || {};
-      if (t.crop.cx != null && t.crop.cy != null) return;
-      const isBg = (t === bg);
-      const box = isBg ? { w: W(), h: H() } : { w: (t.wf || 0.5) * W(), h: (t.hf || 0.5) * H() };
-      const pObj = ctxData.photos[isBg ? bg.photoIndex : t.photoIndex];
-      const im = pObj && pObj.img;
-      const c = (im && im.width) ? coverCenter(im.width, im.height, box.w, box.h, pObj.focus) : { cx: 0.5, cy: 0.5 };
-      if (t.crop.cx == null) t.crop.cx = c.cx;
-      if (t.crop.cy == null) t.crop.cy = c.cy;
-    };
     const cropLive = (id, apply, suf) => { const live = ph((t) => { if (!(t === bg || t.hf)) return; ensureCropCenter(t); apply(t, Number($(id).value)); slv(id + 'V', $(id).value + suf); render(); }); $(id).addEventListener('input', live); $(id).addEventListener('change', commit); };
     cropLive('stPhZoom', (t, v) => { t.crop.zoom = v / 100; }, '%');
     cropLive('stPhPanX', (t, v) => { t.crop.cx = 0.5 + v / 200; }, '');
@@ -1430,6 +1462,12 @@ const Studio = (() => {
     $('stEyedrop').addEventListener('click', eyedrop);
     [['stPlL', 'l'], ['stPlCx', 'cx'], ['stPlR', 'r'], ['stPlT', 't'], ['stPlCy', 'cy'], ['stPlB', 'b']].forEach(([id, d]) => $(id).addEventListener('click', () => alignTo(d)));
     $('stClose').addEventListener('click', tryClose);
+    // the on-canvas "Crop the photo" button: enter background-edit and jump to the crop controls
+    $('stCropFab').addEventListener('click', () => {
+      if (bg.type !== 'photo') return;
+      bgEdit = true; selId = null; bg.filter = bg.filter || {};
+      render(); syncPanel(); renderLayersPanel(); revealPhotoControls();
+    });
     $('stHelp').addEventListener('click', () => $('stCheats').hidden = !$('stCheats').hidden);
     $('stRestoreBtn').addEventListener('click', () => { const w = loadWip(); if (w) restoreWip(w); });
     $('stRestoreNo').addEventListener('click', () => { $('stRestore').hidden = true; });
