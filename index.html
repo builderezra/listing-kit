@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=70" />
+  <link rel="stylesheet" href="styles.css?v=71" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -474,7 +474,7 @@
         <button class="tab" data-tab="signboard" role="tab">🪧 Sign board</button>
         <button class="tab" data-tab="openhome" role="tab">🏠 Open home</button>
         <button class="tab" data-tab="reel" role="tab">🎬 Reel</button>
-        <button class="tab" data-tab="testimonial" role="tab">💬 Review</button>
+        <button class="tab" data-tab="testimonial" role="tab">📣 Posts</button>
         <button class="tab compliance-tab" data-tab="compliance" role="tab">⚖️ <span class="dot" id="complianceDot"></span></button>
         <button type="button" class="studio-launch" id="studioLaunch" title="Open the full-screen design editor">✏️ Design Studio ↗</button>
       </nav>
@@ -624,34 +624,48 @@
         <article class="panel-content" id="testimonialContent" hidden>
           <div class="oh-form">
             <div class="field">
-              <label for="tmQuote">Client review / testimonial</label>
-              <textarea id="tmQuote" rows="3" placeholder="e.g. “Ezra made selling our home effortless — sold above reserve in the first week. Couldn’t recommend him more highly.”"></textarea>
+              <label for="postType">Post type <span class="hint">— brand content, not tied to a listing</span></label>
+              <select id="postType">
+                <option value="testimonial">⭐ Client testimonial</option>
+                <option value="prospect">🏷️ Thinking of selling? (prospecting)</option>
+                <option value="agent">👋 Meet the agent</option>
+              </select>
             </div>
-            <div class="row">
-              <div class="field"><label for="tmAuthor">Client name</label><input type="text" id="tmAuthor" placeholder="The Nguyen Family" /></div>
-              <div class="field"><label for="tmRole">Role / suburb</label><input type="text" id="tmRole" placeholder="Sellers · Scarborough" /></div>
-            </div>
-            <div class="row">
+            <div id="postTestimonial">
               <div class="field">
-                <label for="tmRating">Rating</label>
-                <select id="tmRating">
-                  <option value="5">★★★★★</option>
-                  <option value="4">★★★★</option>
-                  <option value="3">★★★</option>
-                </select>
+                <label for="tmQuote">Client review / testimonial</label>
+                <textarea id="tmQuote" rows="3" placeholder="e.g. “Ezra made selling our home effortless — sold above reserve in the first week. Couldn’t recommend him more highly.”"></textarea>
               </div>
-              <div class="field">
-                <label>Post format</label>
-                <div class="oh-fmt" id="tmFmtRow">
-                  <button type="button" class="fmt-btn active" data-fmt="square">▢ Square</button>
-                  <button type="button" class="fmt-btn" data-fmt="story">▯ Story</button>
-                </div>
+              <div class="row">
+                <div class="field"><label for="tmAuthor">Client name</label><input type="text" id="tmAuthor" placeholder="The Nguyen Family" /></div>
+                <div class="field"><label for="tmRole">Role / suburb</label><input type="text" id="tmRole" placeholder="Sellers · Scarborough" /></div>
+              </div>
+              <div class="field" style="max-width:160px">
+                <label for="tmRating">Rating</label>
+                <select id="tmRating"><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option></select>
+              </div>
+            </div>
+            <div id="postProspect" hidden>
+              <div class="field"><label for="psHeadline">Headline</label><input type="text" id="psHeadline" placeholder="Thinking of selling?" /></div>
+              <div class="field"><label for="psSub">Sub-text</label><textarea id="psSub" rows="2" placeholder="Find out what your home could be worth in today’s market — no obligation."></textarea></div>
+              <div class="field"><label for="psSuburb">Suburb / area</label><input type="text" id="psSuburb" placeholder="Scarborough" /></div>
+            </div>
+            <div id="postAgent" hidden>
+              <div class="field"><label for="agTagline">Tagline</label><input type="text" id="agTagline" placeholder="Your local Scarborough property specialist" /></div>
+              <div class="field"><label for="agBio">Short bio (optional)</label><textarea id="agBio" rows="3" placeholder="A few lines about you — experience, your approach, what clients can expect."></textarea></div>
+              <p class="hint">Uses your headshot, name &amp; contact from “Your brand”.</p>
+            </div>
+            <div class="field">
+              <label>Post format</label>
+              <div class="oh-fmt" id="tmFmtRow">
+                <button type="button" class="fmt-btn active" data-fmt="square">▢ Square</button>
+                <button type="button" class="fmt-btn" data-fmt="story">▯ Story</button>
               </div>
             </div>
           </div>
           <div class="gfx-card">
             <canvas id="cvTestimonial"></canvas>
-            <div class="gfx-foot"><span>Testimonial · your brand colours</span><button type="button" class="copy-btn dlc" data-canvas="cvTestimonial" data-name="testimonial">Download</button></div>
+            <div class="gfx-foot"><span>Social post · your brand colours</span><button type="button" class="copy-btn dlc" data-canvas="cvTestimonial" data-name="post">Download</button></div>
           </div>
         </article>
 
@@ -1017,18 +1031,18 @@
     </div>
   </div>
 
-  <script src="generator.js?v=70"></script>
-  <script src="fairhousing.js?v=70"></script>
-  <script src="parser.js?v=70"></script>
-  <script src="importer.js?v=70"></script>
-  <script src="qr.js?v=70"></script>
-  <script src="visuals.js?v=70"></script>
-  <script src="flyer.js?v=70"></script>
-  <script src="ai.js?v=70"></script>
-  <script src="studio.js?v=70"></script>
-  <script src="tour.js?v=70"></script>
-  <script src="zip.js?v=70"></script>
-  <script src="reel.js?v=70"></script>
-  <script src="app.js?v=70"></script>
+  <script src="generator.js?v=71"></script>
+  <script src="fairhousing.js?v=71"></script>
+  <script src="parser.js?v=71"></script>
+  <script src="importer.js?v=71"></script>
+  <script src="qr.js?v=71"></script>
+  <script src="visuals.js?v=71"></script>
+  <script src="flyer.js?v=71"></script>
+  <script src="ai.js?v=71"></script>
+  <script src="studio.js?v=71"></script>
+  <script src="tour.js?v=71"></script>
+  <script src="zip.js?v=71"></script>
+  <script src="reel.js?v=71"></script>
+  <script src="app.js?v=71"></script>
 </body>
 </html>

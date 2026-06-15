@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v70';
+  const APP_VERSION = 'v71';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -1109,21 +1109,22 @@
     $('reelPace').addEventListener('change', () => { resetReel(); renderReel(); });
   };
 
-  // ---- testimonial / review post (brand content, not tied to a listing) ----
+  // ---- social posts (brand content, not tied to a listing): testimonial / prospecting / meet-the-agent ----
   let tmFormat = 'square';
   const renderTestimonial = () => {
-    if (typeof Visuals === 'undefined' || !Visuals.testimonial) return;
-    Visuals.testimonial($('cvTestimonial'), tmFormat, {
-      brand,
-      quote: $('tmQuote').value,
-      author: $('tmAuthor').value.trim(),
-      role: $('tmRole').value.trim(),
-      rating: parseInt($('tmRating').value, 10) || 5,
-    });
+    if (typeof Visuals === 'undefined') return;
+    const type = $('postType') ? $('postType').value : 'testimonial';
+    if ($('postTestimonial')) $('postTestimonial').hidden = type !== 'testimonial';
+    if ($('postProspect')) $('postProspect').hidden = type !== 'prospect';
+    if ($('postAgent')) $('postAgent').hidden = type !== 'agent';
+    const cv = $('cvTestimonial');
+    if (type === 'prospect') Visuals.prospectPost(cv, tmFormat, { brand, headline: $('psHeadline').value, sub: $('psSub').value, suburb: $('psSuburb').value.trim() });
+    else if (type === 'agent') Visuals.agentPost(cv, tmFormat, { brand, tagline: $('agTagline').value.trim(), bio: $('agBio').value });
+    else Visuals.testimonial(cv, tmFormat, { brand, quote: $('tmQuote').value, author: $('tmAuthor').value.trim(), role: $('tmRole').value.trim(), rating: parseInt($('tmRating').value, 10) || 5 });
   };
   const wireTestimonial = () => {
-    ['tmQuote', 'tmAuthor', 'tmRole'].forEach((id) => $(id).addEventListener('input', () => { if (activeTab === 'testimonial') renderTestimonial(); }));
-    $('tmRating').addEventListener('change', () => { if (activeTab === 'testimonial') renderTestimonial(); });
+    ['tmQuote', 'tmAuthor', 'tmRole', 'psHeadline', 'psSub', 'psSuburb', 'agTagline', 'agBio'].forEach((id) => { if ($(id)) $(id).addEventListener('input', () => { if (activeTab === 'testimonial') renderTestimonial(); }); });
+    ['tmRating', 'postType'].forEach((id) => { if ($(id)) $(id).addEventListener('change', () => { if (activeTab === 'testimonial') renderTestimonial(); }); });
     document.querySelectorAll('#tmFmtRow .fmt-btn').forEach((b) => b.addEventListener('click', () => {
       tmFormat = b.dataset.fmt || 'square';
       document.querySelectorAll('#tmFmtRow .fmt-btn').forEach((x) => x.classList.toggle('active', x === b));

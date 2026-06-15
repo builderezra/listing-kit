@@ -773,6 +773,74 @@ const Visuals = (() => {
     ctx.textAlign = 'left';
   };
 
+  // "Thinking of selling?" prospecting / lead-gen post (brand colours)
+  const prospectPost = (canvas, kind, { brand, headline, sub, suburb }) => {
+    const story = kind === 'story';
+    const [W, H] = story ? [1080, 1920] : [1080, 1080];
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const prim = brand.primary, acc = brand.accent, fg = onColor(prim);
+    const g = ctx.createLinearGradient(0, 0, W, H);
+    g.addColorStop(0, shade(prim, 18)); g.addColorStop(1, shade(prim, -34));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.beginPath(); ctx.arc(W - 90, 120, 200, 0, Math.PI * 2); ctx.strokeStyle = alpha(acc, 0.3); ctx.lineWidth = 3; ctx.stroke();
+    ctx.textAlign = 'center';
+    let y = story ? 560 : 430;
+    ctx.fillStyle = acc; spacing(ctx, 6); ctx.font = font(700, story ? 34 : 30, priceFam(brand, SANS));
+    ctx.fillText((suburb ? suburb.toUpperCase() : 'YOUR AREA') + ' PROPERTY', W / 2, y - (story ? 92 : 78)); spacing(ctx, 0);
+    const hl = (headline || 'Thinking of selling?').trim();
+    ctx.fillStyle = fg; ctx.font = font(700, story ? 96 : 84, priceFam(brand, SANS));
+    fitFont(ctx, hl, W - 150, story ? 96 : 84, 700, priceFam(brand, SANS));
+    ctx.fillText(hl, W / 2, y);
+    const st = (sub || 'Find out what your home could be worth in today’s market — no obligation.').trim();
+    ctx.font = font(400, story ? 40 : 36); ctx.fillStyle = alpha(fg, 0.92);
+    const lines = wrapText(ctx, st, W - 220, 3); y += story ? 90 : 78;
+    lines.forEach((l, i) => ctx.fillText(l, W / 2, y + i * (story ? 54 : 48)));
+    y += (lines.length - 1) * (story ? 54 : 48);
+    // CTA pill
+    const cta = 'BOOK A FREE APPRAISAL';
+    ctx.font = font(800, story ? 32 : 28); spacing(ctx, 3);
+    const tw = ctx.measureText(cta).width, pw = tw + 76, ph = story ? 84 : 76, px = (W - pw) / 2, py = y + (story ? 90 : 76);
+    ctx.fillStyle = acc; rr(ctx, px, py, pw, ph, ph / 2); ctx.fill();
+    ctx.fillStyle = onColor(acc); ctx.textBaseline = 'middle'; ctx.fillText(cta, W / 2, py + ph / 2 + 2); ctx.textBaseline = 'alphabetic'; spacing(ctx, 0);
+    // agent footer
+    const foot = [brand.agentName, brand.phone].filter(Boolean).join('   ·   ');
+    if (foot) { ctx.font = font(600, story ? 30 : 27); ctx.fillStyle = alpha(fg, 0.9); ctx.fillText(foot, W / 2, H - (story ? 96 : 70)); }
+    ctx.textAlign = 'left';
+  };
+
+  // "Meet the agent" intro post (headshot + name + tagline + bio + contact)
+  const agentPost = (canvas, kind, { brand, tagline, bio }) => {
+    const story = kind === 'story';
+    const [W, H] = story ? [1080, 1920] : [1080, 1080];
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const prim = brand.primary, acc = brand.accent, fg = onColor(prim);
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, shade(prim, 16)); g.addColorStop(1, shade(prim, -34));
+    ctx.fillStyle = g; ctx.fillRect(0, 0, W, H);
+    ctx.textAlign = 'center';
+    let y = story ? 430 : 340;
+    if (brand.headImg && brand.headImg.width) circleImg(ctx, brand.headImg, W / 2, y, story ? 320 : 280, acc);
+    else { ctx.beginPath(); ctx.arc(W / 2, y, (story ? 320 : 280) / 2, 0, Math.PI * 2); ctx.fillStyle = alpha(fg, 0.12); ctx.fill(); ctx.strokeStyle = acc; ctx.lineWidth = 4; ctx.stroke(); ctx.fillStyle = alpha(fg, 0.5); ctx.font = font(400, story ? 120 : 104); ctx.fillText('🙂', W / 2, y + (story ? 44 : 38)); }
+    y += (story ? 320 : 280) / 2 + (story ? 110 : 96);
+    ctx.fillStyle = acc; spacing(ctx, 5); ctx.font = font(700, story ? 30 : 27, priceFam(brand, SANS));
+    ctx.fillText('MEET YOUR AGENT', W / 2, y - (story ? 64 : 56)); spacing(ctx, 0);
+    ctx.fillStyle = fg; ctx.font = font(700, story ? 72 : 62, priceFam(brand, SANS));
+    fitFont(ctx, brand.agentName || 'Your Name Here', W - 160, story ? 72 : 62, 700, priceFam(brand, SANS));
+    ctx.fillText(brand.agentName || 'Your Name Here', W / 2, y);
+    const tg = (tagline || ((brand.brokerage ? brand.brokerage + ' · ' : '') + 'Your local property specialist')).trim();
+    ctx.font = font(400, story ? 36 : 32); ctx.fillStyle = alpha(fg, 0.85); y += story ? 56 : 50; ctx.fillText(tg, W / 2, y);
+    if (bio && bio.trim()) {
+      ctx.font = font(400, story ? 34 : 30); ctx.fillStyle = alpha(fg, 0.9);
+      const lines = wrapText(ctx, bio.trim(), W - 220, story ? 5 : 3); y += story ? 80 : 70;
+      lines.forEach((l, i) => ctx.fillText(l, W / 2, y + i * (story ? 50 : 44)));
+    }
+    const contact = [brand.phone, brand.email].filter(Boolean).join('   ·   ');
+    if (contact) { ctx.font = font(600, story ? 30 : 27); ctx.fillStyle = acc; ctx.fillText(contact, W / 2, H - (story ? 96 : 70)); }
+    ctx.textAlign = 'left';
+  };
+
   // diagonal corner banner ("SOLD" / "UNDER OFFER" …) stamped over any graphic.
   // Drawn as a post-render overlay so it works on every template uniformly.
   const STAMP_COLORS = {
@@ -900,5 +968,5 @@ const Visuals = (() => {
     if (d && d.stamp) cornerSash(ctx, W, H, d.stamp);
   };
 
-  return { render, download, SIZES, onColor, shade, featureSlide, ctaSlide, signboard, openHomePost, arrowSign, opensRoundup, testimonial };
+  return { render, download, SIZES, onColor, shade, featureSlide, ctaSlide, signboard, openHomePost, arrowSign, opensRoundup, testimonial, prospectPost, agentPost };
 })();
