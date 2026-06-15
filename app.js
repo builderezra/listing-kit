@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v31';
+  const APP_VERSION = 'v34';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -406,6 +406,7 @@
     price: $('price').value.trim(),
     currency: $('currency').value === 'custom' ? ($('currencyCustom').value.trim() || '$') : $('currency').value,
     rentPeriod: $('rentPeriod').value,
+    rentPeriodCustom: $('rentPeriodCustom').value.trim(),
     badge: $('badge').value,
     badgeCustom: $('badgeCustom').value.trim(),
     openhouse: $('openhouse').value.trim(),
@@ -422,7 +423,7 @@
     // rent-only fields
     available: $('available').value.trim(),
     bond: $('bond').value.trim(),
-    leaseTerm: $('leaseTerm').value,
+    leaseTerm: $('leaseTerm').value === 'custom' ? ($('leaseTermCustom').value.trim() || '') : $('leaseTerm').value,
     furnished: $('furnished').value,
     pets: $('pets').value,
     features: $('features').value.split(/[,\n]/).map((s) => s.trim()).filter(Boolean),
@@ -575,6 +576,11 @@
     if (canShareFiles()) { $('lbShare').hidden = false; $('lbShare').addEventListener('click', async () => { if (lbState.cv) { const ok = await shareCanvas(lbState.cv, `${slug()}-carousel-${String(lbState.n).padStart(2, '0')}.png`, (outputs && outputs.instagram) || ''); if (!ok) $('lbDownload').click(); } }); }
     window.addEventListener('keydown', (e) => { if (!$('lightbox').hidden && e.key === 'Escape') closeLightbox(); });
   };
+  const wireSignboard = () => {
+    $('sbUrl').addEventListener('input', () => { if (activeTab === 'signboard' && outputs) renderSignboard(); saveDraft(); });
+    $('sbDownload').addEventListener('click', () => Visuals.download($('cvSignboard'), `${slug()}-signboard.png`));
+    $('sbStudio').addEventListener('click', () => openStudio());
+  };
   const wireShare = () => {
     if (!canShareFiles()) return;
     $('sharePost').hidden = false;
@@ -686,16 +692,25 @@
   };
 
   // ---------------- tabs ----------------
+  // ---- sign board (with QR code) ----
+  const renderSignboard = () => {
+    const d = vizData();
+    if (!$('sbUrl').value.trim() && $('importUrl').value.trim()) $('sbUrl').value = $('importUrl').value.trim();   // prefill from the imported link
+    const status = d.raw.mode === 'rent' ? 'FOR LEASE' : 'FOR SALE';
+    Visuals.signboard($('cvSignboard'), { brand, d, status, qrUrl: $('sbUrl').value.trim() });
+  };
+
   const renderTab = (tab) => {
     activeTab = tab;
     document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === tab));
     if (!outputs) return;
 
-    ['graphicsContent', 'flyerContent', 'content', 'complianceContent'].forEach((id) => ($(id).hidden = true));
+    ['graphicsContent', 'flyerContent', 'content', 'complianceContent', 'signboardContent'].forEach((id) => ($(id).hidden = true));
 
     if (tab === 'graphics') { $('graphicsContent').hidden = false; renderGraphics(); return; }
     if (tab === 'flyer') { $('flyerContent').hidden = false; renderFlyer(); return; }
     if (tab === 'compliance') { $('complianceContent').hidden = false; renderCompliance(); return; }
+    if (tab === 'signboard') { $('signboardContent').hidden = false; renderSignboard(); return; }
 
     $('content').hidden = false;
     const text = outputs[tab] || '';
@@ -849,6 +864,25 @@
           : 'Flags are guidance, not legal advice. When in doubt, check with your broker’s compliance team.';
       body.appendChild(note);
     }
+
+    // AI deeper double-check (catches subtle/coded wording the regex misses)
+    const aiRow = document.createElement('div');
+    aiRow.className = 'compliance-ai';
+    aiRow.innerHTML = '<button type="button" id="aiComplyBtn">🤖 Double-check with AI</button> <span class="hint">— a deeper review for subtle or coded wording (uses your AI key)</span><div id="aiComplyResults"></div>';
+    body.appendChild(aiRow);
+    $('aiComplyBtn').addEventListener('click', runAiCompliance);
+  };
+  const runAiCompliance = async () => {
+    const box = $('aiComplyResults');
+    if (typeof AI === 'undefined' || !AI.available()) { box.innerHTML = '<p class="muted" style="margin-top:8px">Add your Anthropic API key in “Your brand” to use the AI double-check.</p>'; return; }
+    const btn = $('aiComplyBtn'); btn.disabled = true; btn.textContent = '🤖 Checking…';
+    const text = [outputs && outputs.mls, outputs && outputs.instagram, outputs && outputs.facebook, outputs && outputs.email, $('features').value, $('neighborhood').value, $('address').value].filter(Boolean).join('\n\n');
+    try {
+      const issues = await AI.compliance(text);
+      if (!issues.length) box.innerHTML = '<div class="compliance-summary clear" style="margin-top:10px"><span class="big">✅</span><div><h3>AI found nothing further</h3><p>The AI review didn’t flag anything beyond the scanner above.</p></div></div>';
+      else box.innerHTML = '<p class="ai-comply-head">🤖 The AI also flagged:</p>' + issues.map((i) => `<div class="finding medium"><div class="finding-top"><span class="flag-phrase">“${escapeHtml(i.phrase || '')}”</span><span class="flag-class">${escapeHtml(i.issue || '')}</span></div><div class="finding-why">${escapeHtml(i.why || '')}</div><div class="finding-fix"><b>Try instead:</b> ${escapeHtml(i.fix || '')}</div></div>`).join('');
+    } catch (e) { box.innerHTML = `<p class="muted" style="margin-top:8px">${escapeHtml((typeof AI !== 'undefined' && AI.explain) ? AI.explain(e) : 'AI check failed')}</p>`; }
+    finally { btn.disabled = false; btn.textContent = '🤖 Double-check with AI'; }
   };
 
   const updateComplianceDot = () => {
@@ -1061,7 +1095,7 @@
 
   // ---------------- draft autosave (listing fields survive a refresh) ----------------
   const DRAFT_KEY = 'lk_draft_v1';
-  const LISTING_FIELDS = ['address', 'city', 'price', 'currency', 'currencyCustom', 'rentPeriod', 'badge', 'badgeCustom', 'openhouse', 'type', 'typeCustom', 'tone', 'beds', 'baths', 'cars', 'sqft', 'areaUnit', 'areaUnitCustom', 'year', 'lot', 'available', 'bond', 'leaseTerm', 'furnished', 'pets', 'features', 'neighborhood'];
+  const LISTING_FIELDS = ['address', 'city', 'price', 'currency', 'currencyCustom', 'rentPeriod', 'rentPeriodCustom', 'badge', 'badgeCustom', 'openhouse', 'type', 'typeCustom', 'tone', 'beds', 'baths', 'cars', 'sqft', 'areaUnit', 'areaUnitCustom', 'year', 'lot', 'available', 'bond', 'leaseTerm', 'leaseTermCustom', 'furnished', 'pets', 'features', 'neighborhood', 'sbUrl'];
   let draftTimer = null;
   const saveDraft = () => {
     clearTimeout(draftTimer);
@@ -1445,6 +1479,16 @@
       if ($('areaUnit').value === 'customunit') $('areaUnitCustom').focus();
       rerenderVisuals();
     });
+    $('rentPeriod').addEventListener('change', () => {
+      $('rentPeriodCustom').hidden = $('rentPeriod').value !== 'custom';
+      if ($('rentPeriod').value === 'custom') $('rentPeriodCustom').focus();
+      rerenderVisuals();
+    });
+    $('leaseTerm').addEventListener('change', () => {
+      $('leaseTermCustom').hidden = $('leaseTerm').value !== 'custom';
+      if ($('leaseTerm').value === 'custom') $('leaseTermCustom').focus();
+      rerenderVisuals();
+    });
     // keep the visible custom-input state in sync (drafts, region defaults)
     syncCustomWraps();
   };
@@ -1454,6 +1498,8 @@
     $('typeCustomWrap').hidden = $('type').value !== 'customtype';
     $('currencyCustom').hidden = $('currency').value !== 'custom';
     $('areaUnitCustom').hidden = $('areaUnit').value !== 'customunit';
+    $('rentPeriodCustom').hidden = !(mode === 'rent' && $('rentPeriod').value === 'custom');
+    $('leaseTermCustom').hidden = $('leaseTerm').value !== 'custom';
   };
 
   // ---------------- listing type (sale / rent) ----------------
@@ -1486,7 +1532,7 @@
     saveDraft();
     if (outputs) generate(); else rerenderVisuals();
   }));
-  ['available', 'bond', 'leaseTerm', 'furnished', 'pets', 'rentPeriod'].forEach((id) =>
+  ['available', 'bond', 'leaseTerm', 'leaseTermCustom', 'furnished', 'pets', 'rentPeriod', 'rentPeriodCustom'].forEach((id) =>
     $(id).addEventListener('input', () => { rerenderVisuals(); saveDraft(); }));
   document.querySelectorAll('.tpl').forEach((t) => t.addEventListener('click', () => {
     brand.templateId = t.dataset.tpl;
@@ -1530,6 +1576,7 @@
   wireDownloads();
   wireLightbox();
   wireShare();
+  wireSignboard();
   wireEditableOutput();
   wireAI();
   // accessibility: announce async status updates to screen readers

@@ -207,6 +207,19 @@ Now produce the JSON.`;
     return out;
   };
 
+  // ---- AI compliance double-check (catches what the regex scanner misses) ----
+  const COMPLIANCE_SYSTEM = [
+    'You are a real-estate advertising compliance reviewer for the AU and US markets. Scan the supplied listing text for any wording that could breach fair-housing / anti-discrimination law: a preference, limitation, or exclusion based on race, colour, ethnicity, religion, national origin, sex/gender, disability, familial status / children, age, or (AU) source of income or occupation. Also flag steering language ("safe", "good schools", "exclusive/prestigious area") and ableist phrasing ("walking distance", "must be active").',
+    'Be thorough — catch subtle, coded, and explicit cases (e.g. "no asians", "ideal for a young professional couple", "great Christian community").',
+    'Return ONLY a JSON array, no prose and no markdown fences. Each element: {"phrase": exact offending words from the text, "issue": short class e.g. "Race / national origin", "why": one sentence, "fix": a compliant rewrite or "Remove."}. If the text is clean, return [].',
+  ].join('\n');
+  const compliance = async (text) => {
+    const raw = await call(COMPLIANCE_SYSTEM, `Review this listing text and report every fair-housing / anti-discrimination risk as JSON:\n\n${text}`, 1500);
+    let s = String(raw).trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+    const m = s.match(/\[[\s\S]*\]/); if (m) s = m[0];
+    try { const a = JSON.parse(s); return Array.isArray(a) ? a : []; } catch (e) { return []; }
+  };
+
   // quick validation ping — cheapest model, tiny output
   const test = async () => {
     const key = getKey();
@@ -242,5 +255,5 @@ Now produce the JSON.`;
     return e && e.message ? e.message : 'Something went wrong.';
   };
 
-  return { MODELS, available, getKey, setKey, getModel, setModel, modelLabel, polish, instruct, research, designStyle, designLayout, test, explain };
+  return { MODELS, available, getKey, setKey, getModel, setModel, modelLabel, polish, instruct, research, designStyle, designLayout, compliance, test, explain };
 })();

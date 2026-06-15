@@ -442,7 +442,11 @@ const Studio = (() => {
     if (kind === 'photo') {
       if (!ctxData.photos.length) return;
       const pi = bg.type === 'photo' ? bg.photoIndex : 0;
-      const L = { id: uid++, type: 'photo', photoIndex: pi, shape: 'rect', radius: Math.round(W() * 0.03), xf: 0.5, yf: 0.5, wf: 0.5, filter: { b: 100, c: 100, s: 100, h: 0, sep: 0, blur: 0 }, opacity: 1, rot: 0 };
+      const img = ctxData.photos[pi] && ctxData.photos[pi].img;
+      const wf = 0.5;
+      // give it a box (wf×hf) at the photo's native aspect so it looks unchanged but supports crop (zoom/pan)
+      const hf = (img && img.width) ? wf * W() * (img.height / img.width) / H() : wf;
+      const L = { id: uid++, type: 'photo', photoIndex: pi, shape: 'rect', radius: Math.round(W() * 0.03), xf: 0.5, yf: 0.5, wf, hf, crop: { zoom: 1, ox: 0, oy: 0 }, filter: { b: 100, c: 100, s: 100, h: 0, sep: 0, blur: 0 }, opacity: 1, rot: 0 };
       layers.push(L); selId = L.id; commit(); return;
     }
     const proto = presets()[kind];
@@ -600,9 +604,10 @@ const Studio = (() => {
       $('stPhRadiusRow').style.display = t.shape === 'rounded' ? '' : 'none';
       $('stPhRadius').value = t.radius || 0; slv('stPhRadiusV', Math.round(t.radius || 0) + '');
     } else { $('stPhRadiusRow').style.display = 'none'; }
-    $('stPhCrop').hidden = !isBg;
+    const cropAble = isBg || (!isBg && t.hf);   // bg, or a box photo layer
+    $('stPhCrop').hidden = !cropAble;
     const set = (id, v, suf) => { $(id).value = v; slv(id + 'V', v + suf); };
-    if (isBg) {
+    if (cropAble) {
       const cr = t.crop || {};
       set('stPhZoom', Math.round((cr.zoom || 1) * 100), '%');
       set('stPhPanX', Math.round((cr.ox || 0) * 100), '');
@@ -807,6 +812,7 @@ const Studio = (() => {
     const priceFont = (def) => serif ? 'serif' : sans ? 'sans' : def;
     const out = [];
     const measureW = (t, wt, size, fam) => { ctx2d.font = `${wt} ${size}px ${fam === 'serif' ? SERIF : SANS}`; return ctx2d.measureText(String(t)).width; };
+    const stripW = (text, size) => { ctx2d.font = `700 ${size}px ${SANS}`; const parts = String(text).split(/[·•|]/).map((s) => s.trim()).filter(Boolean); const padX = size * 0.7, gap = size * 0.45; let tot = 0; parts.forEach((p, k2) => { tot += ctx2d.measureText(p).width + padX * 2; if (k2) tot += gap; }); return tot; };
     const push = (o) => { out.push({ id: uid++, opacity: 1, rot: 0, ...o }); return out[out.length - 1]; };
     const leftText = (t, mpx, baseY, size, o = {}) => { const fam = o.font || 'sans', wt = o.weight || 400; const w = measureW(t, wt, size, fam); return push({ type: 'text', text: String(t), size, weight: wt, font: fam, color: o.color || '#ffffff', align: 'left', shadow: !!o.shadow, xf: (mpx + w / 2) / W, yf: (baseY - size * 0.35) / H }); };
     const ctrText = (t, cxpx, baseY, size, o = {}) => push({ type: 'text', text: String(t), size, weight: o.weight || 400, font: o.font || 'sans', color: o.color || '#ffffff', align: 'center', shadow: !!o.shadow, xf: cxpx / W, yf: (baseY - size * 0.35) / H });
@@ -892,7 +898,7 @@ const Studio = (() => {
         let y = m + photoH + (k === 'story' ? 150 : 110);
         if (f.price) { leftText(f.price, m + 16, y, k === 'story' ? 104 : 88, { weight: 800, font: priceFont('sans'), color: fg }); y += k === 'story' ? 66 : 56; }
         if (f.address) { leftText(f.address, m + 16, y, k === 'story' ? 38 : 33, { weight: 400, color: fg }); y += k === 'story' ? 84 : 66; }
-        if (f.stats) push({ type: 'statsstrip', text: f.stats, color: 'accent', size: k === 'story' ? 26 : 23, xf: 0.5, yf: (y + 20) / H, weight: 700 });
+        if (f.stats) { const ss = k === 'story' ? 26 : 23; push({ type: 'statsstrip', text: f.stats, color: 'accent', size: ss, xf: (m + 16 + stripW(f.stats, ss) / 2) / W, yf: (y + 20) / H, weight: 700 }); }   // left-aligned like the generated bold
         const rowY = H - (k === 'story' ? 150 : 130);
         push({ type: 'rect', shape: 'rect', color: 'accent', wf: (W - (m + 16) * 2) / W, hf: 2 / H, xf: 0.5, yf: rowY / H, radius: 0, opacity: 0.55 });
         leftText(b.agentName || 'Your Name Here', m + 16, rowY + (k === 'story' ? 58 : 50), k === 'story' ? 32 : 28, { weight: 700, color: fg });
@@ -1201,7 +1207,7 @@ const Studio = (() => {
     phFilter('stPhB', 'b', '%'); phFilter('stPhC', 'c', '%'); phFilter('stPhS', 's', '%'); phFilter('stPhHue', 'h', '°'); phFilter('stPhSep', 'sep', '%');
     phFilter('stPhHi', 'highlights', ''); phFilter('stPhSh', 'shadows', ''); phFilter('stPhTint', 'tint', ''); phFilter('stPhSharp', 'sharpness', ''); phFilter('stPhVig', 'vignette', '');
     // crop / position (background only)
-    const phCrop = (id, key, div) => { const live = ph((t) => { if (t === bg) { t.crop = t.crop || {}; t.crop[key] = Number($(id).value) / div; slv(id + 'V', $(id).value + (div === 100 && key === 'zoom' ? '%' : '')); render(); } }); $(id).addEventListener('input', live); $(id).addEventListener('change', commit); };
+    const phCrop = (id, key, div) => { const live = ph((t) => { if (t === bg || t.hf) { t.crop = t.crop || {}; t.crop[key] = Number($(id).value) / div; slv(id + 'V', $(id).value + (div === 100 && key === 'zoom' ? '%' : '')); render(); } }); $(id).addEventListener('input', live); $(id).addEventListener('change', commit); };
     phCrop('stPhZoom', 'zoom', 100); phCrop('stPhPanX', 'ox', 100); phCrop('stPhPanY', 'oy', 100);
     $('stPhReset').addEventListener('click', ph((t) => { t.filter = (t === bg) ? {} : { b: 100, c: 100, s: 100, h: 0, sep: 0, blur: 0 }; if (t === bg) t.crop = { zoom: 1, ox: 0, oy: 0 }; commit(); }));
 

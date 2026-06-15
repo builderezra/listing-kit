@@ -495,5 +495,58 @@ const Visuals = (() => {
     }, 'image/png');
   };
 
-  return { render, download, SIZES, onColor, shade, featureSlide, ctaSlide };
+  // =====================  SIGN BOARD (1200×900) with QR code  ==================
+  const signboard = (canvas, { brand, d, status, qrUrl }) => {
+    const W = 1200, H = 900;
+    canvas.width = W; canvas.height = H;
+    const ctx = canvas.getContext('2d');
+    const b = brand;
+    ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, W, H);
+
+    // top status bar
+    const barH = 132, fg = onColor(b.primary);
+    ctx.fillStyle = b.primary; ctx.fillRect(0, 0, W, barH);
+    ctx.fillStyle = fg; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    ctx.font = font(800, 56); spacing(ctx, 3);
+    ctx.fillText(status || 'FOR SALE', 48, barH / 2 + 3); spacing(ctx, 0);
+    if (b.brokerage) { ctx.textAlign = 'right'; ctx.font = font(600, 30); ctx.globalAlpha = 0.92; ctx.fillText(b.brokerage, W - 48, barH / 2 + 2); ctx.globalAlpha = 1; ctx.textAlign = 'left'; }
+    ctx.textBaseline = 'alphabetic';
+
+    // hero photo band + accent rule
+    const photoY = barH, photoH = 356;
+    cover(ctx, d.hero, 0, photoY, W, photoH, 0, b, d.heroFocus, d.heroFilter);
+    ctx.fillStyle = b.accent; ctx.fillRect(0, photoY + photoH, W, 8);
+
+    // price / address / stats (left, in the white zone — QR sits to their right)
+    let y = photoY + photoH + 82;
+    if (d.price) { ctx.font = font(800, 78, priceFam(b, SANS)); ctx.fillStyle = b.primary; ctx.fillText(d.price, 48, y); }
+    if (d.address) { y += 58; ctx.font = font(400, 36); ctx.fillStyle = '#23333b'; ctx.fillText(d.address, 48, y); }
+    const stats = statText(d);
+    if (stats) { y += 50; ctx.font = font(600, 30); spacing(ctx, 3); ctx.fillStyle = '#23333b'; ctx.fillText(stats, 48, y); spacing(ctx, 0); }
+
+    // agent contact row pinned to the very bottom (left); logo/headshot to its left
+    const ay = H - 70;
+    let ax = 48;
+    if (b.headImg && b.headImg.width) { const dd = 96; circleImg(ctx, b.headImg, 48 + dd / 2, ay, dd, b.accent); ax = 48 + dd + 20; }
+    else if (b.logoImg && b.logoImg.width) { const lw = logoImg(ctx, b.logoImg, 48 + 150, ay, 78); ax = 48 + 150 + 18; }
+    ctx.fillStyle = '#1c2b30'; ctx.font = font(700, 36); ctx.textBaseline = 'middle'; ctx.fillText(b.agentName || 'Your Name Here', ax, ay - 16);
+    const contact = [b.phone, b.email].filter(Boolean).join('   ·   ');
+    if (contact) { ctx.font = font(400, 28); ctx.fillStyle = '#5d6e75'; ctx.fillText(contact, ax, ay + 20); }
+    ctx.textBaseline = 'alphabetic';
+
+    // QR (right side, vertically centred in the white zone)
+    if (qrUrl && typeof QR !== 'undefined') {
+      const qs = 196, qx = W - qs - 56, qy = photoY + photoH + 44;
+      ctx.fillStyle = '#ffffff'; rr(ctx, qx - 14, qy - 14, qs + 28, qs + 28, 14); ctx.fill();
+      ctx.strokeStyle = alpha(b.primary, 0.18); ctx.lineWidth = 2; ctx.stroke();
+      try { QR.draw(ctx, qrUrl, qx, qy, qs, '#1c2b30'); } catch (e) {}
+      ctx.fillStyle = '#5d6e75'; ctx.font = font(700, 24); ctx.textAlign = 'center';
+      ctx.fillText('Scan for details', qx + qs / 2, qy + qs + 34); ctx.textAlign = 'left';
+    } else {
+      ctx.fillStyle = '#9aa6ac'; ctx.font = font(500, 26); ctx.textAlign = 'right';
+      ctx.fillText('Add a link below for a QR code →', W - 52, H - 110); ctx.textAlign = 'left';
+    }
+  };
+
+  return { render, download, SIZES, onColor, shade, featureSlide, ctaSlide, signboard };
 })();

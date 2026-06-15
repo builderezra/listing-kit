@@ -47,14 +47,18 @@ const Generator = (() => {
   const areaShort = (u) => (u === 'sqm' ? 'm²' : u === 'sqft' ? 'sq ft' : u || 'm²');
 
   // rent: "$650 per week" / "$650/wk"; sale: "$985,000". `mode` from the form.
-  const RENT_LONG = { pw: 'per week', pm: 'per month' };
-  const RENT_SHORT = { pw: '/wk', pm: '/mo' };
-  const rentLong = (n, cur, period) => { const m = money(n, cur); return m ? `${m} ${RENT_LONG[period] || RENT_LONG.pw}` : ''; };
-  const rentShort = (n, cur, period) => { const m = money(n, cur); return m ? `${m}${RENT_SHORT[period] || RENT_SHORT.pw}` : ''; };
+  const RENT_LONG = { pw: 'per week', pm: 'per month', pf: 'per fortnight' };
+  const RENT_SHORT = { pw: '/wk', pm: '/mo', pf: '/fn' };
+  const rentPeriodShort = (d) => d.rentPeriod === 'custom'
+    ? ((d.rentPeriodCustom || '').trim() ? '/' + d.rentPeriodCustom.trim().replace(/^\//, '') : '/wk')
+    : (RENT_SHORT[d.rentPeriod] || RENT_SHORT.pw);
+  const rentPeriodLong = (d) => d.rentPeriod === 'custom'
+    ? ((d.rentPeriodCustom || '').trim() ? 'per ' + d.rentPeriodCustom.trim().replace(/^\//, '') : 'per week')
+    : (RENT_LONG[d.rentPeriod] || RENT_LONG.pw);
   // headline price string for either mode (long form, used in prose)
-  const priceLong = (d) => (d.mode === 'rent' ? rentLong(d.price, d.currency, d.rentPeriod) : money(d.price, d.currency));
+  const priceLong = (d) => (d.mode === 'rent' ? (money(d.price, d.currency) ? `${money(d.price, d.currency)} ${rentPeriodLong(d)}` : '') : money(d.price, d.currency));
   // compact price string (used on graphics / flyer tag)
-  const priceShort = (d) => (d.mode === 'rent' ? rentShort(d.price, d.currency, d.rentPeriod) : money(d.price, d.currency));
+  const priceShort = (d) => (d.mode === 'rent' ? (money(d.price, d.currency) ? `${money(d.price, d.currency)}${rentPeriodShort(d)}` : '') : money(d.price, d.currency));
 
   const priceTier = (price) => {
     const v = Number(String(price || '').replace(/[^0-9.]/g, ''));

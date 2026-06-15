@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=31" />
+  <link rel="stylesheet" href="styles.css?v=34" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -220,11 +220,7 @@
               <input type="text" id="address" />
             </div>
             <div class="row">
-              <div class="field">
-                <label for="city">Suburb / area</label>
-                <input type="text" id="city" />
-              </div>
-              <div class="field">
+              <div class="field price-field">
                 <label for="price" id="priceLabel">Price</label>
                 <div class="pricewrap">
                   <select id="currency" aria-label="Currency">
@@ -245,8 +241,15 @@
                   <select id="rentPeriod" aria-label="Rent period" hidden>
                     <option value="pw">/wk</option>
                     <option value="pm">/mo</option>
+                    <option value="pf">/fn</option>
+                    <option value="custom">…</option>
                   </select>
+                  <input type="text" id="rentPeriodCustom" placeholder="/term" hidden />
                 </div>
+              </div>
+              <div class="field">
+                <label for="city">Suburb / area</label>
+                <input type="text" id="city" />
               </div>
             </div>
             <div class="row">
@@ -358,7 +361,9 @@
                     <option value="12-month">12 months</option>
                     <option value="6–12 month">6–12 months</option>
                     <option value="flexible">Flexible</option>
+                    <option value="custom">Custom…</option>
                   </select>
+                  <input type="text" id="leaseTermCustom" class="custom-wrap" placeholder="e.g. 2 years" hidden />
                 </div>
                 <div class="field">
                   <label for="furnished">Furnishing</label>
@@ -427,18 +432,16 @@
 
     <!-- ============ OUTPUT ============ -->
     <section class="panel out-panel" aria-label="Generated marketing kit">
-      <div class="out-header">
-        <span class="out-header-label">Your marketing kit</span>
-        <button type="button" class="studio-launch" id="studioLaunch" title="Open the full-screen design editor">✏️ Design Studio ↗</button>
-      </div>
       <nav class="tabs" id="tabs" role="tablist">
         <button class="tab active" data-tab="graphics" role="tab">🎨 Graphics</button>
         <button class="tab" data-tab="flyer" role="tab">📄 Flyer</button>
-        <button class="tab" data-tab="mls" role="tab">Listing</button>
+        <button class="tab" data-tab="mls" role="tab">📝 Listing</button>
         <button class="tab" data-tab="instagram" role="tab"><svg class="tabico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5"/><circle cx="12" cy="12" r="4.4"/><circle cx="17.6" cy="6.4" r="1.3" fill="currentColor" stroke="none"/></svg> Instagram</button>
         <button class="tab" data-tab="facebook" role="tab"><svg class="tabico" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M13.5 21v-7H16l.5-3h-3V9.2c0-.8.3-1.2 1.3-1.2H16.5V5.3C16.1 5.2 15 5 13.9 5 11.6 5 10 6.4 10 9v2H7.5v3H10v7z"/></svg> Facebook</button>
         <button class="tab" data-tab="email" role="tab">✉️ Email</button>
+        <button class="tab" data-tab="signboard" role="tab">🪧 Sign board</button>
         <button class="tab compliance-tab" data-tab="compliance" role="tab">⚖️ <span class="dot" id="complianceDot"></span></button>
+        <button type="button" class="studio-launch" id="studioLaunch" title="Open the full-screen design editor">✏️ Design Studio ↗</button>
       </nav>
 
       <div class="output" id="output">
@@ -519,6 +522,18 @@
 
         <article class="panel-content" id="complianceContent" hidden>
           <div id="complianceBody"></div>
+        </article>
+
+        <article class="panel-content" id="signboardContent" hidden>
+          <div class="sb-bar">
+            <label for="sbUrl">QR code link <span class="hint">— where the QR sends people (the listing page, your site, a virtual tour…)</span></label>
+            <input type="url" id="sbUrl" placeholder="https://… (paste a link to make the QR code)" />
+          </div>
+          <div class="sb-wrap"><canvas id="cvSignboard"></canvas></div>
+          <div class="sb-actions">
+            <button type="button" class="copy-btn dl-all" id="sbDownload">⬇️ Download sign board (PNG)</button>
+            <button type="button" class="copy-btn dl-all" id="sbStudio">🎨 Open in design studio</button>
+          </div>
         </article>
       </div>
     </section>
@@ -812,15 +827,16 @@
     </div>
   </div>
 
-  <script src="generator.js?v=31"></script>
-  <script src="fairhousing.js?v=31"></script>
-  <script src="parser.js?v=31"></script>
-  <script src="importer.js?v=31"></script>
-  <script src="visuals.js?v=31"></script>
-  <script src="flyer.js?v=31"></script>
-  <script src="ai.js?v=31"></script>
-  <script src="studio.js?v=31"></script>
-  <script src="tour.js?v=31"></script>
-  <script src="app.js?v=31"></script>
+  <script src="generator.js?v=34"></script>
+  <script src="fairhousing.js?v=34"></script>
+  <script src="parser.js?v=34"></script>
+  <script src="importer.js?v=34"></script>
+  <script src="qr.js?v=34"></script>
+  <script src="visuals.js?v=34"></script>
+  <script src="flyer.js?v=34"></script>
+  <script src="ai.js?v=34"></script>
+  <script src="studio.js?v=34"></script>
+  <script src="tour.js?v=34"></script>
+  <script src="app.js?v=34"></script>
 </body>
 </html>
