@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v73';
+  const APP_VERSION = 'v74';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -355,7 +355,7 @@
 
   const FOCUS_ORDER = ['center', 'top', 'bottom'];
   const FOCUS_ICON = { center: '⊙', top: '⬆', bottom: '⬇' };
-  // photo filters → CSS/canvas filter string (honest adjustments only)
+  // photo filters → CSS/canvas filter string (basic adjustments, applied live at draw)
   const NEUTRAL = { b: 100, c: 100, s: 100, w: 0 };
   const filterCSS = (f) => {
     if (!f) return '';
@@ -366,7 +366,67 @@
     if (f.w) p.push(`sepia(${Math.round(f.w * 0.6)}%)`);
     return p.join(' ');
   };
-  const syncFcss = () => photos.forEach((p) => { p.fcss = filterCSS(p.filter); });
+  // advanced (pixel-level) adjustments that CSS filters can't express + a true crop.
+  // these are *baked* into photo.img so every output (graphics, carousel, flyer,
+  // signboard, open-home, reel, studio) reflects them with no per-renderer changes.
+  const ADV_KEYS = ['highlights', 'shadows', 'tint', 'sharpness', 'vignette'];
+  const hasAdv = (f) => !!f && ADV_KEYS.some((k) => f[k]);
+  const hasCrop = (cr) => !!cr && (cr.w < 0.999 || cr.h < 0.999 || cr.x > 0.001 || cr.y > 0.001);
+  const sharpenCanvas = (cx, w, h, amt) => {
+    let src; try { src = cx.getImageData(0, 0, w, h); } catch (e) { return; }
+    const out = cx.createImageData(w, h), s = src.data, o = out.data, k = amt * 0.9, wt = 1 + 4 * k;
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      for (let c = 0; c < 3; c++) {
+        const up = y > 0 ? s[i - w * 4 + c] : s[i + c], dn = y < h - 1 ? s[i + w * 4 + c] : s[i + c];
+        const lf = x > 0 ? s[i - 4 + c] : s[i + c], rt = x < w - 1 ? s[i + 4 + c] : s[i + c];
+        const v = s[i + c] * wt - k * (up + dn + lf + rt);
+        o[i + c] = v < 0 ? 0 : v > 255 ? 255 : v;
+      }
+      o[i + 3] = s[i + 3];
+    }
+    cx.putImageData(out, 0, 0);
+  };
+  // apply highlights/shadows/tint/sharpness/vignette onto a context already holding the image
+  const applyAdvanced = (c, w, h, f) => {
+    const hi = (f.highlights || 0) / 100, sh = (f.shadows || 0) / 100, tint = (f.tint || 0) / 100;
+    if (hi || sh || tint) {
+      let id; try { id = c.getImageData(0, 0, w, h); } catch (e) { return; }
+      const d = id.data;
+      for (let i = 0; i < d.length; i += 4) {
+        let r = d[i], g = d[i + 1], b = d[i + 2];
+        const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+        if (sh) { const wgt = Math.max(0, 1 - lum * 1.4); const a = sh * 130 * wgt; r += a; g += a; b += a; }
+        if (hi) { const wgt = Math.max(0, (lum - 0.35) * 1.6); const a = hi * 130 * wgt; r += a; g += a; b += a; }
+        if (tint) { g += tint * 55; r -= tint * 28; b -= tint * 28; }   // green ↔ magenta
+        d[i] = r < 0 ? 0 : r > 255 ? 255 : r; d[i + 1] = g < 0 ? 0 : g > 255 ? 255 : g; d[i + 2] = b < 0 ? 0 : b > 255 ? 255 : b;
+      }
+      c.putImageData(id, 0, 0);
+    }
+    if (f.sharpness) sharpenCanvas(c, w, h, (f.sharpness || 0) / 100);
+    if (f.vignette) { const g = c.createRadialGradient(w / 2, h / 2, Math.min(w, h) * 0.32, w / 2, h / 2, Math.max(w, h) * 0.62); g.addColorStop(0, 'rgba(0,0,0,0)'); g.addColorStop(1, `rgba(0,0,0,${(f.vignette / 100) * 0.75})`); c.fillStyle = g; c.fillRect(0, 0, w, h); }
+  };
+  // rebuild photo.img = source cropped + advanced-baked (cached by signature). basic
+  // filters stay live (fcss). photo.srcImg is captured once and never mutated.
+  const bakeRender = (p) => {
+    if (!p) return;
+    if (!p.srcImg) p.srcImg = p.img;                       // capture the original once
+    const src = p.srcImg; if (!src || !src.width) return;
+    const f = p.filter || {}, crop = hasCrop(p.crop) ? p.crop : null, adv = hasAdv(f);
+    const sig = JSON.stringify({ c: crop, a: ADV_KEYS.map((k) => f[k] || 0) });
+    if (p._rSig === sig && (p.img === p._render || (!crop && !adv && p.img === src))) return;
+    p._rSig = sig;
+    if (!crop && !adv) { p.img = src; p._render = null; return; }
+    const sx = crop ? Math.round(crop.x * src.width) : 0, sy = crop ? Math.round(crop.y * src.height) : 0;
+    const sw = crop ? Math.round(crop.w * src.width) : src.width, sh = crop ? Math.round(crop.h * src.height) : src.height;
+    const max = 1600, sc = Math.min(1, max / Math.max(sw, sh));
+    const w = Math.max(1, Math.round(sw * sc)), h = Math.max(1, Math.round(sh * sc));
+    const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+    const c = cv.getContext('2d'); c.drawImage(src, sx, sy, sw, sh, 0, 0, w, h);
+    if (adv) applyAdvanced(c, w, h, f);
+    p.img = cv; p._render = cv;
+  };
+  const syncFcss = () => photos.forEach((p) => { bakeRender(p); p.fcss = filterCSS(p.filter); });
   let dragFrom = null;   // index being dragged for reorder
   const movePhoto = (from, to) => {
     if (from === to || from == null || to == null) return;
@@ -400,8 +460,8 @@
         movePhoto(dragFrom, i);
       });
       const focus = p.focus || 'center';
-      const edited = filterCSS(p.filter) ? ' edited' : '';
-      cell.innerHTML = `<img src="${p.url}" alt="" style="filter:${filterCSS(p.filter)}">` +
+      const edited = (filterCSS(p.filter) || hasAdv(p.filter) || hasCrop(p.crop)) ? ' edited' : '';
+      cell.innerHTML = `<img src="${photoThumbURL(p)}" alt="" style="filter:${filterCSS(p.filter)}">` +
         (i === heroIndex ? '<span class="hero-tag">★ hero</span>' : '') +
         `<button type="button" class="photo-x" title="Remove">×</button>` +
         `<button type="button" class="photo-edit${edited}" title="Edit photo (filters &amp; crop)">✎</button>` +
@@ -425,7 +485,7 @@
     });
   };
 
-  // ---------------- photo editor (filters + crop focus) ----------------
+  // ---------------- photo editor (filters + advanced tone + crop) ----------------
   const PRESETS = {
     none: { b: 100, c: 100, s: 100, w: 0 },
     airy: { b: 110, c: 95, s: 105, w: 6 },
@@ -433,50 +493,137 @@
     warm: { b: 104, c: 102, s: 110, w: 38 },
     mono: { b: 102, c: 106, s: 0, w: 0 },
   };
-  let editIdx = -1;
-  const pePreviewUpdate = () => {
+  let editIdx = -1, peCropMode = false, peCropFrac = { x: 0, y: 0, w: 1, h: 1 }, peCropDrag = null;
+  // small cached thumbnail that reflects crop + advanced (for the photo grid)
+  const photoThumbURL = (p) => {
+    if (!hasCrop(p.crop) && !hasAdv(p.filter)) return p.url;
+    bakeRender(p);
+    if (p._thumbSig === p._rSig && p._thumb) return p._thumb;
+    const img = p.img; if (!img || !img.width) return p.url;
+    const max = 240, s = Math.min(1, max / Math.max(img.width, img.height));
+    const cv = document.createElement('canvas'); cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    p._thumb = cv.toDataURL('image/jpeg', 0.8); p._thumbSig = p._rSig;
+    return p._thumb;
+  };
+  // composite the editor preview: cropped source → advanced (pixel) → basic (filter),
+  // matching exactly what the outputs draw. showFull = ignore crop (used while cropping).
+  const peComposite = (p, showFull) => {
+    const cvEl = $('pePreview'), src = p.srcImg || p.img; if (!src || !src.width) return;
+    const crop = (!showFull && hasCrop(p.crop)) ? p.crop : null;
+    const sx = crop ? crop.x * src.width : 0, sy = crop ? crop.y * src.height : 0;
+    const sw = crop ? crop.w * src.width : src.width, sh = crop ? crop.h * src.height : src.height;
+    const boxW = 560, boxH = Math.max(220, Math.round(window.innerHeight * 0.42));
+    const sc = Math.min(boxW / sw, boxH / sh, 1);
+    const w = Math.max(1, Math.round(sw * sc)), h = Math.max(1, Math.round(sh * sc));
+    const tmp = document.createElement('canvas'); tmp.width = w; tmp.height = h;
+    const t = tmp.getContext('2d'); t.drawImage(src, sx, sy, sw, sh, 0, 0, w, h);
+    applyAdvanced(t, w, h, p.filter || {});
+    cvEl.width = w; cvEl.height = h;
+    const c = cvEl.getContext('2d'); c.filter = filterCSS(p.filter) || 'none'; c.drawImage(tmp, 0, 0); c.filter = 'none';
+  };
+  const peLayoutCropBox = () => {
+    const cvEl = $('pePreview'), wrap = $('pePreviewWrap'), layer = $('peCropLayer'), box = $('peCropBox');
+    const cr = cvEl.getBoundingClientRect(), wr = wrap.getBoundingClientRect();
+    layer.style.left = (cr.left - wr.left) + 'px'; layer.style.top = (cr.top - wr.top) + 'px';
+    layer.style.width = cr.width + 'px'; layer.style.height = cr.height + 'px';
+    const f = peCropFrac;
+    box.style.left = (f.x * 100) + '%'; box.style.top = (f.y * 100) + '%';
+    box.style.width = (f.w * 100) + '%'; box.style.height = (f.h * 100) + '%';
+  };
+  const peRenderPreview = () => {
     const p = photos[editIdx]; if (!p) return;
-    $('pePreview').style.filter = filterCSS(p.filter);
-    $('pePreview').style.objectPosition = `center ${{ top: '0%', center: '50%', bottom: '100%' }[p.focus || 'center']}`;
+    peComposite(p, peCropMode);
+    if (peCropMode) peLayoutCropBox();
   };
   const peSyncControls = () => {
-    const p = photos[editIdx]; if (!p) return;
-    $('peB').value = p.filter.b; $('peC').value = p.filter.c; $('peS').value = p.filter.s; $('peW').value = p.filter.w;
+    const p = photos[editIdx]; if (!p) return; const f = p.filter;
+    $('peB').value = f.b; $('peC').value = f.c; $('peS').value = f.s; $('peW').value = f.w;
+    $('peHi').value = f.highlights || 0; $('peSh').value = f.shadows || 0; $('peTint').value = f.tint || 0;
+    $('peSharp').value = f.sharpness || 0; $('peVig').value = f.vignette || 0;
     document.querySelectorAll('#peFocus button').forEach((b) => b.classList.toggle('active', b.dataset.focus === (p.focus || 'center')));
     document.querySelectorAll('#pePresets button').forEach((b) => {
       const pr = PRESETS[b.dataset.preset];
-      b.classList.toggle('active', pr && ['b', 'c', 's', 'w'].every((k) => pr[k] === p.filter[k]));
+      b.classList.toggle('active', pr && !hasAdv(f) && ['b', 'c', 's', 'w'].every((k) => pr[k] === f[k]));
     });
+    $('peCropState').textContent = hasCrop(p.crop) ? '✓ cropped' : '';
+  };
+  const peEnterCrop = () => {
+    const p = photos[editIdx]; if (!p) return;
+    peCropMode = true;
+    peCropFrac = hasCrop(p.crop) ? { ...p.crop } : { x: 0.08, y: 0.08, w: 0.84, h: 0.84 };
+    $('peCropBtn').classList.add('active'); $('peCropLayer').hidden = false; $('peCropBar').hidden = false; $('peBody').hidden = true;
+    peRenderPreview();
+  };
+  const peExitCrop = (apply) => {
+    const p = photos[editIdx];
+    if (apply && p) {
+      const f = peCropFrac;
+      p.crop = (f.w >= 0.999 && f.h >= 0.999 && f.x <= 0.001 && f.y <= 0.001) ? null : { x: f.x, y: f.y, w: f.w, h: f.h };
+    }
+    peCropMode = false;
+    $('peCropBtn').classList.remove('active'); $('peCropLayer').hidden = true; $('peCropBar').hidden = true; $('peBody').hidden = false;
+    peSyncControls(); peRenderPreview();
+  };
+  const peCropMove = (e) => {
+    if (!peCropDrag) return;
+    const { mode, lr, sx, sy, start } = peCropDrag;
+    const dx = (e.clientX - sx) / lr.width, dy = (e.clientY - sy) / lr.height, MIN = 0.06;
+    let x = start.x, y = start.y, w = start.w, h = start.h;
+    if (mode === 'move') {
+      x = Math.min(Math.max(0, start.x + dx), 1 - w);
+      y = Math.min(Math.max(0, start.y + dy), 1 - h);
+    } else {
+      let x0 = start.x, y0 = start.y, x1 = start.x + start.w, y1 = start.y + start.h;
+      if (mode.indexOf('l') >= 0) x0 = Math.min(Math.max(0, start.x + dx), x1 - MIN);
+      if (mode.indexOf('r') >= 0) x1 = Math.max(Math.min(1, x1 + dx), x0 + MIN);
+      if (mode.indexOf('t') >= 0) y0 = Math.min(Math.max(0, start.y + dy), y1 - MIN);
+      if (mode.indexOf('b') >= 0) y1 = Math.max(Math.min(1, y1 + dy), y0 + MIN);
+      x = x0; y = y0; w = x1 - x0; h = y1 - y0;
+    }
+    peCropFrac = { x, y, w, h }; peLayoutCropBox();
+  };
+  const peCropUp = () => { peCropDrag = null; window.removeEventListener('pointermove', peCropMove); window.removeEventListener('pointerup', peCropUp); };
+  const peCropDown = (e, mode) => {
+    e.preventDefault(); e.stopPropagation();
+    peCropDrag = { mode, lr: $('peCropLayer').getBoundingClientRect(), sx: e.clientX, sy: e.clientY, start: { ...peCropFrac } };
+    window.addEventListener('pointermove', peCropMove); window.addEventListener('pointerup', peCropUp);
   };
   const openPhotoEditor = (i) => {
     const h = $('studioHint'); if (h) h.hidden = true; clearTimeout(studioHintTimer);   // clear the "saved" notifier
     editIdx = i;
     const p = photos[i]; if (!p) return;
-    $('pePreview').src = p.url;
+    if (!p.srcImg) p.srcImg = p.img;                     // capture original before any edit
+    peCropMode = false;
+    $('peCropLayer').hidden = true; $('peCropBar').hidden = true; $('peBody').hidden = false; $('peCropBtn').classList.remove('active');
     peSyncControls();
-    pePreviewUpdate();
     $('photoEditor').hidden = false;
     document.body.style.overflow = 'hidden';
+    requestAnimationFrame(peRenderPreview);              // size canvas after the modal is laid out
   };
-  const closePhotoEditor = () => { $('photoEditor').hidden = true; document.body.style.overflow = ''; renderPhotoGrid(); rerenderVisuals(); };
+  const closePhotoEditor = () => { if (peCropMode) peExitCrop(false); $('photoEditor').hidden = true; document.body.style.overflow = ''; renderPhotoGrid(); rerenderVisuals(); };
   const wirePhotoEditor = () => {
-    [['peB', 'b'], ['peC', 'c'], ['peS', 's'], ['peW', 'w']].forEach(([id, key]) => {
-      $(id).addEventListener('input', () => { if (photos[editIdx]) { photos[editIdx].filter[key] = Number($(id).value); pePreviewUpdate(); peSyncControls(); } });
+    [['peB', 'b'], ['peC', 'c'], ['peS', 's'], ['peW', 'w'], ['peHi', 'highlights'], ['peSh', 'shadows'], ['peTint', 'tint'], ['peSharp', 'sharpness'], ['peVig', 'vignette']].forEach(([id, key]) => {
+      $(id).addEventListener('input', () => { const p = photos[editIdx]; if (!p) return; p.filter[key] = Number($(id).value); peRenderPreview(); peSyncControls(); });
     });
     document.querySelectorAll('#pePresets button').forEach((b) => b.addEventListener('click', () => {
-      if (!photos[editIdx]) return;
-      photos[editIdx].filter = { ...PRESETS[b.dataset.preset] };
-      peSyncControls(); pePreviewUpdate();
+      const p = photos[editIdx]; if (!p) return;
+      p.filter = { ...PRESETS[b.dataset.preset] };       // presets are basic-only → also clear advanced
+      peSyncControls(); peRenderPreview();
     }));
     document.querySelectorAll('#peFocus button').forEach((b) => b.addEventListener('click', () => {
-      if (!photos[editIdx]) return;
-      photos[editIdx].focus = b.dataset.focus;
-      peSyncControls(); pePreviewUpdate();
+      const p = photos[editIdx]; if (!p) return; p.focus = b.dataset.focus; peSyncControls();
     }));
-    $('peReset').addEventListener('click', () => { if (photos[editIdx]) { photos[editIdx].filter = { ...PRESETS.none }; photos[editIdx].focus = 'center'; peSyncControls(); pePreviewUpdate(); } });
+    $('peCropBtn').addEventListener('click', () => { if (peCropMode) peExitCrop(false); else peEnterCrop(); });
+    $('peCropApply').addEventListener('click', () => peExitCrop(true));
+    $('peCropCancel').addEventListener('click', () => peExitCrop(false));
+    $('peCropBox').addEventListener('pointerdown', (e) => { if (e.target.classList.contains('pe-grip')) return; peCropDown(e, 'move'); });
+    document.querySelectorAll('#peCropBox .pe-grip').forEach((g) => g.addEventListener('pointerdown', (e) => peCropDown(e, g.dataset.h)));
+    $('peReset').addEventListener('click', () => { const p = photos[editIdx]; if (!p) return; if (peCropMode) peExitCrop(false); p.filter = { ...PRESETS.none }; p.focus = 'center'; p.crop = null; peSyncControls(); peRenderPreview(); });
     $('peDone').addEventListener('click', closePhotoEditor);
     $('peClose').addEventListener('click', closePhotoEditor);
     $('photoEditor').addEventListener('click', (e) => { if (e.target === $('photoEditor')) closePhotoEditor(); });
+    window.addEventListener('resize', () => { if (!$('photoEditor').hidden) peRenderPreview(); });
   };
 
   const wireDropZone = () => {
@@ -856,13 +1003,15 @@
       total: (typeof opt.total === 'number') ? opt.total : null,
       // lets the studio upload a photo straight into the listing gallery
       addPhoto: async (file) => { const ok = await addPhotoBlob(file, 'studio'); if (!ok) return null; syncFcss(); return photos[photos.length - 1]; },
-      // "Apply to all my graphics" — push the transferable basic adjustments to the real photo
+      // "Apply to all my graphics" — push the photo adjustments (basic + advanced) to the real photo
       onApplyPhotoAdjust: (idx, filter) => {
         const p = photos[idx]; if (!p) return;
-        p.filter = { b: filter.b != null ? filter.b : 100, c: filter.c != null ? filter.c : 100, s: filter.s != null ? filter.s : 100, w: filter.sep || 0 };
+        p.filter = {
+          b: filter.b != null ? filter.b : 100, c: filter.c != null ? filter.c : 100, s: filter.s != null ? filter.s : 100, w: filter.sep || 0,
+          highlights: filter.highlights || 0, shadows: filter.shadows || 0, tint: filter.tint || 0, sharpness: filter.sharpness || 0, vignette: filter.vignette || 0,
+        };
         syncFcss(); rerenderVisuals();
-        const adv = filter.highlights || filter.shadows || filter.tint || filter.vignette || filter.sharpness;
-        toast(adv ? 'Brightness/contrast applied to all graphics (the studio-only effects stay here)' : '✓ Applied to all your graphics');
+        toast('✓ Applied to all your graphics');
       },
       // closed with unsaved edits → point a friendly notifier at the launcher
       onClose: (wasDirty) => { if (wasDirty) showStudioHint(); },
@@ -1660,20 +1809,28 @@
   const libDel = (id) => libTx('readwrite', (st) => st.delete(id));
 
   // serialize a photo to a size-capped JPEG data URL for storage
-  const photoToDataURL = (p) => {
-    if (p.url && p.url.startsWith('data:')) return p.url;
-    const img = p.img; if (!img || !img.width) return null;
+  const photoToDataURL = (p) => {            // baked render (crop + advanced baked in) — for flyer / zip / outputs
+    bakeRender(p);
+    const img = p.img; if (!img || !img.width) return (p.url && p.url.startsWith('data:')) ? p.url : null;
     const max = 1600, s = Math.min(1, max / Math.max(img.width, img.height));
     const cv = document.createElement('canvas'); cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
     cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
     return cv.toDataURL('image/jpeg', 0.85);
   };
-  const addSavedPhoto = (ph) => new Promise((res) => { const img = new Image(); img.onload = () => { photos.push({ url: ph.dataURL, img, name: ph.name || 'photo', inCarousel: ph.inCarousel !== false, filter: ph.filter || { b: 100, c: 100, s: 100, w: 0 }, focus: ph.focus || 'center' }); res(true); }; img.onerror = () => res(false); img.src = ph.dataURL; });
+  const photoSourceURL = (p) => {            // ORIGINAL pixels — for saving (edits stay re-editable on reload)
+    if (p.url && p.url.startsWith('data:')) return p.url;
+    const img = p.srcImg || p.img; if (!img || !img.width) return null;
+    const max = 1600, s = Math.min(1, max / Math.max(img.width, img.height));
+    const cv = document.createElement('canvas'); cv.width = Math.round(img.width * s); cv.height = Math.round(img.height * s);
+    cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+    return cv.toDataURL('image/jpeg', 0.85);
+  };
+  const addSavedPhoto = (ph) => new Promise((res) => { const img = new Image(); img.onload = () => { photos.push({ url: ph.dataURL, img, srcImg: img, name: ph.name || 'photo', inCarousel: ph.inCarousel !== false, filter: ph.filter || { b: 100, c: 100, s: 100, w: 0 }, crop: ph.crop || null, focus: ph.focus || 'center' }); res(true); }; img.onerror = () => res(false); img.src = ph.dataURL; });
 
   const saveCurrentListing = async () => {
     if (!$('address').value.trim() && !photos.length) { toast('Add an address or a photo first'); return; }
     const fields = {}; LISTING_FIELDS.forEach((id) => { fields[id] = $(id).value; });
-    const rec = { id: 'L' + Date.now() + Math.floor(Math.random() * 1e4), savedAt: Date.now(), title: ($('address').value.trim() || 'Untitled listing'), mode, heroIndex, fields, checklist: { ...checklist }, photos: photos.map((p) => ({ dataURL: photoToDataURL(p), name: p.name, filter: p.filter, focus: p.focus, inCarousel: p.inCarousel })).filter((p) => p.dataURL) };
+    const rec = { id: 'L' + Date.now() + Math.floor(Math.random() * 1e4), savedAt: Date.now(), title: ($('address').value.trim() || 'Untitled listing'), mode, heroIndex, fields, checklist: { ...checklist }, photos: photos.map((p) => ({ dataURL: photoSourceURL(p), name: p.name, filter: p.filter, crop: p.crop, focus: p.focus, inCarousel: p.inCarousel })).filter((p) => p.dataURL) };
     try { await libPut(rec); renderLibrary(); toast('✓ Saved to this device'); } catch (e) { toast('Couldn’t save — storage may be full or blocked'); }
   };
   const openListing = async (id) => {

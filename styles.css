@@ -413,8 +413,32 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 .pe-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .pe-title { font-family: var(--serif); font-size: 18px; }
 .pe-close { background: none; border: none; font-size: 24px; line-height: 1; color: var(--muted); cursor: pointer; }
-.pe-preview { background: #1118; border-radius: 10px; overflow: hidden; margin-bottom: 12px; aspect-ratio: 4/3; }
-.pe-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pe-preview { position: relative; background: #11181f; border-radius: 10px; overflow: hidden; margin-bottom: 12px; display: flex; align-items: center; justify-content: center; min-height: 180px; max-height: 46vh; }
+.pe-preview canvas { max-width: 100%; max-height: 46vh; display: block; touch-action: none; }
+.pe-crop-layer { position: absolute; inset: 0; }
+.pe-crop-box { position: absolute; border: 2px solid #fff; box-shadow: 0 0 0 9999px rgba(0,0,0,.5); cursor: move; box-sizing: border-box; touch-action: none; }
+.pe-grip { touch-action: none; }
+.pe-crop-box::before, .pe-crop-box::after { content: ""; position: absolute; background: rgba(255,255,255,.45); }
+.pe-crop-box::before { left: 33.33%; right: 33.33%; top: 0; bottom: 0; border-left: 1px solid rgba(255,255,255,.45); border-right: 1px solid rgba(255,255,255,.45); background: none; }
+.pe-crop-box::after { top: 33.33%; bottom: 33.33%; left: 0; right: 0; border-top: 1px solid rgba(255,255,255,.45); border-bottom: 1px solid rgba(255,255,255,.45); background: none; }
+.pe-grip { position: absolute; width: 18px; height: 18px; background: #fff; border-radius: 50%; box-shadow: 0 1px 4px rgba(0,0,0,.5); cursor: pointer; }
+.pe-grip.tl { left: -9px; top: -9px; cursor: nwse-resize; }
+.pe-grip.tr { right: -9px; top: -9px; cursor: nesw-resize; }
+.pe-grip.bl { left: -9px; bottom: -9px; cursor: nesw-resize; }
+.pe-grip.br { right: -9px; bottom: -9px; cursor: nwse-resize; }
+.pe-cropbar { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; margin-bottom: 12px; font-size: 12.5px; }
+.pe-crop-hint { color: var(--muted); }
+.pe-cropbar-btns { display: flex; align-items: center; gap: 12px; flex: 0 0 auto; }
+.pe-apply { width: auto; padding: 7px 16px; font-size: 13px; }
+.pe-tool-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+.pe-tool { font-family: var(--sans); font-size: 13px; font-weight: 600; color: var(--ink); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+.pe-tool:hover { border-color: var(--teal); }
+.pe-tool.active { background: var(--teal); border-color: var(--accent-ink); color: #fff; }
+.pe-tool-state { font-size: 12px; color: var(--accent-ink); font-weight: 600; }
+.pe-group-label { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--ink); margin: 2px 0 9px; }
+.pe-group-sub { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--muted); }
+.pe-tint-ends { font-size: 10px; color: var(--muted); font-weight: 500; }
+.pe-sliders + .pe-sliders { margin-top: 6px; padding-top: 12px; border-top: 1px solid var(--line); }
 .pe-presets { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 14px; }
 .pe-presets button {
   font-family: var(--sans); font-size: 12.5px; font-weight: 600; color: var(--navy);

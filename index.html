@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=73" />
+  <link rel="stylesheet" href="styles.css?v=74" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -977,30 +977,62 @@
         <span class="pe-title">Edit photo</span>
         <button type="button" class="pe-close" id="peClose" aria-label="Close">×</button>
       </div>
-      <div class="pe-preview"><img id="pePreview" alt="" /></div>
-      <div class="pe-presets" id="pePresets">
-        <button type="button" data-preset="none">Original</button>
-        <button type="button" data-preset="airy">Bright &amp; airy</button>
-        <button type="button" data-preset="crisp">Crisp</button>
-        <button type="button" data-preset="warm">Warm</button>
-        <button type="button" data-preset="mono">B&amp;W</button>
+      <div class="pe-preview" id="pePreviewWrap">
+        <canvas id="pePreview"></canvas>
+        <div class="pe-crop-layer" id="peCropLayer" hidden>
+          <div class="pe-crop-box" id="peCropBox">
+            <span class="pe-grip tl" data-h="tl"></span>
+            <span class="pe-grip tr" data-h="tr"></span>
+            <span class="pe-grip bl" data-h="bl"></span>
+            <span class="pe-grip br" data-h="br"></span>
+          </div>
+        </div>
       </div>
-      <div class="pe-sliders">
-        <label>Brightness <input type="range" id="peB" min="60" max="140" step="1" value="100" /></label>
-        <label>Contrast <input type="range" id="peC" min="60" max="140" step="1" value="100" /></label>
-        <label>Saturation <input type="range" id="peS" min="0" max="160" step="1" value="100" /></label>
-        <label>Warmth <input type="range" id="peW" min="0" max="100" step="1" value="0" /></label>
+      <div class="pe-cropbar" id="peCropBar" hidden>
+        <span class="pe-crop-hint">Drag the corners to keep only part of the photo.</span>
+        <span class="pe-cropbar-btns">
+          <button type="button" class="link-btn" id="peCropCancel">Cancel</button>
+          <button type="button" class="generate-btn pe-apply" id="peCropApply">Apply crop</button>
+        </span>
       </div>
-      <div class="pe-focus">
-        <span>Crop focus</span>
-        <div class="pe-focus-btns" id="peFocus">
-          <button type="button" data-focus="top">Top</button>
-          <button type="button" data-focus="center">Centre</button>
-          <button type="button" data-focus="bottom">Bottom</button>
+      <div class="pe-body" id="peBody">
+        <div class="pe-presets" id="pePresets">
+          <button type="button" data-preset="none">Original</button>
+          <button type="button" data-preset="airy">Bright &amp; airy</button>
+          <button type="button" data-preset="crisp">Crisp</button>
+          <button type="button" data-preset="warm">Warm</button>
+          <button type="button" data-preset="mono">B&amp;W</button>
+        </div>
+        <div class="pe-tool-row">
+          <button type="button" class="pe-tool" id="peCropBtn">✂ Crop / remove parts</button>
+          <span class="pe-tool-state" id="peCropState"></span>
+        </div>
+        <div class="pe-sliders">
+          <span class="pe-group-label">Light &amp; colour</span>
+          <label>Brightness <input type="range" id="peB" min="60" max="140" step="1" value="100" /></label>
+          <label>Contrast <input type="range" id="peC" min="60" max="140" step="1" value="100" /></label>
+          <label>Saturation <input type="range" id="peS" min="0" max="160" step="1" value="100" /></label>
+          <label>Warmth <input type="range" id="peW" min="0" max="100" step="1" value="0" /></label>
+        </div>
+        <div class="pe-sliders">
+          <span class="pe-group-label">Advanced <span class="pe-group-sub">— pro tone &amp; finish</span></span>
+          <label>Highlights <input type="range" id="peHi" min="-100" max="100" step="1" value="0" /></label>
+          <label>Shadows <input type="range" id="peSh" min="-100" max="100" step="1" value="0" /></label>
+          <label>Tint <span class="pe-tint-ends">green · magenta</span> <input type="range" id="peTint" min="-100" max="100" step="1" value="0" /></label>
+          <label>Sharpness <input type="range" id="peSharp" min="0" max="100" step="1" value="0" /></label>
+          <label>Vignette <input type="range" id="peVig" min="0" max="100" step="1" value="0" /></label>
+        </div>
+        <div class="pe-focus">
+          <span>Crop focus <span class="pe-group-sub">— which part to favour when fitted</span></span>
+          <div class="pe-focus-btns" id="peFocus">
+            <button type="button" data-focus="top">Top</button>
+            <button type="button" data-focus="center">Centre</button>
+            <button type="button" data-focus="bottom">Bottom</button>
+          </div>
         </div>
       </div>
       <div class="pe-actions">
-        <button type="button" class="link-btn" id="peReset">Reset</button>
+        <button type="button" class="link-btn" id="peReset">Reset all</button>
         <button type="button" class="generate-btn pe-done" id="peDone">Done</button>
       </div>
     </div>
@@ -1035,18 +1067,18 @@
     </div>
   </div>
 
-  <script src="generator.js?v=73"></script>
-  <script src="fairhousing.js?v=73"></script>
-  <script src="parser.js?v=73"></script>
-  <script src="importer.js?v=73"></script>
-  <script src="qr.js?v=73"></script>
-  <script src="visuals.js?v=73"></script>
-  <script src="flyer.js?v=73"></script>
-  <script src="ai.js?v=73"></script>
-  <script src="studio.js?v=73"></script>
-  <script src="tour.js?v=73"></script>
-  <script src="zip.js?v=73"></script>
-  <script src="reel.js?v=73"></script>
-  <script src="app.js?v=73"></script>
+  <script src="generator.js?v=74"></script>
+  <script src="fairhousing.js?v=74"></script>
+  <script src="parser.js?v=74"></script>
+  <script src="importer.js?v=74"></script>
+  <script src="qr.js?v=74"></script>
+  <script src="visuals.js?v=74"></script>
+  <script src="flyer.js?v=74"></script>
+  <script src="ai.js?v=74"></script>
+  <script src="studio.js?v=74"></script>
+  <script src="tour.js?v=74"></script>
+  <script src="zip.js?v=74"></script>
+  <script src="reel.js?v=74"></script>
+  <script src="app.js?v=74"></script>
 </body>
 </html>
