@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v74';
+  const APP_VERSION = 'v75';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -813,9 +813,9 @@
   };
 
   // ---- carousel slide lightbox (zoom + edit) ----
-  let lbState = { photo: null, n: 1, cv: null, kind: 'photo', idx: 0, total: 1 };
+  let lbState = { photo: null, n: 1, cv: null, kind: 'photo', idx: 0, total: 1, editFn: null, dlName: null };
   const openLightbox = (cv, photo, n, kind, meta) => {
-    lbState = { photo, n, cv, kind: kind || 'photo', idx: (meta && meta.idx) || 0, total: (meta && meta.total) || 1 };
+    lbState = { photo, n, cv, kind: kind || 'photo', idx: (meta && meta.idx) || 0, total: (meta && meta.total) || 1, editFn: (meta && meta.editFn) || null, dlName: (meta && meta.dlName) || null };
     $('lbImg').src = cv.toDataURL('image/png');
     $('lightbox').hidden = false;
   };
@@ -823,14 +823,16 @@
   const wireLightbox = () => {
     $('lbClose').addEventListener('click', closeLightbox);
     $('lightbox').addEventListener('click', (e) => { if (e.target === $('lightbox')) closeLightbox(); });
-    $('lbDownload').addEventListener('click', () => { const a = document.createElement('a'); a.href = $('lbImg').src; a.download = `${slug()}-carousel-${String(lbState.n).padStart(2, '0')}.png`; a.click(); });
+    const lbDlName = () => lbState.dlName ? `${slug()}-${lbState.dlName}.png` : `${slug()}-carousel-${String(lbState.n).padStart(2, '0')}.png`;
+    $('lbDownload').addEventListener('click', () => { const a = document.createElement('a'); a.href = $('lbImg').src; a.download = lbDlName(); a.click(); });
     $('lbEdit').addEventListener('click', () => {
       closeLightbox();
+      if (lbState.editFn) { lbState.editFn(); return; }                   // generic outputs (open-home, posts, …)
       if (lbState.kind === 'cta') openStudio({ seed: 'cta' });            // the CTA card, not the hero photo
       else if (lbState.photo) openStudio({ seed: 'feature', photoIndex: orderedPhotos().indexOf(lbState.photo), caption: lbState.photo._caption || '', idx: lbState.idx, total: lbState.total });   // reproduce THIS slide (photo + caption + dots)
       else openStudio({ seed: 'cover', photoIndex: 0 });                  // cover ≈ the template card on the hero
     });
-    if (canShareFiles()) { $('lbShare').hidden = false; $('lbShare').addEventListener('click', async () => { if (lbState.cv) { const ok = await shareCanvas(lbState.cv, `${slug()}-carousel-${String(lbState.n).padStart(2, '0')}.png`, (outputs && outputs.instagram) || ''); if (!ok) $('lbDownload').click(); } }); }
+    if (canShareFiles()) { $('lbShare').hidden = false; $('lbShare').addEventListener('click', async () => { if (lbState.cv) { const ok = await shareCanvas(lbState.cv, lbDlName(), (outputs && outputs.instagram) || ''); if (!ok) $('lbDownload').click(); } }); }
     window.addEventListener('keydown', (e) => { if (!$('lightbox').hidden && e.key === 'Escape') closeLightbox(); });
   };
   const wireSignboard = () => {
@@ -997,6 +999,7 @@
       photos: s.photos, brand, fields: s.fields,
       startPhotoIndex: (typeof opt.photoIndex === 'number') ? opt.photoIndex : null,
       seed: opt.seed || null,
+      openHome: opt.openHome || null,    // open-home reproduction data (header/date/time/address)
       // carousel slide reproduction: the clicked slide's caption + position
       caption: opt.caption || null,
       idx: (typeof opt.idx === 'number') ? opt.idx : null,
@@ -1015,7 +1018,7 @@
       },
       // closed with unsaved edits → point a friendly notifier at the launcher
       onClose: (wasDirty) => { if (wasDirty) showStudioHint(); },
-    }, 'square');
+    }, opt.size || 'square');
   };
 
   // small "your design is saved — reopen to keep editing" notifier with an arrow
@@ -1176,6 +1179,18 @@
     }));
     document.querySelectorAll('#openhomeContent .dlc').forEach((b) => b.addEventListener('click', () => { Visuals.download($(b.dataset.canvas), `${slug()}-${b.dataset.name}.png`); markDone('openhome'); }));
     $('ohRoundup').addEventListener('click', buildOpensRoundup);
+    // click the open-home post → zoom + "Edit in Design Studio" (reproduces it as editable layers)
+    const ohCanvas = $('cvOpenPost');
+    ohCanvas.classList.add('lb-zoom'); ohCanvas.title = 'Tap to zoom & edit in the Design Studio';
+    ohCanvas.addEventListener('click', () => {
+      const d = vizData(), when = openHomeWhen(), isRent = d.raw && d.raw.mode === 'rent';
+      const ordered = orderedPhotos();
+      const pIdx = (ohPhoto && ohPhoto !== 'you' && ordered.indexOf(ohPhoto) >= 0) ? ordered.indexOf(ohPhoto) : 0;
+      openLightbox(ohCanvas, null, 1, 'openhome', {
+        dlName: 'open-home',
+        editFn: () => openStudio({ seed: 'openhome', size: ohFormat, photoIndex: pIdx, openHome: { header: isRent ? 'OPEN FOR INSPECTION' : 'HOME OPEN', date: when.date, time: when.time, address: d.address } }),
+      });
+    });
   };
 
   // ---- animated Reel / Story video (on-device, canvas → MediaRecorder) ----

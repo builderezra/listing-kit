@@ -162,7 +162,7 @@ body {
 .lb-actions { display: flex; gap: 10px; }
 .lb-close { position: absolute; top: 18px; right: 22px; width: 40px; height: 40px; border-radius: 50%; border: none; background: rgba(255,255,255,.14); color: #fff; font-size: 22px; cursor: pointer; }
 .lb-close:hover { background: rgba(255,255,255,.24); }
-.car-slide canvas { cursor: zoom-in; }
+.car-slide canvas, .lb-zoom { cursor: zoom-in; }
 
 /* ---------- layout ---------- */
 .layout {

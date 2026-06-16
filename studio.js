@@ -1286,6 +1286,34 @@ const Studio = (() => {
     layers = out; selId = null; bgEdit = false; rebuiltFrom = null; renderBgPicker(); commit(); inRebuild = false;
   };
 
+  // reproduce the open-home post as editable layers — mirrors visuals.openHomePost (visuals.js:626)
+  const buildOpenHome = (slide) => {
+    inRebuild = true;
+    const W = SIZES[sizeKey][0], H = SIZES[sizeKey][1], story = sizeKey === 'story';
+    const b = ctxData.brand, oh = ctxData.openHome || {};
+    const serif = b.font === 'serif', hf = serif ? 'serif' : 'sans';
+    const out = [];
+    const push = (o) => { out.push({ id: uid++, opacity: 1, rot: 0, ...o }); return out[out.length - 1]; };
+    // text whose alphabetic baseline sits at baseY (matches the codebase baseline→centre convention)
+    const ctr = (t, baseY, size, o = {}) => push({ type: 'text', text: String(t), size, weight: o.weight || 400, font: o.font || 'sans', color: o.color || '#ffffff', align: 'center', tracking: o.tracking || 0, shadow: !!o.shadow, opacity: o.opacity == null ? 1 : o.opacity, xf: 0.5, yf: (baseY - size * 0.35) / H });
+    const pIdx = (typeof slide.photoIndex === 'number' && ctxData.photos[slide.photoIndex]) ? slide.photoIndex : 0;
+    bg = ctxData.photos.length ? { type: 'photo', photoIndex: pIdx } : { type: 'color', color: 'dark' };
+    // dark legibility scrim: top + bottom gradients approximate the 4-stop overlay
+    push({ type: 'rect', shape: 'rect', color: '#080e12', grad: 'down', wf: 1, hf: 0.42, xf: 0.5, yf: 0.21, opacity: 0.6, radius: 0, locked: true });
+    push({ type: 'rect', shape: 'rect', color: '#080e12', grad: 'up', wf: 1, hf: 0.46, xf: 0.5, yf: 0.77, opacity: 0.9, radius: 0, locked: true });
+    let y = story ? H * 0.30 : H * 0.27;
+    ctr(oh.header || 'HOME OPEN', y, story ? 44 : 40, { weight: 800, font: hf, color: 'accent', tracking: 8 });
+    push({ type: 'rect', shape: 'rect', color: 'accent', wf: 92 / W, hf: 6 / H, xf: 0.5, yf: (y + 26 + 3) / H, radius: 0, locked: true });
+    if (oh.date) { y += story ? 150 : 124; ctr(String(oh.date).toUpperCase(), y, story ? 100 : 86, { weight: 800, font: hf, color: '#ffffff' }); }
+    if (oh.time) { y += story ? 116 : 98; ctr(oh.time, y, story ? 76 : 66, { weight: 700, font: hf, color: 'accent' }); }
+    if (oh.address) ctr(oh.address, story ? H * 0.72 : H * 0.70, story ? 44 : 40, { weight: 600, color: 'rgba(255,255,255,0.92)' });
+    const yb = H - (story ? 150 : 92);
+    if (b.agentName) ctr(b.agentName, yb, story ? 40 : 34, { weight: 700, color: '#ffffff' });
+    const sub = [b.brokerage, b.phone].filter(Boolean).join('   ·   ');
+    if (sub) ctr(sub, yb + (story ? 44 : 38), story ? 30 : 26, { weight: 400, color: '#ffffff', opacity: 0.85 });
+    layers = out; selId = null; bgEdit = false; rebuiltFrom = null; renderBgPicker(); commit(); inRebuild = false;
+  };
+
   // ---- my templates (save layout, reuse on any listing) ---------------------
   const TPL_LS = 'lk_studio_templates';
   const loadTpls = () => { try { return JSON.parse(localStorage.getItem(TPL_LS) || '[]'); } catch (e) { return []; } };
@@ -1757,6 +1785,9 @@ const Studio = (() => {
     } else if (featureSeed) {
       // faithfully reproduce the clicked photo+caption carousel slide
       buildSlide({ kind: 'feature', photoIndex: startIdx, caption: ctxData.caption || '', idx: ctxData.idx || 0, total: ctxData.total || 1 });
+    } else if (seed === 'openhome') {
+      // faithfully reproduce the open-home post (photo + HOME OPEN + date/time + address)
+      buildOpenHome({ photoIndex: startIdx });
     } else {
       // cover slide / default: reproduce the brand's chosen graphic style as editable layers
       rebuildStyle(ctxData.brand.templateId || 'modern');
