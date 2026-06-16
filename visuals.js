@@ -153,6 +153,16 @@ const Visuals = (() => {
     ctx.drawImage(img, x, y, w, h);   // crisp logo on top
     ctx.restore();
   };
+  // logo centred at (cx,cy) up to maxH tall; halo keeps it legible over a photo
+  const logoCenter = (ctx, img, cx, cy, maxH, halo) => {
+    if (!img || !img.width) return;
+    const sc = Math.min(maxH / img.height, (maxH * 5.0) / img.width);
+    const w = img.width * sc, h = img.height * sc, x = cx - w / 2, y = cy - h / 2;
+    ctx.save();
+    if (halo) { ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = maxH * 0.55; ctx.shadowOffsetY = maxH * 0.06; ctx.drawImage(img, x, y, w, h); ctx.shadowBlur = maxH * 0.28; ctx.drawImage(img, x, y, w, h); ctx.shadowColor = 'transparent'; }
+    ctx.drawImage(img, x, y, w, h);
+    ctx.restore();
+  };
 
   // brand bar across the bottom; returns its height
   const brandBar = (ctx, W, H, brand, h) => {
@@ -178,7 +188,7 @@ const Visuals = (() => {
       circleImg(ctx, brand.headImg, xRight - d / 2, cy, d, alpha('#ffffff', 0.85));
       xRight -= d + h * 0.18;
     }
-    if (!brand.watermark) logoImg(ctx, brand.logoImg, xRight, cy, h * 0.52);   // watermark mode draws the logo top-right instead
+    if (brand.watermark) logoImg(ctx, brand.logoImg, xRight, cy, h * 0.52);   // logo sits in the brand bar, left of the headshot
     return h;
   };
 
@@ -259,6 +269,7 @@ const Visuals = (() => {
     if (kind === 'wide') {
       // photo left, content right
       cover(ctx, d.hero, 44, 44, 596, H - 88, 0, b, d.heroFocus, d.heroFilter);
+      if (b.watermark && b.logoImg && b.logoImg.width) logoCenter(ctx, b.logoImg, 44 + 298, 44 + 42, 42, true);   // logo top-centre over the photo
       badge(ctx, 64, 64, d.badgeText, b.accent, onColor(b.accent), 19, 4);
       ctx.textAlign = 'center';
       let y = d.ohLine ? 150 : 175;
@@ -279,10 +290,11 @@ const Visuals = (() => {
 
     // square / story: photo on top, content below
     const photoW = W - m * 2;
-    const thumbs = (d.photos || []).length >= 3;
+    const thumbs = (d.photos || []).length >= 3 && !(b.headImg && b.headImg.width);   // a headshot takes priority over the thumbnail strip
     const hasHead = b.headImg && b.headImg.width && !thumbs;   // shrink the photo to make room for the headshot
     const mainH = kind === 'story' ? (thumbs ? 880 : hasHead ? 902 : 1010) : (thumbs ? 500 : hasHead ? 498 : 590);
     cover(ctx, d.hero, m, m, photoW, mainH, 0, b, d.heroFocus, d.heroFilter);
+    if (b.watermark && b.logoImg && b.logoImg.width) logoCenter(ctx, b.logoImg, W / 2, m + (kind === 'story' ? 48 : 38), kind === 'story' ? 48 : 42, true);   // logo top-centre over the photo
     badge(ctx, m + 22, m + 22, d.badgeText, b.accent, onColor(b.accent), kind === 'story' ? 26 : 22, 4);
     let y = m + mainH;
     if (thumbs) {
@@ -342,6 +354,8 @@ const Visuals = (() => {
       ctx.fillText(b.agentName || 'Your Name Here', contentX, H - 108);
       const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
       if (sub) { ctx.globalAlpha = 0.8; ctx.font = font(400, 19); ctx.fillText(sub, contentX, H - 72); ctx.globalAlpha = 1; }
+      if (b.headImg && b.headImg.width) circleImg(ctx, b.headImg, W - 560 - m + 66, H - m - 64, 116, b.accent);   // over the photo's bottom-left corner
+      if (b.watermark && b.logoImg && b.logoImg.width) logoImg(ctx, b.logoImg, contentX + contentW, H - 86, 54);   // logo at the content's bottom-right
       return;
     }
 
@@ -372,8 +386,9 @@ const Visuals = (() => {
     ctx.fillText(b.agentName || 'Your Name Here', m + 16, rowY + (kind === 'story' ? 58 : 50));
     const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
     if (sub) { ctx.globalAlpha = 0.8; ctx.font = font(400, kind === 'story' ? 24 : 21); ctx.fillText(sub, m + 16, rowY + (kind === 'story' ? 96 : 84)); ctx.globalAlpha = 1; }
-    if (b.headImg && b.headImg.width) circleImg(ctx, b.headImg, W - m - 16 - 57, rowY + (kind === 'story' ? 72 : 64), kind === 'story' ? 128 : 114, b.accent);
-    else if (!b.watermark) logoImg(ctx, b.logoImg, W - m - 16, rowY + (kind === 'story' ? 72 : 64), kind === 'story' ? 80 : 68);
+    const hd = kind === 'story' ? 128 : 114, hcy = rowY + (kind === 'story' ? 72 : 64), hasHead = b.headImg && b.headImg.width;
+    if (hasHead) circleImg(ctx, b.headImg, W - m - 16 - hd / 2, hcy, hd, b.accent);
+    if (b.watermark && b.logoImg && b.logoImg.width) logoImg(ctx, b.logoImg, W - m - 16 - (hasHead ? hd + 26 : 0), hcy, kind === 'story' ? 72 : 62);   // logo sits left of the headshot in the contact row
   };
 
   // =====================  MINIMAL — full-bleed photo + clean white card  ======
@@ -407,13 +422,12 @@ const Visuals = (() => {
     ctx.fillText(b.agentName || '', lx, ay);
     const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
     if (sub) { ctx.font = font(400, story ? 20 : 17); ctx.fillStyle = mut; ctx.fillText(sub, lx, ay + (story ? 30 : 26)); }
-    // big agent headshot filling the card's empty right side (vertically centred); else the logo
+    // big agent headshot filling the card's empty right side (vertically centred)
     if (b.headImg && b.headImg.width) {
       const hd = Math.min(story ? 196 : wide ? 112 : 168, cardH - pad * 1.2);
       circleImg(ctx, b.headImg, cardX + cardW - pad - hd / 2, cardY + cardH / 2, hd, b.accent);
-    } else if (b.logoImg && b.logoImg.width && !b.watermark) {
-      logoImg(ctx, b.logoImg, cardX + cardW - pad, ay - 6, story ? 56 : 46);
     }
+    if (b.watermark && b.logoImg && b.logoImg.width) watermarkLogo(ctx, W, H, b);   // logo top-right on the photo (above the card)
     ctx.textAlign = 'left';
   };
 
@@ -427,6 +441,7 @@ const Visuals = (() => {
     const kicker = (d.badgeText || (d.stamp ? '' : 'FOR SALE')).toUpperCase();
     if (wide) {
       cover(ctx, d.hero, 44, 44, Math.round(W * 0.5) - 44, H - 88, 0, b, d.heroFocus, d.heroFilter);
+      if (b.watermark && b.logoImg && b.logoImg.width) logoCenter(ctx, b.logoImg, 44 + 78, 44 + 38, 40, true);   // logo top-left over the photo
       const cx = Math.round(W * 0.5) + (W - Math.round(W * 0.5) - 44) / 2;
       ctx.textAlign = 'center';
       let y = 200;
@@ -443,6 +458,7 @@ const Visuals = (() => {
     const mm = 56, photoTop = mm + (story ? 36 : 26);
     const photoH = (b.headImg && b.headImg.width && !story) ? 500 : (story ? 1060 : 624);   // square shrinks the photo to make room for a centred headshot
     cover(ctx, d.hero, mm, photoTop, W - mm * 2, photoH, 0, b, d.heroFocus, d.heroFilter);
+    if (b.watermark && b.logoImg && b.logoImg.width) logoCenter(ctx, b.logoImg, mm + (story ? 86 : 78), photoTop + (story ? 50 : 44), story ? 46 : 40, true);   // logo top-left over the photo
     ctx.textAlign = 'center';
     let y = photoTop + photoH + (story ? 134 : 108);
     ctx.font = font(600, story ? 22 : 19); spacing(ctx, 6); ctx.fillStyle = b.accent;
@@ -476,6 +492,7 @@ const Visuals = (() => {
       ctx.font = font(700, 24); ctx.fillStyle = fg; ctx.fillText(b.agentName || 'Your Name Here', px, H - 108);
       const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  '); if (sub) { ctx.globalAlpha = 0.82; ctx.font = font(400, 18); ctx.fillText(sub, px, H - 76); ctx.globalAlpha = 1; }
       if (b.headImg && b.headImg.width) circleImg(ctx, b.headImg, W - 56 - 42, H - 100, 84, b.accent);
+      if (b.watermark && b.logoImg && b.logoImg.width) logoCenter(ctx, b.logoImg, 44 + 56, H - 44 - 46, 48, true);   // over the photo's bottom-left
       return;
     }
     const bandH = story ? 624 : 364;
@@ -493,13 +510,13 @@ const Visuals = (() => {
     ctx.font = font(700, story ? 30 : 26); ctx.fillStyle = fg; ctx.fillText(b.agentName || 'Your Name Here', m, ry);
     const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
     if (sub) { ctx.globalAlpha = 0.82; ctx.font = font(400, story ? 22 : 19); ctx.fillText(sub, m, ry + (story ? 32 : 27)); ctx.globalAlpha = 1; }
-    // big agent headshot, vertically centred on the right of the brand band; else the logo
+    // big agent headshot, vertically centred on the right of the brand band
     if (b.headImg && b.headImg.width) {
       const hd = Math.min(story ? 210 : 150, bandH - 64);
       circleImg(ctx, b.headImg, W - m - hd / 2, H - bandH + bandH / 2 + (story ? 18 : 12), hd, b.accent);
-    } else if (b.logoImg && b.logoImg.width && !b.watermark) {
-      logoImg(ctx, b.logoImg, W - m, ry, story ? 64 : 52);
     }
+    // logo over the photo's bottom-left, just above the band
+    if (b.watermark && b.logoImg && b.logoImg.width) logoCenter(ctx, b.logoImg, m + (story ? 78 : 62), H - bandH - (story ? 70 : 56), story ? 56 : 46, true);
   };
 
   // =====================  CAROUSEL SLIDES (1080×1080)  =========================
@@ -917,9 +934,8 @@ const Visuals = (() => {
     ctx.clearRect(0, 0, W, H);
     // a status stamp REPLACES the small status badge — blank it so the two don't clash
     const td = (d && d.stamp) ? Object.assign({}, d, { badgeText: '' }) : d;
-    (TEMPLATES[templateId] || modern)(ctx, W, H, td, kind);
+    (TEMPLATES[templateId] || modern)(ctx, W, H, td, kind);   // each template places the logo in its own spot (brand.watermark = "show logo")
     if (d && d.stamp) cornerSash(ctx, W, H, d.stamp);
-    else if (d && d.brand && d.brand.watermark && d.brand.logoImg) watermarkLogo(ctx, W, H, d.brand);
   };
 
   const download = (canvas, filename) => {
