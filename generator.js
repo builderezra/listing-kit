@@ -29,14 +29,23 @@ const Generator = (() => {
     if (items.length === 2) return `${items[0]} and ${items[1]}`;
     return `${items.slice(0, -1).join(', ')}, and ${items[items.length - 1]}`;
   };
+  // parse a number tolerating thousands separators ("1,250,000" / "1.250.000" / "1 250 000")
+  const toNum = (n) => {
+    let s = String(n == null ? '' : n).trim().replace(/[^\d.,]/g, '');
+    if (/^\d{1,3}(\.\d{3})+$/.test(s)) s = s.replace(/\./g, '');            // dot-grouped thousands
+    else if (/^\d{1,3}(,\d{3})+(\.\d+)?$/.test(s)) s = s.replace(/,/g, ''); // comma-grouped thousands
+    else s = s.replace(/,/g, '');                                          // strip stray commas, keep a single decimal dot
+    const v = Number(s);
+    return isFinite(v) ? v : NaN;
+  };
   const num = (n) => {
     if (n == null || n === '') return '';
-    const v = Number(String(n).replace(/[^0-9.]/g, ''));
+    const v = toNum(n);
     return isFinite(v) && v > 0 ? v.toLocaleString('en-US') : '';
   };
   const money = (n, cur = '$') => {
     if (n == null || n === '') return '';
-    const v = Number(String(n).replace(/[^0-9.]/g, ''));
+    const v = toNum(n);
     if (!isFinite(v) || v === 0) return '';
     const s = v.toLocaleString('en-US', { maximumFractionDigits: 0 });
     return cur === 'kr' ? s + ' kr' : cur + s;   // kr is a suffix currency
@@ -61,7 +70,7 @@ const Generator = (() => {
   const priceShort = (d) => (d.mode === 'rent' ? (money(d.price, d.currency) ? `${money(d.price, d.currency)}${rentPeriodShort(d)}` : '') : money(d.price, d.currency));
 
   const priceTier = (price) => {
-    const v = Number(String(price || '').replace(/[^0-9.]/g, ''));
+    const v = toNum(price);
     if (!v) return 'mid';
     if (v >= 1500000) return 'luxury';
     if (v >= 750000) return 'upper';
@@ -299,7 +308,7 @@ const Generator = (() => {
       const r = [];
       if (d.furnished === 'furnished') r.push('offered fully furnished');
       else if (d.furnished === 'part') r.push('part-furnished');
-      if (d.available) r.push(/now|immediate|avail/i.test(d.available) ? 'available now' : `available from ${d.available}`);
+      if (d.available) r.push(/\b(now|immediate|immediately|asap|today)\b/i.test(d.available) ? 'available now' : `available from ${d.available}`);
       if (d.leaseTerm) r.push(`on a ${d.leaseTerm} lease`);
       const pet = petPhrase(d.pets);
       if (pet) r.push(pet);
@@ -471,7 +480,7 @@ const Generator = (() => {
     if (d.beds) stat.push(`🛏️ ${d.beds} bd`);
     if (d.baths) stat.push(`🛁 ${d.baths} ba`);
     if (d.cars) stat.push(`🚗 ${d.cars} car`);
-    if (num(d.sqft)) stat.push(`📐 ${num(d.sqft)} ${d.areaUnit === 'sqm' ? 'm²' : 'sqft'}`);
+    if (num(d.sqft)) stat.push(`📐 ${num(d.sqft)} ${d.areaUnit === 'sqm' ? 'm²' : d.areaUnit === 'sqft' ? 'sqft' : d.areaUnit}`);
     if (priceShort(d)) stat.push(`💰 ${priceShort(d)}`);
     if (stat.length) lines.push(stat.join('  •  '));
 
@@ -545,7 +554,7 @@ const Generator = (() => {
     sentence.push(`${addr ? addr + 'is a' : 'This'} ${noun}${statBlurb(d)}.`);
     const feats = polishFeatures(d.features);
     if (feats.length) sentence.push(`Inside, you’ll find ${oxford(pickN(feats, Math.min(feats.length, 3)).map((f) => f.text))}.`);
-    if (rent && (d.available || d.furnished === 'furnished')) sentence.push(`${d.furnished === 'furnished' ? 'Fully furnished and ' : ''}${d.available ? (/now|immediate|avail/i.test(d.available) ? 'available now' : 'available from ' + d.available) : 'ready to move into'}.`);
+    if (rent && (d.available || d.furnished === 'furnished')) sentence.push(`${d.furnished === 'furnished' ? 'Fully furnished and ' : ''}${d.available ? (/\b(now|immediate|immediately|asap|today)\b/i.test(d.available) ? 'available now' : 'available from ' + d.available) : 'ready to move into'}.`);
     if (d.neighborhood) sentence.push(`It’s ${cleanLocation(d.neighborhood)}.`);
     parts.push(sentence.join(' '));
 
@@ -738,7 +747,10 @@ const Generator = (() => {
     if (p.short) {
       if (out.mls) {
         const parts = out.mls.split('\n\n');
-        if (parts.length > 3) out.mls = [parts[0], parts[1], parts[parts.length - 1]].join('\n\n');
+        if (parts.length > 3) {
+          const glance = parts.find((pp, i) => i >= 2 && i < parts.length - 1 && /^(At a glance|Features at a glance)/.test(pp));   // keep the bullet block — it carries the rent figure
+          out.mls = [parts[0], parts[1], glance, parts[parts.length - 1]].filter(Boolean).join('\n\n');
+        }
       }
       if (out.email) out.email = out.email.split('\n').filter((l) => !l.startsWith('(Alt subject:') && !l.startsWith('P.S.')).join('\n').trimEnd();
     }

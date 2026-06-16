@@ -94,8 +94,8 @@ const Importer = (() => {
       if (o.streetAddress && !out.address) out.address = String(o.streetAddress);
       if (o.addressLocality && !out.city) out.city = String(o.addressLocality);
       if (o.price && !out.price) out.price = parseInt(String(o.price).replace(/[^\d]/g, ''), 10) || undefined;
-      if (o.numberOfBedrooms != null && !out.beds) out.beds = String(parseFloat(o.numberOfBedrooms) || '');
-      if (o.numberOfBathroomsTotal != null && !out.baths) out.baths = String(parseFloat(o.numberOfBathroomsTotal) || '');
+      if (o.numberOfBedrooms != null && !out.beds) { const n = parseFloat(o.numberOfBedrooms); if (Number.isFinite(n)) out.beds = String(n); }
+      if (o.numberOfBathroomsTotal != null && !out.baths) { const n = parseFloat(o.numberOfBathroomsTotal); if (Number.isFinite(n)) out.baths = String(n); }
       if (o.floorSize && o.floorSize.value && !out.sqft) {
         out.sqft = parseInt(String(o.floorSize.value).replace(/[^\d]/g, ''), 10) || undefined;
         out.areaUnit = /FTK|sq\s?ft/i.test(String(o.floorSize.unitCode || o.floorSize.unitText || '')) ? 'sqft' : 'sqm';

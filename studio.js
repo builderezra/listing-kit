@@ -81,7 +81,7 @@ const Studio = (() => {
     if (f.c != null && f.c !== 100) p.push(`contrast(${f.c}%)`);
     if (f.s != null && f.s !== 100) p.push(`saturate(${f.s}%)`);
     if (f.h) p.push(`hue-rotate(${f.h}deg)`);
-    if (f.sep) p.push(`sepia(${f.sep}%)`);
+    if (f.sep) p.push(`sepia(${Math.round(f.sep * 0.6)}%)`);   // match the gallery/export warmth scale so studio preview == export
     if (f.blur) p.push(`blur(${f.blur}px)`);
     return p.join(' ');
   };
@@ -109,7 +109,7 @@ const Studio = (() => {
   const processed = (img, f, host) => {
     if (!hasAdv(f)) return null;
     const key = fKey(f);
-    if (host._procKey === key && host._procCv) return host._procCv;
+    if (host._procKey === key && host._procCv && host._procCv.getContext) return host._procCv;   // guard against a stale {} after a JSON round-trip (undo/restore/template)
     const max = 1400, sc = Math.min(1, max / Math.max(img.width, img.height));
     const w = Math.max(1, Math.round(img.width * sc)), h = Math.max(1, Math.round(img.height * sc));
     const cv = document.createElement('canvas'); cv.width = w; cv.height = h; const c = cv.getContext('2d');
@@ -687,8 +687,9 @@ const Studio = (() => {
 
   // ---- history (undo / redo) -------------------------------------------------
   let history = [], hidx = -1, replaying = false;
-  const clean = () => layers.map(({ _c, ...r }) => r);
-  const snapshot = () => JSON.stringify({ sizeKey, bg, layers: clean() });
+  const clean = () => layers.map(({ _c, _procCv, _procKey, ...r }) => r);   // never persist the runtime hit-box / baked-filter cache
+  const cleanBg = (b) => { const { _procCv, _procKey, ...r } = b || {}; return r; };
+  const snapshot = () => JSON.stringify({ sizeKey, bg: cleanBg(bg), layers: clean() });
   const restoreSnap = (s) => { const o = JSON.parse(s); sizeKey = o.sizeKey; bg = JSON.parse(JSON.stringify(o.bg)); layers = JSON.parse(JSON.stringify(o.layers)); if (!layers.some((l) => l.id === selId)) selId = null; };
   const resetHistory = () => { history = [snapshot()]; hidx = 0; updateUndo(); };
   // commit a finished mutation: redraw, push history, autosave, refresh panels
@@ -1719,7 +1720,7 @@ const Studio = (() => {
   // ---- work-in-progress autosave / restore ----------------------------------
   const WIP_LS = 'lk_studio_wip';
   const addrKey = () => (ctxData.fields.address || ctxData.fields.price || '').trim();
-  const autosave = () => { try { localStorage.setItem(WIP_LS, JSON.stringify({ addr: addrKey(), size: sizeKey, bg, layers: clean(), at: 1 })); } catch (e) {} };
+  const autosave = () => { try { localStorage.setItem(WIP_LS, JSON.stringify({ addr: addrKey(), size: sizeKey, bg: cleanBg(bg), layers: clean(), at: 1 })); } catch (e) {} };
   const loadWip = () => { try { return JSON.parse(localStorage.getItem(WIP_LS) || 'null'); } catch (e) { return null; } };
   const restoreWip = (wip) => {
     sizeKey = SIZES[wip.size] ? wip.size : 'square';

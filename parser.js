@@ -101,12 +101,7 @@ const Parser = (() => {
     }
 
     // ---- beds / baths / cars --------------------------------------------------
-    // AU shorthand first: "4x2" or "4x2x2" = beds × baths (× cars)
-    let m = text.match(/\b([1-9])\s*[x×]\s*([1-9](?:\.\d)?)(?:\s*[x×]\s*(\d{1,2}))?\b/i);
-    if (m) {
-      out.beds = m[1]; out.baths = m[2]; found.push('beds', 'baths');
-      if (m[3]) { out.cars = m[3]; found.push('cars'); }
-    }
+    let m;
     // flowery copy spells numbers out: "three spacious bedrooms"
     const WORDNUM = { one: '1', two: '2', three: '3', four: '4', five: '5', six: '6', seven: '7' };
     const WN = '(one|two|three|four|five|six|seven)';
@@ -121,8 +116,17 @@ const Parser = (() => {
       if (m) { out.baths = m[1]; found.push('baths'); }
       else if ((m = text.match(new RegExp(WN + FLUFF + '\\s+bath(?:room)?s?\\b', 'i')))) { out.baths = WORDNUM[m[1].toLowerCase()]; found.push('baths'); }
     }
+    // AU shorthand "4x2" / "4x2x2" = beds × baths (× cars) — fallback ONLY when beds/baths
+    // weren't stated explicitly, so dimension figures ("Workshop 9x6", "patio 8x5") don't win
+    if (!out.beds && !out.baths) {
+      m = text.match(/\b([1-9])\s*[x×]\s*([1-9](?:\.\d)?)(?:\s*[x×]\s*(\d{1,2}))?\b/i);
+      if (m) {
+        out.beds = m[1]; out.baths = m[2]; found.push('beds', 'baths');
+        if (m[3]) { out.cars = m[3]; found.push('cars'); }
+      }
+    }
     if (!out.cars) {
-      m = text.match(/(\d+)\s*(?:car(?:\s*(?:bays?|spaces?|ports?))?|garage|parking)\b/i);
+      m = text.match(/\b([1-9])\s*(?:car(?:\s*(?:bays?|spaces?|ports?))?|garage|parking)\b/i);
       if (m) { out.cars = m[1]; found.push('cars'); }
       else if (/\b(?:double|2)\s*(?:lock[- ]?up\s*)?garage\b/i.test(text)) { out.cars = '2'; found.push('cars'); }
       else if (/\bsingle\s*garage\b/i.test(text)) { out.cars = '1'; found.push('cars'); }

@@ -194,7 +194,7 @@ const QR = (() => {
     for (const ch of unescape(encodeURIComponent(String(text)))) bytes.push(ch.charCodeAt(0));   // UTF-8
     // pick smallest version 1..10 that fits
     let v = 1; while (v <= 10) { const countBits = v >= 10 ? 16 : 8; const need = 4 + countBits + bytes.length * 8; if (need <= dataCodewords(v) * 8) break; v++; }
-    if (v > 10) { v = 10; }   // clamp (URLs always fit by v10)
+    if (v > 10) throw new Error('QR: content too long (max ~213 bytes in byte mode at version 10) — use a shorter link');   // caller falls back gracefully instead of drawing a corrupt code
     const codewords = buildCodewords(bytes, v);
     const base = makeMatrix(v, codewords);
     // choose best mask

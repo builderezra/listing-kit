@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v84';
+  const APP_VERSION = 'v85';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -844,7 +844,7 @@
   };
   const openSignboardStudio = () => {
     const d = vizData();
-    const status = d.stamp || (d.ohLine ? d.badgeText : (d.raw.mode === 'rent' ? 'FOR LEASE' : 'FOR SALE'));
+    const status = d.stamp ? '' : (d.ohLine ? d.badgeText : (d.raw.mode === 'rent' ? 'FOR LEASE' : 'FOR SALE'));   // match the live signboard: blank banner when a stamp owns the status
     openStudio({ seed: 'signboard', size: 'signboard', photoIndex: 0, signboard: { status, ohLine: d.ohLine || '', qrData: qrDataURL($('sbUrl').value.trim()) } });
   };
   const wireSignboard = () => {
@@ -1035,7 +1035,7 @@
       addPhoto: async (file) => { const ok = await addPhotoBlob(file, 'studio'); if (!ok) return null; syncFcss(); return photos[photos.length - 1]; },
       // "Apply to all my graphics" — push the photo adjustments (basic + advanced) to the real photo
       onApplyPhotoAdjust: (idx, filter) => {
-        const p = photos[idx]; if (!p) return;
+        const p = orderedPhotos()[idx]; if (!p || photos.indexOf(p) < 0) return;   // studio reports an ORDERED (hero-first) index — map back to the real photo
         p.filter = {
           b: filter.b != null ? filter.b : 100, c: filter.c != null ? filter.c : 100, s: filter.s != null ? filter.s : 100, w: filter.sep || 0,
           highlights: filter.highlights || 0, shadows: filter.shadows || 0, tint: filter.tint || 0, sharpness: filter.sharpness || 0, vignette: filter.vignette || 0,
@@ -1261,7 +1261,7 @@
     $('ohInviteSend').addEventListener('click', () => {
       const text = $('ohInviteText').value;
       if (ohInviteTone === 'email') openEmail(savedEmailSvc(), text);
-      else window.location.href = 'sms:?&body=' + encodeURIComponent(text);
+      else window.location.href = 'sms:&body=' + encodeURIComponent(text);   // iOS-friendly; the stray "?&" left the body blank on some devices
     });
     // click the open-home post → zoom + "Edit in Design Studio" (reproduces it as editable layers)
     const ohCanvas = $('cvOpenPost');
@@ -1899,6 +1899,8 @@
     ohFormat = 'square'; ohPhoto = null;
     document.querySelectorAll('#ohFmtRow .fmt-btn').forEach((b) => b.classList.toggle('active', b.dataset.fmt === 'square'));
     if ($('ohRoundupWrap')) $('ohRoundupWrap').hidden = true;
+    // clear the open-home invite so one property's invite can't leak into the next
+    ohInviteEdited = false; if ($('ohInviteText')) $('ohInviteText').value = '';
     reelCaps = null; if ($('reelCaps')) { $('reelCaps').hidden = true; $('reelCaps').innerHTML = ''; }
     checklist = {}; renderChecklist();
     resetReel();
@@ -1913,7 +1915,7 @@
     // a cleared listing must not let Undo/Redo resurrect the previous property's copy
     history = { mls: [], instagram: [], facebook: [], email: [] };
     redoStack = { mls: [], instagram: [], facebook: [], email: [] };
-    ['graphicsContent', 'flyerContent', 'content', 'complianceContent'].forEach((id) => ($(id).hidden = true));
+    ['graphicsContent', 'flyerContent', 'content', 'complianceContent', 'signboardContent', 'openhomeContent', 'reelContent', 'testimonialContent'].forEach((id) => { const e = $(id); if (e) e.hidden = true; });
     $('emptyState').hidden = false;
     $('complianceDot').className = 'dot';
     $('parseNote').textContent = '';

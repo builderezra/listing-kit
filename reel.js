@@ -278,7 +278,7 @@ const Reel = (() => {
     ctx.clearRect(0, 0, W, H);
     const hero = d && d.hero;
     if (hero && hero.width) {
-      const n = Math.max(1, ((d.photos || []).filter((x) => x.inCarousel !== false).length) || 1);
+      const n = Math.min(6, Math.max(1, ((d.photos || []).filter((x) => x.inCarousel !== false).length) || 1));   // the reel caps photo scenes at 6
       const cap = d.price ? (d.price + (d.address ? '  ·  ' + d.address : '')) : (d.address || 'Your next home');
       paintPhotoScene(ctx, { img: hero, fcss: d.heroFilter, caption: cap, move: 0, p: 0.5, dur: 2.6, counter: '1 / ' + n, brokerage: brand.brokerage, acc: brand.accent || '#c08a3e', fit: false, grain: 0.05 });
       drawProgress(ctx, n + 2, 1, 0.5);

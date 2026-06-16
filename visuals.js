@@ -355,7 +355,7 @@ const Visuals = (() => {
       const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
       if (sub) { ctx.globalAlpha = 0.8; ctx.font = font(400, 19); ctx.fillText(sub, contentX, H - 72); ctx.globalAlpha = 1; }
       if (b.headImg && b.headImg.width) circleImg(ctx, b.headImg, W - 560 - m + 66, H - m - 64, 116, b.accent);   // over the photo's bottom-left corner
-      if (b.watermark && b.logoImg && b.logoImg.width) logoImg(ctx, b.logoImg, contentX + contentW, H - 86, 54);   // logo at the content's bottom-right
+      if (b.watermark && b.logoImg && b.logoImg.width) logoImg(ctx, b.logoImg, W - m - 14, H - m - 26, 48);   // logo over the photo's bottom-right (clear of the contact line)
       return;
     }
 
@@ -427,7 +427,7 @@ const Visuals = (() => {
       const hd = Math.min(story ? 196 : wide ? 112 : 168, cardH - pad * 1.2);
       circleImg(ctx, b.headImg, cardX + cardW - pad - hd / 2, cardY + cardH / 2, hd, b.accent);
     }
-    if (b.watermark && b.logoImg && b.logoImg.width) watermarkLogo(ctx, W, H, b);   // logo top-right on the photo (above the card)
+    if (b.watermark && b.logoImg && b.logoImg.width && !d.stamp) watermarkLogo(ctx, W, H, b);   // logo top-right on the photo (skip when a status sash owns that corner)
     ctx.textAlign = 'left';
   };
 
