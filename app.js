@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v86';
+  const APP_VERSION = 'v87';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -1128,6 +1128,7 @@
     stamp = val || '';
     document.querySelectorAll('#stampRow .stamp-btn').forEach((b) => b.classList.toggle('active', (b.dataset.stamp || '') === stamp));
     rerenderVisuals();
+    saveDraft();   // a stamp click alone should persist (so it survives a refresh, like the text fields)
   };
   const wireStamps = () => {
     document.querySelectorAll('#stampRow .stamp-btn').forEach((b) =>
@@ -1888,10 +1889,17 @@
   const DRAFT_KEY = 'lk_draft_v1';
   const LISTING_FIELDS = ['address', 'city', 'price', 'currency', 'currencyCustom', 'rentPeriod', 'rentPeriodCustom', 'badge', 'badgeCustom', 'openhouse', 'type', 'typeCustom', 'tone', 'beds', 'baths', 'cars', 'sqft', 'areaUnit', 'areaUnitCustom', 'year', 'lot', 'available', 'bond', 'leaseTerm', 'leaseTermCustom', 'furnished', 'pets', 'features', 'neighborhood', 'sbUrl', 'ohDate', 'ohTime'];
   let draftTimer = null;
+  // reflect the feature text back onto the chip .added states (mirrors the wireChips click logic) so a
+  // restored listing's chips aren't stale — otherwise clicking a "looks-un-added" chip silently DELETES it
+  const syncFeatureChips = () => {
+    const have = $('features').value.split(/[,\n]/).map((s) => s.trim().toLowerCase()).filter(Boolean);
+    document.querySelectorAll('#featureChips .chip').forEach((c) =>
+      c.classList.toggle('added', have.includes(c.textContent.trim().toLowerCase())));
+  };
   const saveDraft = () => {
     clearTimeout(draftTimer);
     draftTimer = setTimeout(() => {
-      const draft = { __mode: mode, __checklist: checklist };
+      const draft = { __mode: mode, __checklist: checklist, __stamp: stamp };
       LISTING_FIELDS.forEach((id) => (draft[id] = $(id).value));
       try { localStorage.setItem(DRAFT_KEY, JSON.stringify(draft)); } catch (e) {}
     }, 400);
@@ -1903,8 +1911,10 @@
       if (draft.__mode) applyMode(draft.__mode, false); // rebuild status options before setting badge
       LISTING_FIELDS.forEach((id) => { if (draft[id] != null && draft[id] !== '') $(id).value = draft[id]; });
       checklist = (draft.__checklist && typeof draft.__checklist === 'object') ? draft.__checklist : {};
+      if (draft.__stamp) setStamp(draft.__stamp);   // a stamp survives a plain refresh, like every text field does
       renderChecklist();
       syncCustomWraps();
+      syncFeatureChips();
     } catch (e) {}
   };
   const clearListing = () => {
@@ -1986,7 +1996,14 @@
   const saveCurrentListing = async () => {
     if (!$('address').value.trim() && !photos.length) { toast('Add an address or a photo first'); return; }
     const fields = {}; LISTING_FIELDS.forEach((id) => { fields[id] = $(id).value; });
-    const rec = { id: 'L' + Date.now() + Math.floor(Math.random() * 1e4), savedAt: Date.now(), title: ($('address').value.trim() || 'Untitled listing'), mode, heroIndex, stamp, fields, checklist: { ...checklist }, photos: photos.map((p) => ({ dataURL: photoSourceURL(p), name: p.name, filter: p.filter, crop: p.crop, focus: p.focus, inCarousel: p.inCarousel })).filter((p) => p.dataURL) };
+    // persist the user's hand-edited / AI-revised copy so it survives save → reopen (not just side-effect regens)
+    const editedCopy = {}; editedChannels.forEach((ch) => { if (outputs && outputs[ch] != null) editedCopy[ch] = outputs[ch]; });
+    // map heroIndex onto the actually-saved photos by identity — a not-yet-decoded photo dropped by the
+    // dataURL filter must not shift the stored hero onto a different photo
+    const heroPhoto = photos[heroIndex];
+    const savedPhotos = photos.map((p) => ({ src: p, dataURL: photoSourceURL(p), name: p.name, filter: p.filter, crop: p.crop, focus: p.focus, inCarousel: p.inCarousel })).filter((p) => p.dataURL);
+    const savedHero = Math.max(0, savedPhotos.findIndex((p) => p.src === heroPhoto));
+    const rec = { id: 'L' + Date.now() + Math.floor(Math.random() * 1e4), savedAt: Date.now(), title: ($('address').value.trim() || 'Untitled listing'), mode, heroIndex: savedHero, stamp, fields, checklist: { ...checklist }, copy: editedCopy, editedChannels: [...editedChannels], photos: savedPhotos.map(({ src, ...rest }) => rest) };
     try { await libPut(rec); renderLibrary(); toast('✓ Saved to this device'); } catch (e) { toast('Couldn’t save — storage may be full or blocked'); }
   };
   const openListing = async (id) => {
@@ -1996,6 +2013,7 @@
     applyMode(rec.mode || 'sale', false);
     LISTING_FIELDS.forEach((k) => { if (rec.fields[k] != null) $(k).value = rec.fields[k]; });
     syncCustomWraps();
+    syncFeatureChips();
     setStamp(rec.stamp || '');   // restore the status sash (SOLD / UNDER OFFER / …)
     for (const ph of (rec.photos || [])) { if (gen !== openGen) return; await addSavedPhoto(ph, gen); }
     if (gen !== openGen) return;
@@ -2003,6 +2021,13 @@
     syncFcss(); renderPhotoGrid(); clearMissingFlags();
     $('librarySection').open = false;
     generate(true);   // re-generate without auto-ticking the checklist
+    // restore hand-edited / AI-revised copy on top of the fresh generation, and re-mark those channels
+    // sticky so a later side-effect regen keeps them (via the editedChannels preserve path)
+    if (rec.copy && outputs) {
+      Object.keys(rec.copy).forEach((ch) => { if (rec.copy[ch] != null) outputs[ch] = rec.copy[ch]; });
+      (rec.editedChannels || Object.keys(rec.copy)).forEach((ch) => editedChannels.add(ch));
+      renderTab(activeTab);   // repaint the visible copy pane with the restored text
+    }
     checklist = (rec.checklist && typeof rec.checklist === 'object') ? rec.checklist : {};
     renderChecklist();
     toast('Listing opened');

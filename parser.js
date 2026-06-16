@@ -29,7 +29,7 @@ const Parser = (() => {
   const MULT = `(million(?![a-z])|m(?![²2a-z])|k(?![a-z²]))`;
   // grouped number: "475,000" / "2 950 000" / "1.250.000" / "1.2" — group-of-3
   // separators only, so digits never glom across line breaks or stat rows
-  const NUM = `(\\d{1,3}(?:[ .,]\\d{3})*(?:[.,]\\d{1,2})?|\\d+)`;
+  const NUM = `(\\d{1,3}(?:[ .,]\\d{3})+(?:[.,]\\d{1,2})?|\\d+(?:[.,]\\d{1,2})?)`;
 
   const CURRENCIES = [
     { re: new RegExp(`£\\s?${NUM}\\s*${MULT}?`, 'i'), c: '£' },
@@ -92,7 +92,10 @@ const Parser = (() => {
       }
     }
     if (!out.price) {
-      const g = new RegExp(`(?:price|asking|guide(?:\\s+price)?|offers(?:\\s+(?:over|around|from|in\\s+excess\\s+of))?|listed\\s+(?:at|for)|from)\\s*:?\\s*\\$?\\s?${NUM}`, 'gi');
+      // own digit-run group (NOT the shared NUM, whose grouped branch commits to the first 3 digits of
+      // an ungrouped integer): grouped 3-digit runs OR a 4+-digit integer. No \s, so it can't span a
+      // newline into the stat rows; the \d{4,} branch has no space, so it can't glom onto a following bed count.
+      const g = new RegExp(`(?:price|asking|guide(?:\\s+price)?|offers(?:\\s+(?:over|around|from|in\\s+excess\\s+of))?|listed\\s+(?:at|for)|from)\\s*:?\\s*\\$?\\s?(\\d{1,3}(?:[ .,]\\d{3})+|\\d{4,})`, 'gi');
       let m;
       while ((m = g.exec(text)) !== null) {
         if (m.index >= PRICE_WINDOW) break;

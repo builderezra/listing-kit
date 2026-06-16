@@ -66,6 +66,17 @@ const Studio = (() => {
     if (c === 'dark') return '#1c2b30';
     return c || '#ffffff';
   };
+  // any colour (token / #rrggbb / #rgb / rgb()/rgba()) → a valid #rrggbb for <input type=color>
+  // (an rgba()/named string fed to a colour input silently resets it to #000000)
+  const toHexColor = (c) => {
+    const v = resolveColor(c);
+    if (/^#[0-9a-f]{6}$/i.test(v)) return v.toLowerCase();
+    const m3 = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/i.exec(v);
+    if (m3) return ('#' + m3[1] + m3[1] + m3[2] + m3[2] + m3[3] + m3[3]).toLowerCase();
+    const mr = /^rgba?\(\s*(\d+)[ ,]+(\d+)[ ,]+(\d+)/i.exec(v);
+    if (mr) { const h = (x) => Math.max(0, Math.min(255, +x)).toString(16).padStart(2, '0'); return ('#' + h(mr[1]) + h(mr[2]) + h(mr[3])).toLowerCase(); }
+    return '#ffffff';
+  };
   // hex (#rrggbb) + 0–1 alpha → rgba()
   const rgba = (hex, a) => {
     const h = (resolveColor(hex) || '#000').replace('#', '');
@@ -570,7 +581,7 @@ const Studio = (() => {
       if (Math.hypot(p.x - br.x, p.y - br.y) <= handleR() * 1.9) {
         bgEdit = false;   // resizing a layer leaves background-adjust mode
         // capture the starting dimensions so resize scales from them (no drift / clamp distortion)
-        drag = { id: cur.id, resize: true, startDist: Math.max(8, Math.hypot(p.x - cur._c.cx, p.y - cur._c.cy)), startSize: sizeOf(cur), startWf: cur.wf, startHf: cur.hf, moved: false };
+        drag = { id: cur.id, resize: true, startDist: Math.max(8, Math.hypot(p.x - cur._c.cx, p.y - cur._c.cy)), startSize: sizeOf(cur), startWf: cur.wf, startHf: cur.hf, startStroke: cur.strokeWf, startPts: cur.pts ? cur.pts.map((pt) => pt.slice()) : null, moved: false };
         e.preventDefault(); return;
       }
     }
@@ -630,7 +641,8 @@ const Studio = (() => {
       else if (L.type === 'rect') {
         L.hf = Math.min(2, Math.max(0.008, drag.startHf * factor));
         if (L.shape !== 'rect') L.wf = Math.min(2, Math.max(0.02, drag.startWf * factor));   // ellipse/triangle/star/etc keep aspect
-      } else { L.wf = Math.min(2, Math.max(0.04, drag.startWf * factor)); if (L.type === 'photo' && drag.startHf) L.hf = Math.min(2, Math.max(0.04, drag.startHf * factor)); }   // image/photo keep aspect (box photos scale both)
+      } else if (L.type === 'draw' && drag.startPts) { L.strokeWf = Math.max(0.001, (drag.startStroke || L.strokeWf || 0.01) * factor); L.pts = drag.startPts.map(([x, y]) => [x * factor, y * factor]); }   // scale the stroke + its points around the layer centre
+      else if (drag.startWf != null) { L.wf = Math.min(2, Math.max(0.04, drag.startWf * factor)); if (L.type === 'photo' && drag.startHf) L.hf = Math.min(2, Math.max(0.04, drag.startHf * factor)); }   // image/photo keep aspect (box photos scale both); guard stops a wf-less layer (draw) getting NaN
       render(); syncPanel(); e.preventDefault(); return;
     }
     let xf = Math.min(1, Math.max(0, (p.x - drag.dx) / W()));
@@ -938,7 +950,7 @@ const Studio = (() => {
       cbox.appendChild(sw);
     });
     const pick = document.createElement('label'); pick.className = 'st-sw st-sw-pick'; pick.title = 'Custom colour';
-    const inp = document.createElement('input'); inp.type = 'color'; inp.value = /^#[0-9a-f]{6}$/i.test(L.color) ? L.color : resolveColor(L.color);
+    const inp = document.createElement('input'); inp.type = 'color'; inp.value = toHexColor(L.color);
     inp.addEventListener('input', () => { L.color = inp.value; render(); });
     inp.addEventListener('change', () => setColor(L, inp.value));
     pick.appendChild(inp); cbox.appendChild(pick);
@@ -1472,7 +1484,7 @@ const Studio = (() => {
   const loadTpls = () => { try { return JSON.parse(localStorage.getItem(TPL_LS) || '[]'); } catch (e) { return []; } };
   const saveTpls = (list) => { try { localStorage.setItem(TPL_LS, JSON.stringify(list)); } catch (e) {} };
   const saveTemplate = (name) => {
-    const data = { v: 2, size: sizeKey, bg: { type: bg.type }, layers: clean() };
+    const data = { v: 2, size: sizeKey, bg: cleanBg(bg), layers: clean() };   // keep colour/gradient/darken, not just the type
     const list = loadTpls();
     const existing = list.findIndex((t) => t.name.toLowerCase() === name.toLowerCase());
     if (existing >= 0) list[existing] = { name, data }; else list.push({ name, data });
@@ -1482,7 +1494,9 @@ const Studio = (() => {
     const t = loadTpls()[i]; if (!t || !t.data) return;
     sizeKey = SIZES[t.data.size] ? t.data.size : 'square';
     document.querySelectorAll('#stSizes button').forEach((x) => x.classList.toggle('active', x.dataset.size === sizeKey));
-    bg = (t.data.bg && t.data.bg.type === 'photo' && ctxData.photos.length) ? { type: 'photo', photoIndex: 0 } : { type: 'color' };
+    bg = (t.data.bg && t.data.bg.type === 'photo')
+      ? (ctxData.photos.length ? { type: 'photo', photoIndex: 0 } : { type: 'color' })
+      : (t.data.bg || { type: 'color' });   // restore a saved solid/gradient bg verbatim (was reverting to brand primary)
     layers = (t.data.layers || []).map((L) => {
       const n = { ...L, id: uid++ }; delete n._c;
       if (n.field && ctxData.fields[n.field] && !n.edited) n.text = ctxData.fields[n.field];
@@ -1543,7 +1557,10 @@ const Studio = (() => {
     if (!str) return null;
     if (L.uppercase) str = String(str).toUpperCase();
     const kind = (t === 'badge' || t === 'text' || L.textRef === 'badge') ? 'badge' : 'text';
-    return { ...base, type: kind, text: String(str), size: clampN(L.size, 12, 280, 60), color: okColor(L.color, 'white'), font: L.font === 'serif' ? 'serif' : 'sans', weight: [300, 400, 500, 600, 700, 800, 900].includes(L.weight) ? L.weight : 700, align: ['left', 'center', 'right'].includes(L.align) ? L.align : 'center', shadow: !!L.shadow, outline: !!L.outline, wrapf: (L.wrapf >= 0.2 && L.wrapf <= 1) ? L.wrapf : 0 };
+    // bind fact layers to their field so they re-sync when the listing changes (like template layers do)
+    // and so AI restyle describes them by role, not the generic "label"
+    const field = (kind === 'badge') ? 'badge' : (['price', 'address', 'stats'].includes(L.textRef) ? L.textRef : undefined);
+    return { ...base, type: kind, field, edited: false, text: String(str), size: clampN(L.size, 12, 280, 60), color: okColor(L.color, 'white'), font: L.font === 'serif' ? 'serif' : 'sans', weight: [300, 400, 500, 600, 700, 800, 900].includes(L.weight) ? L.weight : 700, align: ['left', 'center', 'right'].includes(L.align) ? L.align : 'center', shadow: !!L.shadow, outline: !!L.outline, wrapf: (L.wrapf >= 0.2 && L.wrapf <= 1) ? L.wrapf : 0 };
   };
   const mapAIBg = (b) => {
     if (!b || typeof b !== 'object') return { type: 'color', color: ctxData.brand.primary };
@@ -1657,7 +1674,10 @@ const Studio = (() => {
   const alignTo = (dir) => {
     const L = sel(); if (!L || !L._c) return;
     const w = W(), h = H(), m = 0.04;
-    const hw = L._c.w / 2 + L._c.pad, hh = L._c.h / 2 + L._c.pad;
+    // use the rotated axis-aligned footprint so a rotated layer's corners don't overhang the edge
+    const a = (L._c.rot || 0) * Math.PI / 180, ca = Math.abs(Math.cos(a)), sa = Math.abs(Math.sin(a));
+    const halfW = L._c.w / 2 + L._c.pad, halfH = L._c.h / 2 + L._c.pad;
+    const hw = halfW * ca + halfH * sa, hh = halfW * sa + halfH * ca;
     if (dir === 'l') L.xf = (m * w + hw) / w; else if (dir === 'cx') L.xf = 0.5; else if (dir === 'r') L.xf = (w - m * w - hw) / w;
     else if (dir === 't') L.yf = (m * h + hh) / h; else if (dir === 'cy') L.yf = 0.5; else if (dir === 'b') L.yf = (h - m * h - hh) / h;
     commit();

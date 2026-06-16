@@ -23,6 +23,7 @@ const Generator = (() => {
   };
   const pickN = (arr, n) => shuffle(arr).slice(0, n);
   const cap = (s) => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
+  const article = (w) => (/^[aeiou]/i.test((w || '').trim()) ? 'an' : 'a');   // "a house" / "an apartment"
   const oxford = (items) => {
     if (items.length === 0) return '';
     if (items.length === 1) return items[0];
@@ -43,6 +44,8 @@ const Generator = (() => {
     const v = toNum(n);
     return isFinite(v) && v > 0 ? v.toLocaleString('en-US') : '';
   };
+  // bed count for copy: a studio is "0" beds — treat it as absent so we never advertise "0 bedrooms"
+  const beds = (d) => (Number(d.beds) > 0 ? d.beds : '');
   const money = (n, cur = '$') => {
     if (n == null || n === '') return '';
     const v = toNum(n);
@@ -58,11 +61,13 @@ const Generator = (() => {
   // rent: "$650 per week" / "$650/wk"; sale: "$985,000". `mode` from the form.
   const RENT_LONG = { pw: 'per week', pm: 'per month', pf: 'per fortnight' };
   const RENT_SHORT = { pw: '/wk', pm: '/mo', pf: '/fn' };
+  // a custom period may be typed as "night", "/night", "per night" or "/per night" — normalise to the bare unit
+  const rentUnit = (d) => (d.rentPeriodCustom || '').trim().replace(/^\/?\s*per\s+/i, '').replace(/^\//, '').trim();
   const rentPeriodShort = (d) => d.rentPeriod === 'custom'
-    ? ((d.rentPeriodCustom || '').trim() ? '/' + d.rentPeriodCustom.trim().replace(/^\//, '') : '/wk')
+    ? (rentUnit(d) ? '/' + rentUnit(d) : '/wk')
     : (RENT_SHORT[d.rentPeriod] || RENT_SHORT.pw);
   const rentPeriodLong = (d) => d.rentPeriod === 'custom'
-    ? ((d.rentPeriodCustom || '').trim() ? 'per ' + d.rentPeriodCustom.trim().replace(/^\//, '') : 'per week')
+    ? (rentUnit(d) ? 'per ' + rentUnit(d) : 'per week')
     : (RENT_LONG[d.rentPeriod] || RENT_LONG.pw);
   // headline price string for either mode (long form, used in prose)
   const priceLong = (d) => (d.mode === 'rent' ? (money(d.price, d.currency) ? `${money(d.price, d.currency)} ${rentPeriodLong(d)}` : '') : money(d.price, d.currency));
@@ -188,7 +193,7 @@ const Generator = (() => {
       'Sleek, bright, and effortless — this {noun} delivers.',
     ],
     investor: [
-      'A standout opportunity in a {noun} that pairs strong fundamentals with upside.',
+      'A standout opportunity in this {noun} that pairs strong fundamentals with upside.',
       'Smart buyers will appreciate the numbers behind this {noun}.',
       'A well-positioned {noun} ready to perform from day one.',
       'Value, condition, and location align in this {noun}.',
@@ -244,8 +249,10 @@ const Generator = (() => {
     let t = String(text).trim().replace(/\.$/, '');
     t = t.replace(/within walking distance (of|to)?/gi, 'just minutes from');
     t = t.replace(/walking distance (of|to)?/gi, 'moments from');
-    if (/^(near|close to|minutes|moments|just|steps|blocks)/i.test(t)) return t.charAt(0).toLowerCase() + t.slice(1);
-    return 'close to ' + t.charAt(0).toLowerCase() + t.slice(1);
+    // lowercase the first word for mid-sentence flow, but leave a leading acronym/proper noun (CBD, IGA, UWA) intact
+    const lc = (s) => /^[A-Z]{2,}/.test(s) ? s : s.charAt(0).toLowerCase() + s.slice(1);
+    if (/^(near|close to|minutes|moments|just|steps|blocks)/i.test(t)) return lc(t);
+    return 'close to ' + lc(t);
   };
 
   // ---- headline line (REIWA/portal convention: punchy first line) -----------
@@ -291,13 +298,14 @@ const Generator = (() => {
 
     // stats with a tone-flavored tail
     const statBits = [];
-    if (d.beds) statBits.push(`${d.beds} ${d.beds == 1 ? 'bedroom' : 'bedrooms'}`);
+    const bd = beds(d);
+    if (bd) statBits.push(`${bd} ${bd == 1 ? 'bedroom' : 'bedrooms'}`);
     if (d.baths) statBits.push(`${d.baths} ${d.baths == 1 ? 'bath' : 'baths'}`);
     const sq = num(d.sqft);
     if (statBits.length || sq) {
       let s = statBits.length ? cap(oxford(statBits)) : 'The floor plan';
       // verb agrees with the subject: "4 bedrooms span", "1 bedroom spans", "The floor plan spans"
-      const subjPlural = statBits.length >= 2 || (statBits.length === 1 && Number(d.beds || d.baths) !== 1);
+      const subjPlural = statBits.length >= 2 || (statBits.length === 1 && Number(bd || d.baths) !== 1);
       s += sq ? ` ${subjPlural ? 'span' : 'spans'} ${sq} ${areaLong(d.areaUnit)}` : ` ${subjPlural ? 'fill' : 'fills'} the home`;
       s += `, ${pick(STAT_TAILS[tone] || STAT_TAILS.classic)}.`;
       p1.push(s);
@@ -477,7 +485,7 @@ const Generator = (() => {
     lines.push('');
 
     const stat = [];
-    if (d.beds) stat.push(`🛏️ ${d.beds} bd`);
+    if (beds(d)) stat.push(`🛏️ ${beds(d)} bd`);
     if (d.baths) stat.push(`🛁 ${d.baths} ba`);
     if (d.cars) stat.push(`🚗 ${d.cars} car`);
     if (num(d.sqft)) stat.push(`📐 ${num(d.sqft)} ${d.areaUnit === 'sqm' ? 'm²' : d.areaUnit === 'sqft' ? 'sqft' : d.areaUnit}`);
@@ -526,7 +534,7 @@ const Generator = (() => {
   // ---- Facebook post --------------------------------------------------------
   const statBlurb = (d) => {
     const p = [];
-    if (d.beds) p.push(`${d.beds} bed`);
+    if (beds(d)) p.push(`${beds(d)} bed`);
     if (d.baths) p.push(`${d.baths} bath`);
     let s = p.length ? ' with ' + oxford(p) : '';
     if (num(d.sqft)) s += `${p.length ? ',' : ' with'} ${num(d.sqft)} ${areaShort(d.areaUnit)}`;
@@ -551,7 +559,7 @@ const Generator = (() => {
 
     const sentence = [];
     const addr = d.address ? `${d.address} ` : '';
-    sentence.push(`${addr ? addr + 'is a' : 'This'} ${noun}${statBlurb(d)}.`);
+    sentence.push(`${addr ? addr + 'is ' + article(noun) : 'This'} ${noun}${statBlurb(d)}.`);
     const feats = polishFeatures(d.features);
     if (feats.length) sentence.push(`Inside, you’ll find ${oxford(pickN(feats, Math.min(feats.length, 3)).map((f) => f.text))}.`);
     if (rent && (d.available || d.furnished === 'furnished')) sentence.push(`${d.furnished === 'furnished' ? 'Fully furnished and ' : ''}${d.available ? (/\b(now|immediate|immediately|asap|today)\b/i.test(d.available) ? 'available now' : 'available from ' + d.available) : 'ready to move into'}.`);
@@ -576,7 +584,7 @@ const Generator = (() => {
     const noun = typeNoun(d.type, d.typeCustom);
     const feats = polishFeatures(d.features);
     const where = d.city || 'the area';
-    const bedBit = d.beds ? `${d.beds}-bed ` : '';
+    const bedBit = beds(d) ? `${beds(d)}-bed ` : '';
 
     const rent = d.mode === 'rent';
     const done = d.badge === 'sold' || d.badge === 'leased'; // the deal's done → pivot to prospecting
@@ -601,7 +609,7 @@ const Generator = (() => {
         d.address ? `SOLD: ${d.address}` : `Just sold in ${where}`,
         `Another one sold in ${where} — thinking of selling?`,
       ],
-      forsale: [`For sale in ${where}: ${bedBit}${noun}`, d.address ? `Have you seen ${d.address}?` : `A ${noun} worth your weekend in ${where}`],
+      forsale: [`For sale in ${where}: ${bedBit}${noun}`, d.address ? `Have you seen ${d.address}?` : `${cap(article(noun))} ${noun} worth your weekend in ${where}`],
       // rent
       forlease: [
         `For lease in ${where}: ${bedBit}${noun}${priceShort(d) ? ' — ' + priceShort(d) : ''}`,
@@ -620,7 +628,7 @@ const Generator = (() => {
     const subject = subs[0];
     const altSubject = subs[1] || '';
     const preheader = [
-      [d.beds && `${d.beds} bed`, d.baths && `${d.baths} bath`, d.cars && `${d.cars} car`].filter(Boolean).join(' · '),
+      [beds(d) && `${beds(d)} bed`, d.baths && `${d.baths} bath`, d.cars && `${d.cars} car`].filter(Boolean).join(' · '),
       priceShort(d) || (done ? '' : (rent ? 'rent on application' : 'price on application')),
       rent && d.available ? `avail ${d.available}` : '',
       'photos inside',
@@ -650,7 +658,7 @@ const Generator = (() => {
           `Some homes I send to everyone — this one I wanted my list to see first${d.address ? ': ' + d.address + (d.city ? ', ' + d.city : '') : ''}.`,
         ]));
       body.push('');
-      let para = `It’s a ${noun}`;
+      let para = `It’s ${article(noun)} ${noun}`;
       para += feats.length ? ` with ${oxford(pickN(feats, Math.min(feats.length, 3)).map((f) => f.text))}.` : ' worth a closer look.';
       if (d.neighborhood) para += ` And it’s ${cleanLocation(d.neighborhood)}.`;
       body.push(para);
@@ -661,7 +669,7 @@ const Generator = (() => {
       const bullets = [];
       if (rent) { if (priceLong(d)) bullets.push(`Rent: ${priceLong(d)}`); }
       else if (money(d.price)) bullets.push(`Price: ${money(d.price, d.currency)}`);
-      const bb = [d.beds && d.beds + ' bed', d.baths && d.baths + ' bath', d.cars && d.cars + ' car', num(d.sqft) && num(d.sqft) + ' ' + areaShort(d.areaUnit)].filter(Boolean);
+      const bb = [beds(d) && beds(d) + ' bed', d.baths && d.baths + ' bath', d.cars && d.cars + ' car', num(d.sqft) && num(d.sqft) + ' ' + areaShort(d.areaUnit)].filter(Boolean);
       if (bb.length) bullets.push(bb.join(' / '));
       if (rent) {
         if (d.available) bullets.push(`Available: ${d.available}`);
@@ -737,7 +745,7 @@ const Generator = (() => {
   const EMOJI_RE = /[\u{1F000}-\u{1FAFF}\u{2600}-\u{27BF}\u{2B00}-\u{2BFF}\u{FE0F}\u{200D}]/gu;
   const stripEmojis = (s) => s
     .split('\n')
-    .map((l) => l.replace(EMOJI_RE, '').replace(/ {2,}/g, ' ').replace(/^[\s•·–-]*$/, '').trimStart())
+    .map((l) => l.replace(EMOJI_RE, '').replace(/ {2,}/g, ' ').replace(/^[\s•·–-]*$/, '').trim())
     .join('\n')
     .replace(/\n{3,}/g, '\n\n');
 
