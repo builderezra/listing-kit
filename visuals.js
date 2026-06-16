@@ -149,21 +149,6 @@ const Visuals = (() => {
     ctx.restore();
   };
 
-  // optional circular headshot badge in a chosen corner — a post-render overlay so it
-  // works uniformly on every output. pos: 'tl'|'tr'|'bl'|'br' (anything else / falsy = off).
-  const agentBadge = (ctx, W, H, brand, pos) => {
-    const img = brand && brand.headImg;
-    if (!img || !img.width || !pos || pos === 'off') return;
-    const s = Math.min(W, H), d = s * 0.16, pad = s * 0.055;
-    const x = (pos === 'tl' || pos === 'bl') ? pad + d / 2 : W - pad - d / 2;
-    const y = (pos === 'tl' || pos === 'tr') ? pad + d / 2 : H - pad - d / 2;
-    ctx.save();
-    ctx.shadowColor = 'rgba(0,0,0,0.40)'; ctx.shadowBlur = s * 0.022; ctx.shadowOffsetY = s * 0.005;
-    ctx.beginPath(); ctx.arc(x, y, d / 2 + s * 0.009, 0, Math.PI * 2); ctx.fillStyle = '#ffffff'; ctx.fill();   // white separation ring
-    ctx.restore();
-    circleImg(ctx, img, x, y, d, brand.accent);
-  };
-
   // brand bar across the bottom; returns its height
   const brandBar = (ctx, W, H, brand, h) => {
     const bg = brand.primary, fg = onColor(bg);
@@ -183,7 +168,7 @@ const Visuals = (() => {
     }
     // right side: headshot circle, then logo to its left
     let xRight = W - pad;
-    if (!brand._hideHead && brand.headImg && brand.headImg.width) {
+    if (brand.headImg && brand.headImg.width) {
       const d = h * 0.62;
       circleImg(ctx, brand.headImg, xRight - d / 2, cy, d, alpha('#ffffff', 0.85));
       xRight -= d + h * 0.22;
@@ -312,7 +297,7 @@ const Visuals = (() => {
 
     // contact block pinned to the bottom
     const baseY = H - (kind === 'story' ? 120 : 96);
-    if (!compact && !b._hideHead && b.headImg && b.headImg.width) circleImg(ctx, b.headImg, W / 2, baseY - (kind === 'story' ? 110 : 88), kind === 'story' ? 120 : 92, b.accent);
+    if (!compact && b.headImg && b.headImg.width) circleImg(ctx, b.headImg, W / 2, baseY - (kind === 'story' ? 110 : 88), kind === 'story' ? 120 : 92, b.accent);
     ctx.font = font(700, kind === 'story' ? 30 : 26); ctx.fillStyle = ink;
     ctx.fillText(b.agentName || 'Your Name Here', W / 2, baseY);
     const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
@@ -380,7 +365,7 @@ const Visuals = (() => {
     ctx.fillText(b.agentName || 'Your Name Here', m + 16, rowY + (kind === 'story' ? 58 : 50));
     const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
     if (sub) { ctx.globalAlpha = 0.8; ctx.font = font(400, kind === 'story' ? 24 : 21); ctx.fillText(sub, m + 16, rowY + (kind === 'story' ? 96 : 84)); ctx.globalAlpha = 1; }
-    if (!b._hideHead && b.headImg && b.headImg.width) circleImg(ctx, b.headImg, W - m - 16 - 50, rowY + (kind === 'story' ? 72 : 64), kind === 'story' ? 110 : 96, b.accent);
+    if (b.headImg && b.headImg.width) circleImg(ctx, b.headImg, W - m - 16 - 50, rowY + (kind === 'story' ? 72 : 64), kind === 'story' ? 110 : 96, b.accent);
     else if (!b.watermark) logoImg(ctx, b.logoImg, W - m - 16, rowY + (kind === 'story' ? 72 : 64), kind === 'story' ? 80 : 68);
   };
 
@@ -415,7 +400,10 @@ const Visuals = (() => {
     ctx.fillText(b.agentName || '', lx, ay);
     const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
     if (sub) { ctx.font = font(400, story ? 20 : 17); ctx.fillStyle = mut; ctx.fillText(sub, lx, ay + (story ? 30 : 26)); }
-    if (b.logoImg && b.logoImg.width && !b.watermark) logoImg(ctx, b.logoImg, cardX + cardW - pad, ay - 6, story ? 56 : 46);
+    // headshot + logo, bottom-right of the card
+    let hx = cardX + cardW - pad;
+    if (b.headImg && b.headImg.width) { const hd = story ? 64 : 54; circleImg(ctx, b.headImg, hx - hd / 2, ay - (story ? 6 : 4), hd, b.accent); hx -= hd + (story ? 16 : 12); }
+    if (b.logoImg && b.logoImg.width && !b.watermark) logoImg(ctx, b.logoImg, hx, ay - 6, story ? 56 : 46);
     ctx.textAlign = 'left';
   };
 
@@ -437,7 +425,9 @@ const Visuals = (() => {
       ctx.strokeStyle = alpha(b.accent, 0.85); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx - 42, y - 8); ctx.lineTo(cx + 42, y - 8); ctx.stroke(); y += 44;
       if (d.address) { ctx.font = font(400, 26); ctx.fillStyle = mut; ctx.fillText(d.address, cx, y); y += 52; }
       const stats = statText(d); if (stats) { ctx.font = font(500, 20); spacing(ctx, 3); ctx.fillStyle = ink; ctx.fillText(stats, cx, y); spacing(ctx, 0); }
-      ctx.font = font(500, 24, SERIF); ctx.fillStyle = ink; ctx.fillText(b.agentName || 'Your Name Here', cx, H - 104);
+      const lname = b.agentName || 'Your Name Here';
+      ctx.font = font(500, 24, SERIF); ctx.fillStyle = ink; ctx.fillText(lname, cx, H - 104);
+      if (b.headImg && b.headImg.width) { const hd = 66, nw = ctx.measureText(lname).width; circleImg(ctx, b.headImg, cx - nw / 2 - hd / 2 - 18, H - 104 - 9, hd, b.accent); }
       const sub = [b.brokerage, b.phone].filter(Boolean).join('   ·   '); if (sub) { ctx.font = font(400, 18); ctx.fillStyle = mut; ctx.fillText(sub, cx, H - 74); }
       ctx.textAlign = 'left'; return;
     }
@@ -453,7 +443,9 @@ const Visuals = (() => {
     if (d.address) { ctx.font = font(400, story ? 34 : 30); ctx.fillStyle = mut; ctx.fillText(d.address, W / 2, y); y += story ? 52 : 46; }
     const stats = statText(d); if (stats) { ctx.font = font(500, story ? 26 : 23); spacing(ctx, 3); ctx.fillStyle = ink; ctx.fillText(stats, W / 2, y); spacing(ctx, 0); }
     const baseY = H - (story ? 104 : 84);
-    ctx.font = font(500, story ? 30 : 26, SERIF); ctx.fillStyle = ink; ctx.fillText(b.agentName || 'Your Name Here', W / 2, baseY);
+    const lname = b.agentName || 'Your Name Here';
+    ctx.font = font(500, story ? 30 : 26, SERIF); ctx.fillStyle = ink; ctx.fillText(lname, W / 2, baseY);
+    if (b.headImg && b.headImg.width) { const hd = story ? 78 : 62, nw = ctx.measureText(lname).width; circleImg(ctx, b.headImg, W / 2 - nw / 2 - hd / 2 - (story ? 26 : 18), baseY - (story ? 12 : 9), hd, b.accent); }
     const sub = [b.brokerage, b.phone].filter(Boolean).join('   ·   '); if (sub) { ctx.font = font(400, story ? 22 : 19); ctx.fillStyle = mut; ctx.fillText(sub, W / 2, baseY + (story ? 34 : 30)); }
     ctx.textAlign = 'left';
   };
@@ -475,6 +467,7 @@ const Visuals = (() => {
       const stats = statText(d); if (stats) { ctx.font = font(600, 20); spacing(ctx, 3); ctx.fillStyle = fg; ctx.fillText(stats, px, y); spacing(ctx, 0); }
       ctx.font = font(700, 24); ctx.fillStyle = fg; ctx.fillText(b.agentName || 'Your Name Here', px, H - 108);
       const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  '); if (sub) { ctx.globalAlpha = 0.82; ctx.font = font(400, 18); ctx.fillText(sub, px, H - 76); ctx.globalAlpha = 1; }
+      if (b.headImg && b.headImg.width) circleImg(ctx, b.headImg, W - 56 - 42, H - 100, 84, b.accent);
       return;
     }
     const bandH = story ? 624 : 364;
@@ -492,8 +485,9 @@ const Visuals = (() => {
     ctx.font = font(700, story ? 30 : 26); ctx.fillStyle = fg; ctx.fillText(b.agentName || 'Your Name Here', m, ry);
     const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
     if (sub) { ctx.globalAlpha = 0.82; ctx.font = font(400, story ? 22 : 19); ctx.fillText(sub, m, ry + (story ? 32 : 27)); ctx.globalAlpha = 1; }
-    if (b.logoImg && b.logoImg.width && !b.watermark) logoImg(ctx, b.logoImg, W - m, ry, story ? 64 : 52);
-    else if (!b._hideHead && b.headImg && b.headImg.width) circleImg(ctx, b.headImg, W - m - 40, ry - (story ? 18 : 14), story ? 96 : 78, b.accent);
+    let xr = W - m;
+    if (b.headImg && b.headImg.width) { const hd = story ? 96 : 78; circleImg(ctx, b.headImg, xr - hd / 2, ry - (story ? 18 : 14), hd, b.accent); xr -= hd + (story ? 20 : 16); }
+    if (b.logoImg && b.logoImg.width && !b.watermark) logoImg(ctx, b.logoImg, xr, ry, story ? 64 : 52);
   };
 
   // =====================  CAROUSEL SLIDES (1080×1080)  =========================
@@ -911,15 +905,9 @@ const Visuals = (() => {
     ctx.clearRect(0, 0, W, H);
     // a status stamp REPLACES the small status badge — blank it so the two don't clash
     const td = (d && d.stamp) ? Object.assign({}, d, { badgeText: '' }) : d;
-    // when the corner headshot badge is on, suppress the template's own brand-bar face so there's never a duplicate
-    const badgeOn = !!(d && d.brand && d.headPos && d.headPos !== 'off' && d.brand.headImg && d.brand.headImg.width);
-    const prevHide = d && d.brand ? d.brand._hideHead : undefined;
-    if (d && d.brand) d.brand._hideHead = badgeOn;
     (TEMPLATES[templateId] || modern)(ctx, W, H, td, kind);
-    if (d && d.brand) d.brand._hideHead = prevHide;
     if (d && d.stamp) cornerSash(ctx, W, H, d.stamp);
     else if (d && d.brand && d.brand.watermark && d.brand.logoImg) watermarkLogo(ctx, W, H, d.brand);
-    if (badgeOn) agentBadge(ctx, W, H, d.brand, d.headPos);   // graphics badge (app may also stamp other outputs)
   };
 
   const download = (canvas, filename) => {
@@ -995,5 +983,5 @@ const Visuals = (() => {
     if (d && d.stamp) cornerSash(ctx, W, H, d.stamp);
   };
 
-  return { render, download, SIZES, onColor, shade, agentBadge, featureSlide, ctaSlide, signboard, openHomePost, arrowSign, opensRoundup, testimonial, prospectPost, agentPost };
+  return { render, download, SIZES, onColor, shade, featureSlide, ctaSlide, signboard, openHomePost, arrowSign, opensRoundup, testimonial, prospectPost, agentPost };
 })();
