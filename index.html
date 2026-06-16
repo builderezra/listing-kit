@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=77" />
+  <link rel="stylesheet" href="styles.css?v=78" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -695,6 +695,22 @@
             </div>
           </div>
           <p class="hint" id="ohEmpty">Add the inspection date &amp; time above — they’ll appear on the post and sign.</p>
+          <div class="oh-invite" id="ohInvite">
+            <div class="oh-invite-head">
+              <span class="hint">📣 Invite message <span class="muted">— send it to your buyer list</span></span>
+              <div class="oh-invite-tone" id="ohInviteTone">
+                <button type="button" class="fmt-btn active" data-tone="sms">💬 Text</button>
+                <button type="button" class="fmt-btn" data-tone="email">✉️ Email</button>
+              </div>
+            </div>
+            <textarea id="ohInviteText" class="oh-invite-text" rows="5" spellcheck="true"></textarea>
+            <div class="oh-invite-actions">
+              <button type="button" class="copy-btn" id="ohInviteCopy">📋 Copy message</button>
+              <button type="button" class="mini-btn" id="ohInviteSend">Open ↗</button>
+              <button type="button" class="link-btn" id="ohInviteRewrite">↻ Rewrite</button>
+              <span class="parse-note" id="ohInviteNote"></span>
+            </div>
+          </div>
           <div class="oh-pick">
             <span class="hint">Featured photo <span class="muted">— a property shot, or a photo of you</span></span>
             <div class="oh-photos" id="ohPhotos"></div>
@@ -1067,18 +1083,18 @@
     </div>
   </div>
 
-  <script src="generator.js?v=77"></script>
-  <script src="fairhousing.js?v=77"></script>
-  <script src="parser.js?v=77"></script>
-  <script src="importer.js?v=77"></script>
-  <script src="qr.js?v=77"></script>
-  <script src="visuals.js?v=77"></script>
-  <script src="flyer.js?v=77"></script>
-  <script src="ai.js?v=77"></script>
-  <script src="studio.js?v=77"></script>
-  <script src="tour.js?v=77"></script>
-  <script src="zip.js?v=77"></script>
-  <script src="reel.js?v=77"></script>
-  <script src="app.js?v=77"></script>
+  <script src="generator.js?v=78"></script>
+  <script src="fairhousing.js?v=78"></script>
+  <script src="parser.js?v=78"></script>
+  <script src="importer.js?v=78"></script>
+  <script src="qr.js?v=78"></script>
+  <script src="visuals.js?v=78"></script>
+  <script src="flyer.js?v=78"></script>
+  <script src="ai.js?v=78"></script>
+  <script src="studio.js?v=78"></script>
+  <script src="tour.js?v=78"></script>
+  <script src="zip.js?v=78"></script>
+  <script src="reel.js?v=78"></script>
+  <script src="app.js?v=78"></script>
 </body>
 </html>

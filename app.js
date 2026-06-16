@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v77';
+  const APP_VERSION = 'v78';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -20,6 +20,8 @@
   let ohDir = 'right';    // open-home directional-sign arrow ('left' | 'up' | 'right')
   let ohFormat = 'square';   // open-home post format ('square' | 'story')
   let ohPhoto = null;        // featured photo: a listing-photo object, 'you' (headshot), or null = hero
+  let ohInviteTone = 'sms';  // open-home invite message tone ('sms' | 'email')
+  let ohInviteEdited = false; // user hand-edited the invite → stop auto-rewriting it
   let reelBlob = null, reelExt = 'webm', reelURL = '';   // last rendered Reel video
   let reelCaps = null;    // AI-written on-screen captions for the reel (one per photo)
 
@@ -1104,6 +1106,50 @@
   };
   const openHomeWhen = () => ({ date: fmtOpenDate($('ohDate').value), time: $('ohTime').value.trim() });
   const hasOpenHome = () => { const w = openHomeWhen(); return !!(w.date || w.time); };
+  // a ready-to-send invite the agent can text/email to their buyer list. Built from
+  // the real listing facts + brand; honours house-style prefs; no fair-housing language.
+  const buildInviteMessage = (tone) => {
+    const d = vizData(), when = openHomeWhen(), p = (brand.prefs || {});
+    const isRent = d.raw && d.raw.mode === 'rent';
+    const eventName = isRent ? 'inspection' : 'home open';
+    const addr = d.address || 'the property';
+    const whenStr = [when.date, when.time].filter(Boolean).join(', ');
+    const sign = [brand.agentName, brand.brokerage].filter(Boolean).join(', ');
+    const beds = [d.beds && `${d.beds} bed`, d.baths && `${d.baths} bath`, d.cars && `${d.cars} car`].filter(Boolean).join(', ');
+    let text;
+    if (tone === 'email') {
+      const greeting = (p.greeting ? p.greeting.trim().replace(/[,!.]*$/, '') : 'Hi there') + ',';
+      const signoff = (p.signoff ? p.signoff.trim().replace(/[,!.]*$/, '') : 'Hope to see you there') + ',';
+      const L = [`Subject: You're invited — ${eventName} at ${addr}`, '', greeting, ''];
+      L.push(`You're warmly invited to the ${eventName} at ${addr}${d.price ? ` (${d.price})` : ''}.`);
+      if (whenStr) L.push(`When: ${whenStr}`);
+      if (beds) L.push(`The home: ${beds}.`);
+      L.push('', 'Come through and take a look — just drop by, no need to register. I’d be glad to show you around and answer any questions.', '', signoff);
+      if (sign) L.push(sign);
+      if (brand.phone) L.push(brand.phone);
+      text = L.join('\n');
+    } else {
+      const lines = [`Hi! You’re invited to the ${eventName} at ${addr}${whenStr ? ` on ${whenStr}` : ''}.`,
+        `Come take a look${beds ? ` (${beds})` : ''} — would love to see you there.`];
+      if (sign) lines.push(`— ${sign}${brand.phone ? ` · ${brand.phone}` : ''}`);
+      text = lines.join('\n');
+    }
+    if (p.noExclaim) text = text.replace(/!+/g, '.').replace(/\.{2,}/g, '.');
+    return text;
+  };
+  const renderOhInvite = () => {
+    const ta = $('ohInviteText'); if (!ta) return;
+    if (!ohInviteEdited) ta.value = buildInviteMessage(ohInviteTone);
+    document.querySelectorAll('#ohInviteTone .fmt-btn').forEach((b) => b.classList.toggle('active', b.dataset.tone === ohInviteTone));
+    // compliance backstop (the whole app is compliance-aware) — flag risky wording
+    const note = $('ohInviteNote');
+    if (note) {
+      let flagged = 0;
+      try { const r = FairHousing.scan({ 'invite message': ta.value }); if (r && !r.clear) flagged = r.findings.length; } catch (e) {}
+      note.textContent = flagged ? `⚠ ${flagged} wording flag${flagged === 1 ? '' : 's'} — review before sending` : '';
+      note.className = 'parse-note' + (flagged ? ' err' : '');
+    }
+  };
   // the open schedule as ONE compact line ("Sat 20 Jun, 11:00–11:30am"), used to
   // flow "Home Open" into EVERY format. Prefers the Open Home tab's structured
   // date+time; falls back to the listing form's free-text open field.
@@ -1147,6 +1193,7 @@
     Visuals.openHomePost($('cvOpenPost'), ohFormat, { brand, d, when, photo: resolveOhPhoto() });
     Visuals.arrowSign($('cvOpenSign'), { brand, d, when, dir: ohDir });
     $('ohEmpty').hidden = !!(when.date || when.time);
+    renderOhInvite();
   };
   const buildOpensRoundup = async () => {
     const items = [];
@@ -1186,6 +1233,18 @@
     }));
     document.querySelectorAll('#openhomeContent .dlc').forEach((b) => b.addEventListener('click', () => { Visuals.download($(b.dataset.canvas), `${slug()}-${b.dataset.name}.png`); markDone('openhome'); }));
     $('ohRoundup').addEventListener('click', buildOpensRoundup);
+    // invite message: tone toggle, manual edit, copy, open (text/email), rewrite
+    document.querySelectorAll('#ohInviteTone .fmt-btn').forEach((b) => b.addEventListener('click', () => {
+      ohInviteTone = b.dataset.tone || 'sms'; ohInviteEdited = false; renderOhInvite();
+    }));
+    $('ohInviteText').addEventListener('input', () => { ohInviteEdited = true; renderOhInvite(); });
+    $('ohInviteRewrite').addEventListener('click', () => { ohInviteEdited = false; renderOhInvite(); });
+    $('ohInviteCopy').addEventListener('click', async () => { const ok = await copyText($('ohInviteText').value); toast(ok ? '✓ Invite copied' : 'Copy failed — select & copy manually'); });
+    $('ohInviteSend').addEventListener('click', () => {
+      const text = $('ohInviteText').value;
+      if (ohInviteTone === 'email') openEmail(savedEmailSvc(), text);
+      else window.location.href = 'sms:?&body=' + encodeURIComponent(text);
+    });
     // click the open-home post → zoom + "Edit in Design Studio" (reproduces it as editable layers)
     const ohCanvas = $('cvOpenPost');
     ohCanvas.classList.add('lb-zoom'); ohCanvas.title = 'Tap to zoom & edit in the Design Studio';

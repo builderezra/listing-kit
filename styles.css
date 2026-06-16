@@ -551,6 +551,14 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 .dir-btn:hover { border-color: var(--accent-ink); color: var(--ink); }
 .dir-btn.active { background: var(--teal); border-color: var(--accent-ink); color: #fff; }
 #ohEmpty { margin: 0 0 12px; }
+.oh-invite { margin: 2px 0 16px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 11px; background: var(--hi); }
+.oh-invite-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 9px; flex-wrap: wrap; }
+.oh-invite-tone { display: flex; gap: 6px; }
+.oh-invite-text { width: 100%; box-sizing: border-box; resize: vertical; min-height: 96px; font: 400 13.5px/1.5 var(--sans); color: var(--ink); background: var(--card); border: 1px solid var(--line); border-radius: 9px; padding: 10px 12px; }
+.oh-invite-text:focus { outline: none; border-color: var(--accent-ink); }
+.oh-invite-actions { display: flex; align-items: center; gap: 10px; margin-top: 9px; flex-wrap: wrap; }
+.oh-invite-actions .copy-btn { width: auto; padding: 8px 14px; margin: 0; }
+.oh-invite-actions .parse-note { margin: 0; }
 .oh-pick { margin: 2px 0 10px; }
 .oh-photos { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .oh-thumb { width: 46px; height: 46px; object-fit: cover; border-radius: 8px; border: 2px solid transparent; cursor: pointer; opacity: .82; transition: opacity .12s, border-color .12s; }
