@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v72';
+  const APP_VERSION = 'v73';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -1123,7 +1123,7 @@
     const card = cv.closest('.gfx-card'); if (card) card.classList.toggle('story', tmFormat === 'story');   // cap the tall story canvas
     if (type === 'prospect') Visuals.prospectPost(cv, tmFormat, { brand, headline: $('psHeadline').value, sub: $('psSub').value, suburb: $('psSuburb').value.trim() });
     else if (type === 'agent') Visuals.agentPost(cv, tmFormat, { brand, tagline: $('agTagline').value.trim(), bio: $('agBio').value });
-    else Visuals.testimonial(cv, tmFormat, { brand, quote: $('tmQuote').value, author: $('tmAuthor').value.trim(), role: $('tmRole').value.trim(), rating: parseInt($('tmRating').value, 10) || 5 });
+    else Visuals.testimonial(cv, tmFormat, { brand, quote: $('tmQuote').value, author: $('tmAuthor').value.trim(), role: $('tmRole').value.trim(), rating: parseFloat($('tmRating').value) || 5 });
   };
   const wireTestimonial = () => {
     ['tmQuote', 'tmAuthor', 'tmRole', 'psHeadline', 'psSub', 'psSuburb', 'agTagline', 'agBio'].forEach((id) => { if ($(id)) $(id).addEventListener('input', () => { if (activeTab === 'testimonial') renderTestimonial(); }); });
@@ -2174,10 +2174,14 @@
   }));
 
   // about/privacy popover (replaces the old bottom footer warning)
-  $('infoBtn').addEventListener('click', (e) => { e.stopPropagation(); $('infoPop').hidden = !$('infoPop').hidden; });
+  $('infoBtn').addEventListener('click', (e) => { e.stopPropagation(); $('palettePop').hidden = true; $('infoPop').hidden = !$('infoPop').hidden; });
   document.addEventListener('click', (e) => { if (!$('infoPop').hidden && !$('infoPop').contains(e.target) && e.target !== $('infoBtn')) $('infoPop').hidden = true; });
   $('infoTour').addEventListener('click', () => { $('infoPop').hidden = true; Tour.start(); });
   $('tourBtn').addEventListener('click', () => Tour.start());
+
+  // colour-theme popover (discoverable 🎨 button in the topbar)
+  $('paletteBtn').addEventListener('click', (e) => { e.stopPropagation(); $('infoPop').hidden = true; $('palettePop').hidden = !$('palettePop').hidden; });
+  document.addEventListener('click', (e) => { if (!$('palettePop').hidden && !$('palettePop').contains(e.target) && e.target !== $('paletteBtn')) $('palettePop').hidden = true; });
 
   loadBrand();
   restoreDraft();

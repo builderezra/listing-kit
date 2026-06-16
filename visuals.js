@@ -750,12 +750,18 @@ const Visuals = (() => {
     ctx.fillStyle = alpha(acc, 0.92); ctx.font = font(800, story ? 230 : 196, SERIF);
     ctx.fillText('“', W / 2, story ? 380 : 312);
 
-    const r = Math.max(1, Math.min(5, Math.round(rating || 5)));
+    const r = Math.max(0.5, Math.min(5, rating || 5));   // supports half-stars (e.g. 4.5)
     const starSize = story ? 60 : 54, starsY = story ? 470 : 392;
-    ctx.font = font(400, starSize);
+    ctx.font = font(400, starSize); ctx.textAlign = 'center';
     const sw = ctx.measureText('★').width, gap = starSize * 0.16, totalW = 5 * sw + 4 * gap;
     let sx = W / 2 - totalW / 2 + sw / 2;
-    for (let i = 0; i < 5; i++) { ctx.fillStyle = i < r ? acc : alpha(fg, 0.25); ctx.fillText('★', sx, starsY); sx += sw + gap; }
+    for (let i = 0; i < 5; i++) {
+      const level = r - i;                                          // >=1 full · 0.5 half · <=0 empty
+      ctx.fillStyle = alpha(fg, 0.25); ctx.fillText('★', sx, starsY);   // faint base star
+      if (level >= 1) { ctx.fillStyle = acc; ctx.fillText('★', sx, starsY); }
+      else if (level >= 0.5) { ctx.save(); ctx.beginPath(); ctx.rect(sx - sw / 2 - 1, starsY - starSize, sw / 2 + 1, starSize * 2); ctx.clip(); ctx.fillStyle = acc; ctx.fillText('★', sx, starsY); ctx.restore(); }
+      sx += sw + gap;
+    }
 
     const q = String(quote || 'Add a client review to create a testimonial post.').trim();
     ctx.fillStyle = fg; ctx.font = font(500, story ? 56 : 50, SERIF);

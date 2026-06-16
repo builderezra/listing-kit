@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=72" />
+  <link rel="stylesheet" href="styles.css?v=73" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -29,22 +29,26 @@
       <span class="badge" title="Every output is scanned for discrimination-risk language.">⚖️ Compliance-Aware</span>
       <button type="button" class="round-btn" id="tourBtn" aria-label="Take the guided tour" title="Take the guided tour">?</button>
       <button type="button" class="round-btn" id="infoBtn" aria-label="About &amp; privacy" title="About, privacy &amp; version">i</button>
+      <button type="button" class="theme-toggle" id="paletteBtn" aria-label="Colour theme" title="Colour theme">🎨</button>
       <button type="button" class="theme-toggle" id="themeToggle" aria-label="Toggle dark mode" title="Toggle light / dark">🌙</button>
     </div>
     <div class="info-pop" id="infoPop" hidden>
       <p>Runs entirely in your browser — photos and details are never uploaded (link import fetches via public read proxies). The compliance check is decision support, not legal advice; always defer to your agency’s compliance guidance.</p>
+      <p class="muted" id="verLine"></p>
+      <button type="button" class="mini-btn" id="infoTour">▶ Take the guided tour</button>
+    </div>
+    <div class="info-pop palette-pop" id="palettePop" hidden>
       <div class="theme-pick">
         <span class="theme-pick-label">Colour theme</span>
         <div class="theme-dots" id="themeDots">
-          <button type="button" class="theme-dot" data-theme="coastal" title="Coastal" style="background:linear-gradient(135deg,#16404f 50%,#2c7a7b 50%)"></button>
-          <button type="button" class="theme-dot" data-theme="forest" title="Forest" style="background:linear-gradient(135deg,#1f4d38 50%,#2a7a4d 50%)"></button>
-          <button type="button" class="theme-dot" data-theme="plum" title="Plum" style="background:linear-gradient(135deg,#3a3056 50%,#6a50ac 50%)"></button>
-          <button type="button" class="theme-dot" data-theme="ocean" title="Ocean" style="background:linear-gradient(135deg,#1f5279 50%,#2c76a0 50%)"></button>
-          <button type="button" class="theme-dot" data-theme="charcoal" title="Charcoal &amp; brass" style="background:linear-gradient(135deg,#2c333d 50%,#8a611f 50%)"></button>
+          <button type="button" class="theme-dot" data-theme="coastal" title="Coastal"><span class="swatch" style="background:linear-gradient(135deg,#16404f 50%,#2c7a7b 50%)"></span><span class="theme-dot-name">Coastal</span></button>
+          <button type="button" class="theme-dot" data-theme="forest" title="Forest"><span class="swatch" style="background:linear-gradient(135deg,#1f4d38 50%,#2a7a4d 50%)"></span><span class="theme-dot-name">Forest</span></button>
+          <button type="button" class="theme-dot" data-theme="plum" title="Plum"><span class="swatch" style="background:linear-gradient(135deg,#3a3056 50%,#6a50ac 50%)"></span><span class="theme-dot-name">Plum</span></button>
+          <button type="button" class="theme-dot" data-theme="ocean" title="Ocean"><span class="swatch" style="background:linear-gradient(135deg,#1f5279 50%,#2c76a0 50%)"></span><span class="theme-dot-name">Ocean</span></button>
+          <button type="button" class="theme-dot" data-theme="charcoal" title="Charcoal &amp; brass"><span class="swatch" style="background:linear-gradient(135deg,#2c333d 50%,#8a611f 50%)"></span><span class="theme-dot-name">Brass</span></button>
         </div>
       </div>
-      <p class="muted" id="verLine"></p>
-      <button type="button" class="mini-btn" id="infoTour">▶ Take the guided tour</button>
+      <p class="muted palette-hint">Recolours the whole app. Use 🌙 for light / dark.</p>
     </div>
   </header>
 
@@ -642,7 +646,7 @@
               </div>
               <div class="field" style="max-width:160px">
                 <label for="tmRating">Rating</label>
-                <select id="tmRating"><option value="5">★★★★★</option><option value="4">★★★★</option><option value="3">★★★</option></select>
+                <select id="tmRating"><option value="5">★★★★★</option><option value="4.5">★★★★½</option><option value="4">★★★★</option><option value="3.5">★★★½</option><option value="3">★★★</option></select>
               </div>
             </div>
             <div id="postProspect" hidden>
@@ -1031,18 +1035,18 @@
     </div>
   </div>
 
-  <script src="generator.js?v=72"></script>
-  <script src="fairhousing.js?v=72"></script>
-  <script src="parser.js?v=72"></script>
-  <script src="importer.js?v=72"></script>
-  <script src="qr.js?v=72"></script>
-  <script src="visuals.js?v=72"></script>
-  <script src="flyer.js?v=72"></script>
-  <script src="ai.js?v=72"></script>
-  <script src="studio.js?v=72"></script>
-  <script src="tour.js?v=72"></script>
-  <script src="zip.js?v=72"></script>
-  <script src="reel.js?v=72"></script>
-  <script src="app.js?v=72"></script>
+  <script src="generator.js?v=73"></script>
+  <script src="fairhousing.js?v=73"></script>
+  <script src="parser.js?v=73"></script>
+  <script src="importer.js?v=73"></script>
+  <script src="qr.js?v=73"></script>
+  <script src="visuals.js?v=73"></script>
+  <script src="flyer.js?v=73"></script>
+  <script src="ai.js?v=73"></script>
+  <script src="studio.js?v=73"></script>
+  <script src="tour.js?v=73"></script>
+  <script src="zip.js?v=73"></script>
+  <script src="reel.js?v=73"></script>
+  <script src="app.js?v=73"></script>
 </body>
 </html>
