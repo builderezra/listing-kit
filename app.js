@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v79';
+  const APP_VERSION = 'v80';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -35,6 +35,7 @@
     templateId: 'modern',
     font: 'auto',                // headline font: auto | serif | sans
     watermark: false,            // overlay the logo on social graphics
+    headPos: {},                 // per-section headshot badge corner: { graphics, signboard, openhome, posts, flyer } → 'off'|'tl'|'tr'|'bl'|'br'
     prefs: { noEmojis: false, noHashtags: false, noExclaim: false, short: false, greeting: '', signoff: '', banned: '' },
     region: 'au',                // au | us | uk | other — drives defaults + compliance framing
   };
@@ -148,10 +149,11 @@
       const src = brand[key];
       if (src) {
         const img = new Image();
-        img.onload = () => { if (brand[key] === src) { brand[prop] = img; rerenderVisuals(); } };   // ignore a late load for a since-changed logo
+        img.onload = () => { if (brand[key] === src) { brand[prop] = img; rerenderVisuals(); if (key === 'headshot') syncHeadControls(); } };   // ignore a late load for a since-changed logo
         img.src = src;
       }
     });
+    syncHeadControls();
   };
 
   const bindBrandField = (id, key) => {
@@ -738,8 +740,49 @@
       heroFilter: photos[heroIndex] ? filterCSS(photos[heroIndex].filter) : '',
       photos: orderedPhotos(),
       stamp,
+      headPos: headPosOf('graphics'),   // headshot badge on the main graphics + carousel cover
       raw: d,
     };
+  };
+
+  // per-section headshot badge: corner for each section ('off' | tl/tr/bl/br).
+  // the flyer already places the headshot in its agent block, so it defaults ON.
+  const HEAD_DEFAULT = { flyer: 'on' };
+  const headPosOf = (key) => (brand.headPos && brand.headPos[key]) || HEAD_DEFAULT[key] || 'off';
+  // stamp the headshot badge onto a finished output canvas (for outputs render() doesn't cover)
+  const stampHead = (canvas, key) => {
+    const pos = headPosOf(key);
+    if (pos === 'off' || !canvas || !brand.headImg || !brand.headImg.width) return;
+    try { Visuals.agentBadge(canvas.getContext('2d'), canvas.width, canvas.height, brand, pos); } catch (e) {}
+  };
+  // per-section headshot controls (🙂 Off / corners), shown on every visual tab
+  const HEAD_RERENDER = {
+    graphics: () => { if (outputs) renderGraphics(); },
+    signboard: () => { if (outputs) renderSignboard(); },
+    openhome: () => renderOpenHome(),
+    posts: () => renderTestimonial(),
+    flyer: () => { if (outputs) renderFlyer(); },
+  };
+  const syncHeadControls = () => {
+    const hasHead = !!(brand.headImg && brand.headImg.width);
+    document.querySelectorAll('.head-ctl').forEach((ctl) => {
+      const pos = headPosOf(ctl.dataset.headkey);
+      ctl.querySelectorAll('.head-ctl-seg button').forEach((b) => b.classList.toggle('active', b.dataset.pos === pos));
+      const hint = ctl.querySelector('.head-ctl-hint'); if (hint) hint.hidden = hasHead;
+      const seg = ctl.querySelector('.head-ctl-seg'); if (seg) seg.style.opacity = hasHead ? '1' : '0.55';
+    });
+  };
+  const wireHeadControls = () => {
+    document.querySelectorAll('.head-ctl').forEach((ctl) => {
+      const key = ctl.dataset.headkey;
+      ctl.querySelectorAll('.head-ctl-seg button').forEach((b) => b.addEventListener('click', () => {
+        if (!brand.headPos) brand.headPos = {};
+        brand.headPos[key] = b.dataset.pos;
+        saveBrand(); syncHeadControls();
+        const fn = HEAD_RERENDER[key]; if (fn) fn();
+      }));
+    });
+    syncHeadControls();
   };
 
   // ---------------- graphics tab ----------------
@@ -799,7 +842,7 @@
 
     addSlide('1 · Cover', (cv) => Visuals.render(brand.templateId, 'square', cv, d), null, 'cover');
     slides.forEach((p, i) =>
-      addSlide(`${i + 2} · Photo`, (cv) => Visuals.featureSlide(cv, { photo: p, caption: p._caption || '', brand, idx: i + 1, total }), p, 'photo', { idx: i + 1, total }));
+      addSlide(`${i + 2} · Photo`, (cv) => { Visuals.featureSlide(cv, { photo: p, caption: p._caption || '', brand, idx: i + 1, total }); stampHead(cv, 'graphics'); }, p, 'photo', { idx: i + 1, total }));
     addSlide(`${total} · CTA`, (cv) => Visuals.ctaSlide(cv, { brand, address: d.address, badgeText: d.badgeText, ohLine: d.ohLine }), null, 'cta');
   };
 
@@ -952,21 +995,21 @@
         let n = 0;
         await addAsset(`carousel/${String(++n).padStart(2, '0')}-cover.png`, (cv) => Visuals.render(brand.templateId, 'square', cv, d));
         for (let i = 0; i < carPhotos.length; i++) {
-          await addAsset(`carousel/${String(++n).padStart(2, '0')}-photo.png`, (cv) => Visuals.featureSlide(cv, { photo: carPhotos[i], caption: carPhotos[i]._caption || '', brand, idx: i + 1, total }));
+          await addAsset(`carousel/${String(++n).padStart(2, '0')}-photo.png`, (cv) => { Visuals.featureSlide(cv, { photo: carPhotos[i], caption: carPhotos[i]._caption || '', brand, idx: i + 1, total }); stampHead(cv, 'graphics'); });
         }
         await addAsset(`carousel/${String(++n).padStart(2, '0')}-cta.png`, (cv) => Visuals.ctaSlide(cv, { brand, address: d.address, badgeText: d.badgeText, ohLine: d.ohLine }));
       }
 
       // 3) sign board (with QR if a link is set; honours the status stamp)
       const sbStatus = d.stamp ? '' : (d.ohLine ? d.badgeText : (d.raw.mode === 'rent' ? 'FOR LEASE' : 'FOR SALE'));
-      await addAsset('signboard.png', (cv) => Visuals.signboard(cv, { brand, d, status: sbStatus, qrUrl: ($('sbUrl').value.trim() || $('importUrl').value.trim()) }));
+      await addAsset('signboard.png', (cv) => { Visuals.signboard(cv, { brand, d, status: sbStatus, qrUrl: ($('sbUrl').value.trim() || $('importUrl').value.trim()) }); stampHead(cv, 'signboard'); });
 
       // 3b) open-home post + directional sign (only when an inspection time is set)
       const hasOpen = hasOpenHome();
       if (hasOpen) {
         const when = openHomeWhen(), ohp = resolveOhPhoto();
-        for (const k of ['square', 'story']) await addAsset(`open-home/open-home-post-${k}.png`, (cv) => Visuals.openHomePost(cv, k, { brand, d, when, photo: ohp }));
-        await addAsset('open-home/directional-sign.png', (cv) => Visuals.arrowSign(cv, { brand, d, when, dir: ohDir }));
+        for (const k of ['square', 'story']) await addAsset(`open-home/open-home-post-${k}.png`, (cv) => { Visuals.openHomePost(cv, k, { brand, d, when, photo: ohp }); stampHead(cv, 'openhome'); });
+        await addAsset('open-home/directional-sign.png', (cv) => { Visuals.arrowSign(cv, { brand, d, when, dir: ohDir }); stampHead(cv, 'openhome'); });
       }
 
       // 4) print-ready flyer — self-contained (photos baked in as data URLs so it works from the zip)
@@ -1075,6 +1118,7 @@
       // the flyer has its own Highlights sidebar — drop the bullet block
       mls: outputs ? outputs.mls.split('\n\n').filter((p) => !p.startsWith('At a glance') && !p.startsWith('Features at a glance')).join('\n\n') : '',
       features: Generator.flyerFeatures(d.raw, 7),
+      showHead: headPosOf('flyer') !== 'off',
     };
   };
 
@@ -1209,7 +1253,9 @@
     renderOhPhotos();
     const opCard = $('cvOpenPost').closest('.gfx-card'); if (opCard) opCard.classList.toggle('story', ohFormat === 'story');   // cap the tall story canvas
     Visuals.openHomePost($('cvOpenPost'), ohFormat, { brand, d, when, photo: resolveOhPhoto() });
+    stampHead($('cvOpenPost'), 'openhome');
     Visuals.arrowSign($('cvOpenSign'), { brand, d, when, dir: ohDir });
+    stampHead($('cvOpenSign'), 'openhome');
     $('ohEmpty').hidden = !!(when.date || when.time);
     renderOhInvite();
   };
@@ -1230,6 +1276,7 @@
     if (!items.length) { toast('Add an open date/time (and save listings) to build a roundup'); return; }
     items.sort((a, b) => (a._key || '9999').localeCompare(b._key || '9999'));
     Visuals.opensRoundup($('cvOpenRoundup'), { brand, items });
+    stampHead($('cvOpenRoundup'), 'openhome');
     $('ohRoundupWrap').hidden = false;
     toast(`Roundup built — ${items.length} listing${items.length === 1 ? '' : 's'}`);
   };
@@ -1382,6 +1429,7 @@
     if (type === 'prospect') Visuals.prospectPost(cv, tmFormat, { brand, headline: $('psHeadline').value, sub: $('psSub').value, suburb: $('psSuburb').value.trim() });
     else if (type === 'agent') Visuals.agentPost(cv, tmFormat, { brand, tagline: $('agTagline').value.trim(), bio: $('agBio').value });
     else Visuals.testimonial(cv, tmFormat, { brand, quote: $('tmQuote').value, author: $('tmAuthor').value.trim(), role: $('tmRole').value.trim(), rating: parseFloat($('tmRating').value) || 5 });
+    if (type !== 'agent') stampHead(cv, 'posts');   // agent post already features the face
   };
   const postData = () => {
     const type = $('postType') ? $('postType').value : 'testimonial';
@@ -1416,6 +1464,7 @@
     if (!$('sbUrl').value.trim() && $('importUrl').value.trim()) $('sbUrl').value = $('importUrl').value.trim();   // prefill from the imported link
     const status = d.stamp ? '' : (d.ohLine ? d.badgeText : (d.raw.mode === 'rent' ? 'FOR LEASE' : 'FOR SALE'));
     Visuals.signboard($('cvSignboard'), { brand, d, status, qrUrl: $('sbUrl').value.trim() });
+    stampHead($('cvSignboard'), 'signboard');
   };
 
   const renderTab = (tab) => {
@@ -2402,6 +2451,7 @@
   wireLightbox();
   wireShare();
   wireSignboard();
+  wireHeadControls();
   wireEditableOutput();
   wireAI();
   wireBuyerMatch();

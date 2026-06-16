@@ -14,7 +14,7 @@ const Flyer = (() => {
   // page geometry: A4 everywhere except the US (Letter). px @ 96dpi for preview scaling.
   const pagePx = (brand) => (brand.region === 'us' ? { w: 816, h: 1056 } : { w: 794, h: 1123 });
 
-  const buildHTML = ({ d, brand, photos, mls, features, print }) => {
+  const buildHTML = ({ d, brand, photos, mls, features, print, showHead }) => {
     const isA4 = brand.region !== 'us';
     const pageSize = isA4 ? 'A4' : 'letter';
     const pageW = isA4 ? '210mm' : '8.5in';
@@ -124,7 +124,7 @@ ${print ? '<div class="printbar"><button onclick="window.print()">🖨️ Print 
   </div>
   ${strip.length ? `<div class="strip">${strip.map((p) => `<img src="${p.url}" alt="" style="filter:${p.fcss || ''}">`).join('')}${strip.length < 3 ? '<div class="ph">🏡</div>'.repeat(3 - strip.length) : ''}</div>` : ''}
   <div class="agent">
-    ${brand.headshot ? `<img class="head" src="${brand.headshot}" alt="">` : ''}
+    ${(brand.headshot && showHead !== false) ? `<img class="head" src="${brand.headshot}" alt="">` : ''}
     <div class="who">
       <b>${esc(brand.agentName || 'Your Name Here')}</b>
       <span>${esc(brand.brokerage || '')}</span>
