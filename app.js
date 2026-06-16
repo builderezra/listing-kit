@@ -7,12 +7,14 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v85';
+  const APP_VERSION = 'v86';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
+  let openGen = 0;        // bumped on every clear/open so a slow async photo decode from a superseded listing can't push into the new one
   let heroIndex = 0;
   let outputs = null;     // { mls, instagram, facebook, email }
+  const editedChannels = new Set();   // channels the user hand-edited or AI-revised — kept across side-effect regens
   let report = null;      // fair-housing scan result
   let activeTab = 'graphics';
   let mode = 'sale';      // 'sale' | 'rent' — the listing type
@@ -24,6 +26,7 @@
   let ohInviteEdited = false; // user hand-edited the invite → stop auto-rewriting it
   let reelBlob = null, reelExt = 'webm', reelURL = '';   // last rendered Reel video
   let reelCaps = null;    // AI-written on-screen captions for the reel (one per photo)
+  let carFeatSig = '';    // signature of the feature list the carousel captions were last derived from
 
   // status options per listing type
   const SALE_STATUS = [['justlisted', 'Just Listed'], ['openhouse', 'Home Open / Open House'], ['forsale', 'For Sale'], ['newprice', 'New Price'], ['sold', 'Just Sold'], ['custom', 'Custom…']];
@@ -325,6 +328,8 @@
       const url = URL.createObjectURL(f);
       const img = new Image();
       img.onload = () => { renderPhotoGrid(); rerenderVisuals(); };
+      // an image/* file with undecodable bytes would otherwise leak its blob URL and leave a dead thumbnail
+      img.onerror = () => { URL.revokeObjectURL(url); photos = photos.filter((x) => x.url !== url); renderPhotoGrid(); rerenderVisuals(); };
       img.src = url;
       photos.push({ url, img, name: f.name, inCarousel: true, filter: { b: 100, c: 100, s: 100, w: 0 } });
     });
@@ -436,6 +441,7 @@
     const [moved] = photos.splice(from, 1);
     photos.splice(to, 0, moved);
     heroIndex = Math.max(0, photos.indexOf(heroPhoto));
+    invalidateReelCaps();
     renderPhotoGrid();
     rerenderVisuals();
   };
@@ -481,6 +487,7 @@
         photos.splice(i, 1);
         heroIndex = photos.indexOf(wasHero);
         if (heroIndex < 0 || heroIndex >= photos.length) heroIndex = 0;
+        invalidateReelCaps();
         renderPhotoGrid(); rerenderVisuals();
       });
       grid.appendChild(cell);
@@ -711,10 +718,16 @@
     updateComplianceDot();
   };
 
-  const generate = (auto) => {
+  const generate = (auto, preserve) => {
     const data = readForm();
     snapshotAll(); // so Undo can revert a Reword/regenerate
+    // a side-effect regen (brand pref / open-home / mode change) must not throw away copy
+    // the user hand-edited or AI-revised; the explicit Generate/Reword buttons pass no preserve flag.
+    const kept = {};
+    if (preserve && outputs) editedChannels.forEach((ch) => { if (outputs[ch] != null) kept[ch] = outputs[ch]; });
     outputs = Generator.applyPrefs(Generator.generate(data), brand.prefs || {});
+    if (preserve) Object.keys(kept).forEach((ch) => { outputs[ch] = kept[ch]; });
+    else editedChannels.clear();
     runScan();
     $('emptyState').hidden = true;
     renderTab(activeTab);
@@ -768,14 +781,17 @@
       im.src = p.url;
       im.className = 'car-pick-img' + (p.inCarousel === false ? ' off' : '');
       im.title = p.inCarousel === false ? 'Excluded — tap to include' : 'Included — tap to exclude';
-      im.addEventListener('click', () => { p.inCarousel = p.inCarousel === false; renderCarousel(vizData()); });
+      im.addEventListener('click', () => { p.inCarousel = p.inCarousel === false; invalidateReelCaps(); renderCarousel(vizData()); });
       pickRow.appendChild(im);
     });
 
     const feats = Generator.flyerFeatures(d.raw, 8);
+    // re-derive captions when the Features field actually changes; otherwise keep them bound
+    // so toggling a photo in/out or re-rendering doesn't reshuffle the captions
+    const featSig = feats.join('|');
+    if (featSig !== carFeatSig) { carFeatSig = featSig; d.photos.forEach((p) => { delete p._caption; }); }
     const slides = d.photos.filter((p) => p.inCarousel !== false).slice(0, 6);
     const total = slides.length + 2;
-    // bind a caption to each photo ONCE so toggling/re-rendering doesn't reshuffle them
     let fi = 0;
     slides.forEach((p) => { if (p._caption == null) p._caption = feats[fi++] || ''; });
 
@@ -1019,8 +1035,11 @@
     clearTimeout(studioHintTimer);
     const opt = (arg && typeof arg === 'object') ? arg : { photoIndex: arg };
     const s = studioFields();
+    // extraPhoto: an image not in the gallery (e.g. the agent headshot featured on an open-home post)
+    // appended so the studio can feature it; onApplyPhotoAdjust's bounds guard ignores this trailing index.
+    const studioPhotos = opt.extraPhoto ? [...s.photos, opt.extraPhoto] : s.photos;
     Studio.open({
-      photos: s.photos, brand, fields: s.fields,
+      photos: studioPhotos, brand, fields: s.fields,
       startPhotoIndex: (typeof opt.photoIndex === 'number') ? opt.photoIndex : null,
       seed: opt.seed || null,
       openHome: opt.openHome || null,    // open-home reproduction data (header/date/time/address)
@@ -1237,7 +1256,7 @@
     ['ohDate', 'ohTime'].forEach((id) => {
       $(id).addEventListener('input', () => { if (activeTab === 'openhome') renderOpenHome(); saveDraft(); });
       // committing an open date/time flows "Home Open" into every other format
-      $(id).addEventListener('change', () => { if (outputs) generate(); else if (activeTab === 'openhome') renderOpenHome(); });
+      $(id).addEventListener('change', () => { if (outputs) generate(true, true); else if (activeTab === 'openhome') renderOpenHome(); });
     });
     document.querySelectorAll('#ohDirRow .dir-btn').forEach((b) => b.addEventListener('click', () => {
       ohDir = b.dataset.dir || 'right';
@@ -1269,10 +1288,16 @@
     ohCanvas.addEventListener('click', () => {
       const d = vizData(), when = openHomeWhen(), isRent = d.raw && d.raw.mode === 'rent';
       const ordered = orderedPhotos();
-      const pIdx = (ohPhoto && ohPhoto !== 'you' && ordered.indexOf(ohPhoto) >= 0) ? ordered.indexOf(ohPhoto) : 0;
+      // featuring the headshot: append it as an extra studio photo so the post reproduces with the face, not a property shot
+      const useHead = ohPhoto === 'you' && brand.headImg && brand.headImg.width;
+      const extraPhoto = useHead
+        ? { url: brand.headshot, img: brand.headImg, srcImg: brand.headImg, name: 'Headshot', inCarousel: false, filter: { b: 100, c: 100, s: 100, w: 0 }, crop: null, focus: 'center', fcss: '' }
+        : null;
+      const pIdx = useHead ? ordered.length
+        : (ohPhoto && ohPhoto !== 'you' && ordered.indexOf(ohPhoto) >= 0) ? ordered.indexOf(ohPhoto) : 0;
       openLightbox(ohCanvas, null, 1, 'openhome', {
         dlName: 'open-home',
-        editFn: () => openStudio({ seed: 'openhome', size: ohFormat, photoIndex: pIdx, openHome: { header: isRent ? 'OPEN FOR INSPECTION' : 'HOME OPEN', date: when.date, time: when.time, address: d.address } }),
+        editFn: () => openStudio({ seed: 'openhome', size: ohFormat, photoIndex: pIdx, extraPhoto, openHome: { header: isRent ? 'OPEN FOR INSPECTION' : 'HOME OPEN', date: when.date, time: when.time, address: d.address } }),
       });
     });
     // click the directional sign → zoom + edit in studio (reproduced as editable layers)
@@ -1312,6 +1337,9 @@
     box.hidden = false; box.innerHTML = '<span class="hint">AI captions (used on Create reel):</span> ';
     reelCaps.forEach((c) => { const s = document.createElement('span'); s.className = 'reel-cap'; s.textContent = c; box.appendChild(s); });
   };
+  // AI reel captions are positional (one per included photo) — drop them whenever the
+  // included set or its order changes, so makeReel falls back to per-photo captions instead of misaligned ones
+  const invalidateReelCaps = () => { if (reelCaps) { reelCaps = null; renderReelCaps(); } };
   const genReelCaptions = async () => {
     if (typeof AI === 'undefined' || !AI.available()) { $('brandSection').open = true; setTimeout(() => $('aiKey').focus(), 50); $('reelStatus').className = 'parse-note err'; $('reelStatus').textContent = 'Add your API key in “Your brand” to use AI captions.'; return; }
     const d = vizData();
@@ -1520,6 +1548,7 @@
     el.addEventListener('input', () => {
       if (!outputs || activeTab === 'compliance') return;
       outputs[activeTab] = el.innerText;
+      editedChannels.add(activeTab);   // sticky: survive a later side-effect regen
       updateCharcount();
       clearTimeout(rescanTimer);
       rescanTimer = setTimeout(() => {
@@ -1889,7 +1918,7 @@
     syncCustomWraps();
     clearMissingFlags();
     photos.forEach((p) => { if (p.url.startsWith('blob:')) URL.revokeObjectURL(p.url); });
-    photos = []; heroIndex = 0;
+    photos = []; heroIndex = 0; openGen++;   // supersede any in-flight saved-listing photo loads
     renderPhotoGrid();
     document.querySelectorAll('#featureChips .chip').forEach((c) => c.classList.remove('added'));
     stamp = '';
@@ -1901,7 +1930,7 @@
     if ($('ohRoundupWrap')) $('ohRoundupWrap').hidden = true;
     // clear the open-home invite so one property's invite can't leak into the next
     ohInviteEdited = false; if ($('ohInviteText')) $('ohInviteText').value = '';
-    reelCaps = null; if ($('reelCaps')) { $('reelCaps').hidden = true; $('reelCaps').innerHTML = ''; }
+    reelCaps = null; carFeatSig = ''; if ($('reelCaps')) { $('reelCaps').hidden = true; $('reelCaps').innerHTML = ''; }
     checklist = {}; renderChecklist();
     resetReel();
     // clear the buyer-match draft so one property's outreach email can't leak into the next
@@ -1912,6 +1941,7 @@
     if ($('bmStatus')) { $('bmStatus').textContent = ''; $('bmStatus').className = 'ai-status'; }
     if ($('buyerMatch')) $('buyerMatch').open = false;
     outputs = null; report = null;
+    editedChannels.clear();   // a new property starts with no sticky hand-edits
     // a cleared listing must not let Undo/Redo resurrect the previous property's copy
     history = { mls: [], instagram: [], facebook: [], email: [] };
     redoStack = { mls: [], instagram: [], facebook: [], email: [] };
@@ -1951,21 +1981,24 @@
     cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
     return cv.toDataURL('image/jpeg', 0.85);
   };
-  const addSavedPhoto = (ph) => new Promise((res) => { const img = new Image(); img.onload = () => { photos.push({ url: ph.dataURL, img, srcImg: img, name: ph.name || 'photo', inCarousel: ph.inCarousel !== false, filter: ph.filter || { b: 100, c: 100, s: 100, w: 0 }, crop: ph.crop || null, focus: ph.focus || 'center' }); res(true); }; img.onerror = () => res(false); img.src = ph.dataURL; });
+  const addSavedPhoto = (ph, gen) => new Promise((res) => { const img = new Image(); img.onload = () => { if (gen != null && gen !== openGen) { res(false); return; } photos.push({ url: ph.dataURL, img, srcImg: img, name: ph.name || 'photo', inCarousel: ph.inCarousel !== false, filter: ph.filter || { b: 100, c: 100, s: 100, w: 0 }, crop: ph.crop || null, focus: ph.focus || 'center' }); res(true); }; img.onerror = () => res(false); img.src = ph.dataURL; });
 
   const saveCurrentListing = async () => {
     if (!$('address').value.trim() && !photos.length) { toast('Add an address or a photo first'); return; }
     const fields = {}; LISTING_FIELDS.forEach((id) => { fields[id] = $(id).value; });
-    const rec = { id: 'L' + Date.now() + Math.floor(Math.random() * 1e4), savedAt: Date.now(), title: ($('address').value.trim() || 'Untitled listing'), mode, heroIndex, fields, checklist: { ...checklist }, photos: photos.map((p) => ({ dataURL: photoSourceURL(p), name: p.name, filter: p.filter, crop: p.crop, focus: p.focus, inCarousel: p.inCarousel })).filter((p) => p.dataURL) };
+    const rec = { id: 'L' + Date.now() + Math.floor(Math.random() * 1e4), savedAt: Date.now(), title: ($('address').value.trim() || 'Untitled listing'), mode, heroIndex, stamp, fields, checklist: { ...checklist }, photos: photos.map((p) => ({ dataURL: photoSourceURL(p), name: p.name, filter: p.filter, crop: p.crop, focus: p.focus, inCarousel: p.inCarousel })).filter((p) => p.dataURL) };
     try { await libPut(rec); renderLibrary(); toast('✓ Saved to this device'); } catch (e) { toast('Couldn’t save — storage may be full or blocked'); }
   };
   const openListing = async (id) => {
     let rec; try { rec = await libGet(id); } catch (e) { return; } if (!rec) return;
     clearListing();
+    const gen = openGen;   // if another open/clear supersedes us mid-load, abandon this one
     applyMode(rec.mode || 'sale', false);
     LISTING_FIELDS.forEach((k) => { if (rec.fields[k] != null) $(k).value = rec.fields[k]; });
     syncCustomWraps();
-    for (const ph of (rec.photos || [])) await addSavedPhoto(ph);
+    setStamp(rec.stamp || '');   // restore the status sash (SOLD / UNDER OFFER / …)
+    for (const ph of (rec.photos || [])) { if (gen !== openGen) return; await addSavedPhoto(ph, gen); }
+    if (gen !== openGen) return;
     heroIndex = Math.min(Math.max(0, rec.heroIndex || 0), Math.max(0, photos.length - 1));
     syncFcss(); renderPhotoGrid(); clearMissingFlags();
     $('librarySection').open = false;
@@ -2027,9 +2060,11 @@
   let redoStack = { mls: [], instagram: [], facebook: [], email: [] };
   const pushHistory = (tab) => {
     if (!outputs || outputs[tab] == null || !history[tab]) return;
-    history[tab].push(outputs[tab]);
-    if (history[tab].length > 25) history[tab].shift();
-    if (redoStack[tab]) redoStack[tab] = [];   // a fresh change invalidates the redo trail
+    const h = history[tab];
+    if (h.length && h[h.length - 1] === outputs[tab]) return;   // unchanged since last snapshot — don't pile up dupes or wipe the redo trail on a no-op regen
+    h.push(outputs[tab]);
+    if (h.length > 25) h.shift();
+    if (redoStack[tab]) redoStack[tab] = [];   // a genuine new change invalidates the redo trail
   };
   const snapshotAll = () => { if (outputs) ['mls', 'instagram', 'facebook', 'email'].forEach(pushHistory); };
   const updateUndo = () => {
@@ -2104,26 +2139,28 @@
       aiBusy(false, 'Add your API key in “Your brand” to enable AI.', 'err');
       return;
     }
+    const ch = activeTab;   // capture at request time — the user can switch tabs during the await
     setAiButtons(true);
+    const ce = $('copytext'); const prevCE = ce.contentEditable; ce.contentEditable = 'false';   // lock the pane so a mid-run hand-edit can't be silently clobbered
     const busy = startBusy($('aiStatus'), 'ai-status', mode === 'polish' ? 'Polishing' : 'Revising', '5–20s');
     try {
-      const opts = { channelLabel: AI_CHANNEL[activeTab], currentText: outputs[activeTab], facts: aiFacts(), style: aiStyle() };
+      const opts = { channelLabel: AI_CHANNEL[ch], currentText: outputs[ch], facts: aiFacts(), style: aiStyle() };
       const text = mode === 'polish' ? await AI.polish(opts) : await AI.instruct({ ...opts, instruction });
-      if (!text) { busy.finish('No change returned — try again.', 'err'); setAiButtons(false); return; }
-      pushHistory(activeTab); // remember the before-AI version so Undo works
+      if (!text) { busy.finish('No change returned — try again.', 'err'); return; }
+      pushHistory(ch); // remember the before-AI version so Undo works
       // mechanical house-style is still enforced, and compliance re-scanned
-      const single = Generator.applyPrefs({ [activeTab]: text }, brand.prefs || {});
-      outputs[activeTab] = single[activeTab];
-      $('copytext').textContent = outputs[activeTab];
-      updateCharcount();
+      const single = Generator.applyPrefs({ [ch]: text }, brand.prefs || {});
+      outputs[ch] = single[ch];
+      editedChannels.add(ch);   // an AI revision is a deliberate edit — keep it across side-effect regens
       runScan();
-      updateUndo();
+      if (activeTab === ch) { $('copytext').textContent = outputs[ch]; updateCharcount(); updateUndo(); }   // only repaint the pane if the user is still on that channel
       busy.finish('✓ Updated with ' + AI.modelLabel() + ' · ↶ Undo to compare', 'ok');
       if (mode === 'instruct') $('aiInstruction').value = '';
     } catch (e) {
       busy.finish(AI.explain(e), 'err');
     } finally {
       setAiButtons(false);
+      ce.contentEditable = prevCE;   // restore editability
     }
   };
 
@@ -2166,6 +2203,7 @@
   // ---- buyer-match email (AI: draft personal outreach to a buyer) ----
   let bmEmail = '';
   const draftBuyerMatch = async () => {
+    if ($('bmDraft').disabled) return;   // already drafting — ignore Cmd+Enter auto-repeat / double-clicks (the textarea keeps firing keydown even when the button is disabled)
     if (!AI.available()) { $('brandSection').open = true; setTimeout(() => $('aiKey').focus(), 50); $('bmStatus').textContent = 'Add your API key in “Your brand” to enable AI.'; $('bmStatus').className = 'ai-status err'; return; }
     const req = $('bmReq').value.trim();
     if (!req) { $('bmReq').focus(); return; }
@@ -2202,12 +2240,14 @@
     const busy = startBusy($('researchStatus'), 'parse-note', 'Researching nearby amenities (web search)', '10–25s');
     try {
       const phrase = (await AI.research({ address, suburb, region: brand.region }) || '').replace(/^["'“]+|["'”]+$/g, '').trim();
+      // the user may have cleared / imported / opened a different listing while we were waiting — don't write a stale result into it
+      if ($('address').value.trim() !== address || $('city').value.trim() !== suburb) { busy.finish('Listing changed — research discarded.', 'err'); return; }
       if (phrase) {
         $('neighborhood').value = phrase;
         $('neighborhood').classList.remove('missing');
         saveDraft();
         busy.finish('✓ Filled — check it reads right, then Generate (or Reword).', 'ok');
-        if (outputs) generate();
+        if (outputs) generate(true, true);
       } else busy.finish('Nothing found — fill it in manually.', 'err');
     } catch (e) {
       busy.finish(AI.explain(e), 'err');
@@ -2231,6 +2271,7 @@
     if (!outputs || !(history[activeTab] && history[activeTab].length)) return;
     redoStack[activeTab].push(outputs[activeTab]);   // remember current so Redo can restore it
     outputs[activeTab] = history[activeTab].pop();
+    editedChannels.add(activeTab);
     $('copytext').textContent = outputs[activeTab];
     updateCharcount(); runScan(); updateUndo();
     aiBusy(false, '↩ Reverted to the previous version', 'ok');
@@ -2239,6 +2280,7 @@
     if (!outputs || !(redoStack[activeTab] && redoStack[activeTab].length)) return;
     history[activeTab].push(outputs[activeTab]);
     outputs[activeTab] = redoStack[activeTab].pop();
+    editedChannels.add(activeTab);
     $('copytext').textContent = outputs[activeTab];
     updateCharcount(); runScan(); updateUndo();
     aiBusy(false, '↪ Redid the change', 'ok');
@@ -2346,13 +2388,13 @@
   // custom badge/type text also flows through the written copy — refresh it
   // once the agent finishes typing (change = on blur)
   ['badgeCustom', 'typeCustom'].forEach((id) =>
-    $(id).addEventListener('change', () => { if (outputs) generate(); }));
+    $(id).addEventListener('change', () => { if (outputs) generate(true, true); }));
   wireCustomToggles();
   document.querySelectorAll('.mode-btn').forEach((b) => b.addEventListener('click', () => {
     if (b.dataset.mode === mode) return;
     applyMode(b.dataset.mode, false);
     saveDraft();
-    if (outputs) generate(); else rerenderVisuals();
+    if (outputs) generate(true, true); else rerenderVisuals();
   }));
   ['available', 'bond', 'leaseTerm', 'leaseTermCustom', 'furnished', 'pets', 'rentPeriod', 'rentPeriodCustom'].forEach((id) =>
     $(id).addEventListener('input', () => { rerenderVisuals(); saveDraft(); }));
@@ -2370,12 +2412,12 @@
     $(id).addEventListener('change', () => {
       brand.prefs[key] = $(id).checked;
       saveBrand();
-      if (outputs) generate();
+      if (outputs) generate(true, true);
     });
   });
   [['prefGreeting', 'greeting'], ['prefSignoff', 'signoff'], ['prefBanned', 'banned']].forEach(([id, key]) => {
     $(id).addEventListener('input', () => { brand.prefs[key] = $(id).value; saveBrand(); });
-    $(id).addEventListener('change', () => { if (outputs) generate(); });
+    $(id).addEventListener('change', () => { if (outputs) generate(true, true); });
   });
   bindBrandField('brandPrimary', 'primary');
   bindBrandField('brandAccent', 'accent');

@@ -14,11 +14,12 @@ const Parser = (() => {
   const numVal = (raw, mult) => {
     const s = String(raw).trim();
     if (mult) {
+      // "1,250m" / "1.250m" / "1 250m" are grouped thousands, not "1.25 million" — a misparse:
+      // treat as a plain grouped integer and ignore the multiplier (check on the RAW digits).
+      if (/^\d{1,3}([ .,]\d{3})+$/.test(s.replace(/\s/g, ' '))) { const d = s.replace(/[^\d]/g, ''); return d ? parseInt(d, 10) : null; }
       const f = parseFloat(s.replace(/\s/g, '').replace(',', '.'));
       if (!isFinite(f)) return null;
-      const v = Math.round(f * mult);
-      // "£1.2m" is fine; "£1,250m" is a misparse — ignore the multiplier then.
-      return f < 1000 ? v : Math.round(f);
+      return Math.round(f * mult);
     }
     const digits = s.replace(/[^\d]/g, '');
     return digits ? parseInt(digits, 10) : null;
@@ -91,7 +92,7 @@ const Parser = (() => {
       }
     }
     if (!out.price) {
-      const g = /(?:price|asking|guide(?:\s+price)?|offers(?:\s+(?:over|around|from|in\s+excess\s+of))?|listed\s+(?:at|for)|from)\s*:?\s*\$?\s?([\d][\d\s.,]{4,})/gi;
+      const g = new RegExp(`(?:price|asking|guide(?:\\s+price)?|offers(?:\\s+(?:over|around|from|in\\s+excess\\s+of))?|listed\\s+(?:at|for)|from)\\s*:?\\s*\\$?\\s?${NUM}`, 'gi');
       let m;
       while ((m = g.exec(text)) !== null) {
         if (m.index >= PRICE_WINDOW) break;

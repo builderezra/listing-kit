@@ -296,7 +296,9 @@ const Studio = (() => {
         const p = ctxData.photos[L.photoIndex]; img = p && p.img;
         const proc = img ? processed(img, L.filter, L) : null;   // advanced ops baked (cached)
         draw = proc || img;
-        if (!proc) useFilter = photoFilterCSS(L.filter);
+        // mirror drawBackground: a reproduction inset has no own filter, so fall back to the source
+        // photo's live basic adjustments (p.fcss) instead of dropping them (would mismatch the export)
+        if (!proc) useFilter = L.filter ? photoFilterCSS(L.filter) : ((p && p.fcss) || photoFilterCSS(p && p.filter));
       } else { img = L.src === 'logo' ? ctxData.brand.logoImg : L.src === 'head' ? ctxData.brand.headImg : (L.imgData ? getDataImg(L.imgData) : null); draw = img; }
       if (!img || !img.width) { ctx2d.restore(); L._c = { cx, cy, w: 0, h: 0, rot: L.rot || 0, pad: 0 }; return; }
       if (useFilter) { try { ctx2d.filter = useFilter; } catch (e) {} }
@@ -546,7 +548,7 @@ const Studio = (() => {
     }
     return null;
   };
-  const sizeOf = (L) => (L.type === 'text' || L.type === 'badge') ? L.size : (L.type === 'rect' ? L.hf : L.wf);
+  const sizeOf = (L) => (L.type === 'text' || L.type === 'badge' || L.type === 'statsstrip') ? L.size : (L.type === 'rect' ? L.hf : L.wf);
   let pinch = null;
   const touchSpread = (e) => { const a = e.touches[0], b = e.touches[1]; return Math.hypot(a.clientX - b.clientX, a.clientY - b.clientY); };
   const onDown = (e) => {
@@ -624,7 +626,7 @@ const Studio = (() => {
     const L = layers.find((x) => x.id === drag.id); if (!L) return;
     if (drag.resize) {
       const factor = Math.hypot(p.x - L._c.cx, p.y - L._c.cy) / drag.startDist;
-      if (L.type === 'text' || L.type === 'badge') L.size = Math.max(12, Math.round(drag.startSize * factor));
+      if (L.type === 'text' || L.type === 'badge' || L.type === 'statsstrip') L.size = Math.max(12, Math.round(drag.startSize * factor));
       else if (L.type === 'rect') {
         L.hf = Math.min(2, Math.max(0.008, drag.startHf * factor));
         if (L.shape !== 'rect') L.wf = Math.min(2, Math.max(0.02, drag.startWf * factor));   // ellipse/triangle/star/etc keep aspect
@@ -1263,22 +1265,24 @@ const Studio = (() => {
 
     const caption = slide.caption || '';
     if (caption) {
-      // replicate wrapText(caption, W-128=952, max 2 lines) to find line count + widest line
+      // mirror visuals.wrapText(caption, 952, 2) EXACTLY — incl. the ellipsis on truncation —
+      // then lock the layer to those lines (wrapf:0) so the studio can never add a 3rd line
+      // that overflows into the footer (the original passed the full caption + wrapf, which re-wrapped).
       ctx2d.font = `700 46px ${capFont === 'serif' ? SERIF : SANS}`;
-      const words = String(caption).split(/\s+/);
-      let line = '', lines = [];
+      const words = String(caption).split(/\s+/).filter(Boolean);
+      const lines = []; let line = '';
       for (const wd of words) {
-        const t = line ? line + ' ' + wd : wd;
-        if (ctx2d.measureText(t).width > 952 && line) { lines.push(line); line = wd; if (lines.length === 2) break; }
-        else line = t;
+        const tryLine = line ? line + ' ' + wd : wd;
+        if (ctx2d.measureText(tryLine).width <= 952 || !line) line = tryLine;
+        else { lines.push(line); line = wd; if (lines.length === 2) break; }
       }
       if (lines.length < 2 && line) lines.push(line);
-      const nLines = Math.max(1, Math.min(2, lines.length));
+      else if (line && lines.length === 2) lines[1] = lines[1].replace(/\s+\S*$/, '') + '…';
+      const nLines = Math.max(1, lines.length);
       let textW = 0; lines.forEach((l) => { textW = Math.max(textW, ctx2d.measureText(l).width); });
       const firstBaseline = 1080 - 96 - (nLines - 1) * 58;   // visuals: y = H-96-(lines-1)*58
-      // block centre keeps the codebase's baseline→centre convention (size*0.35) per line
       const blockCentreY = firstBaseline + (nLines - 1) * 29 - 46 * 0.35;
-      push({ type: 'text', text: caption, size: 46, weight: 700, font: capFont, color: '#ffffff', align: 'left', wrapf: 952 / W, lineh: 58 / 46, xf: (64 + Math.min(textW, 952) / 2) / W, yf: blockCentreY / H });
+      push({ type: 'text', text: lines.join('\n'), size: 46, weight: 700, font: capFont, color: '#ffffff', align: 'left', wrapf: 0, lineh: 58 / 46, xf: (64 + Math.min(textW, 952) / 2) / W, yf: blockCentreY / H });
       // accent tick: 56×5 bar at (64, firstBaseline-58)
       push({ type: 'rect', shape: 'rect', color: 'accent', wf: 56 / W, hf: 5 / H, xf: (64 + 28) / W, yf: ((firstBaseline - 58) + 2.5) / H, radius: 0, locked: true });
     }
@@ -1720,14 +1724,17 @@ const Studio = (() => {
   // ---- work-in-progress autosave / restore ----------------------------------
   const WIP_LS = 'lk_studio_wip';
   const addrKey = () => (ctxData.fields.address || ctxData.fields.price || '').trim();
-  const autosave = () => { try { localStorage.setItem(WIP_LS, JSON.stringify({ addr: addrKey(), size: sizeKey, bg: cleanBg(bg), layers: clean(), at: 1 })); } catch (e) {} };
+  const autosave = () => {
+    if (pendingWip && $('stRestore') && !$('stRestore').hidden) { $('stRestore').hidden = true; pendingWip = null; }   // the design has diverged — the prior-session offer is now stale
+    try { localStorage.setItem(WIP_LS, JSON.stringify({ addr: addrKey(), size: sizeKey, bg: cleanBg(bg), layers: clean(), at: 1 })); } catch (e) {}
+  };
   const loadWip = () => { try { return JSON.parse(localStorage.getItem(WIP_LS) || 'null'); } catch (e) { return null; } };
   const restoreWip = (wip) => {
     sizeKey = SIZES[wip.size] ? wip.size : 'square';
     document.querySelectorAll('#stSizes button').forEach((x) => x.classList.toggle('active', x.dataset.size === sizeKey));
     bg = (wip.bg && wip.bg.type === 'photo' && ctxData.photos.length) ? wip.bg : (wip.bg || { type: 'color' });
     layers = (wip.layers || []).map((L) => { const n = { ...L }; delete n._c; uid = Math.max(uid, (n.id || 0) + 1); return n; });
-    selId = null; $('stRestore').hidden = true;
+    selId = null; rebuiltFrom = null; inRebuild = false; $('stRestore').hidden = true;   // detach from the seeded template so a later size-change can't rebuild over the restored design
     renderBgPicker(); render(); syncPanel(); renderLayersPanel(); resetHistory(); dirty = false;
   };
 
@@ -1868,8 +1875,8 @@ const Studio = (() => {
       render(); syncPanel(); renderLayersPanel(); revealPhotoControls();
     });
     $('stHelp').addEventListener('click', () => $('stCheats').hidden = !$('stCheats').hidden);
-    $('stRestoreBtn').addEventListener('click', () => { const w = loadWip(); if (w) restoreWip(w); });
-    $('stRestoreNo').addEventListener('click', () => { $('stRestore').hidden = true; });
+    $('stRestoreBtn').addEventListener('click', () => { if (pendingWip) { restoreWip(pendingWip); pendingWip = null; } });
+    $('stRestoreNo').addEventListener('click', () => { $('stRestore').hidden = true; pendingWip = null; });
     $('stTplSave').addEventListener('click', () => { const name = ($('stTplName').value || '').trim(); if (!name) { $('stTplName').focus(); return; } saveTemplate(name); $('stTplName').value = ''; });
     $('stTplName').addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); $('stTplSave').click(); } });
 
@@ -1914,6 +1921,7 @@ const Studio = (() => {
   };
 
   let lastFocus = null;
+  let pendingWip = null;   // the prior session captured at open() — used by the Restore button so a later edit can't swap it for the current autosave
   const open = (data, startSize) => {
     wire();
     ctxData = data;
@@ -1961,6 +1969,7 @@ const Studio = (() => {
     resetAi();
     // offer to restore the previous unsaved session if it's the same listing
     $('stRestore').hidden = !(wip && wip.layers && wip.layers.length && wip.addr === addrKey());
+    pendingWip = $('stRestore').hidden ? null : wip;   // remember THIS session so a later edit (which overwrites autosave) can't be restored by mistake
     $('studio').hidden = false;
     document.body.style.overflow = 'hidden';
     lastFocus = document.activeElement;

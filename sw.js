@@ -1,7 +1,7 @@
 /* Listing Kit — service worker. Network-first with cache fallback: you always
  * get the newest version when online, and the app still works offline / as an
  * installed home-screen app for in-the-field or interview demos. */
-const CACHE = 'listing-kit-v85';
+const CACHE = 'listing-kit-v86';
 const ASSETS = [
   './', './index.html', './styles.css',
   './app.js', './generator.js', './fairhousing.js',
@@ -28,8 +28,12 @@ self.addEventListener('fetch', (e) => {
     // no-cache: revalidate with the server so deploys show up immediately
     fetch(e.request, { cache: 'no-cache' })
       .then((res) => {
-        const copy = res.clone();
-        caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+        // only persist a genuinely good same-origin response — never cache a 404/500
+        // or an HTML error/maintenance page returned in place of a real asset
+        if (res && res.ok && res.type === 'basic') {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+        }
         return res;
       })
       .catch(() => caches.match(e.request, { ignoreSearch: true }).then((hit) => hit || caches.match('./index.html')))
