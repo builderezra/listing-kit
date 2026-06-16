@@ -1314,6 +1314,72 @@ const Studio = (() => {
     layers = out; selId = null; bgEdit = false; rebuiltFrom = null; renderBgPicker(); commit(); inRebuild = false;
   };
 
+  // reproduce a social post (testimonial / prospect / agent) as editable layers —
+  // mirrors visuals.testimonial / prospectPost / agentPost (visuals.js:738+)
+  const buildPost = (slide) => {
+    inRebuild = true;
+    const W = SIZES[sizeKey][0], H = SIZES[sizeKey][1], story = sizeKey === 'story';
+    const b = ctxData.brand, p = ctxData.post || {};
+    const prim = b.primary, fg = Visuals.onColor(prim);
+    const serif = b.font === 'serif', sf = serif ? 'serif' : 'sans';
+    const out = [];
+    const push = (o) => { out.push({ id: uid++, opacity: 1, rot: 0, ...o }); return out[out.length - 1]; };
+    // single-line centred text at baseline baseY
+    const ctr = (t, baseY, size, o = {}) => push({ type: 'text', text: String(t), size, weight: o.weight || 400, font: o.font || 'sans', color: o.color || fg, align: 'center', tracking: o.tracking || 0, opacity: o.opacity == null ? 1 : o.opacity, xf: 0.5, yf: (baseY - size * 0.35) / H });
+    // count wrap lines the way visuals.wrapText does (greedy, capped) so we can anchor the block
+    const wrapCount = (text, size, fam, weight, maxWpx, maxLines) => {
+      ctx2d.font = `${weight} ${size}px ${fam === 'serif' ? SERIF : SANS}`;
+      const words = String(text).split(/\s+/).filter(Boolean); let line = '', n = 0;
+      for (const w of words) { const t = line ? line + ' ' + w : w; if (ctx2d.measureText(t).width > maxWpx && line) { n++; line = w; if (n >= maxLines) return maxLines; } else line = t; }
+      if (line) n++; return Math.max(1, Math.min(maxLines, n));
+    };
+    // wrapped centred block whose FIRST line baseline sits at topY (matches visuals' top-down draw)
+    const wrapBlock = (text, topY, size, lh, maxWpx, maxLines, o = {}) => {
+      const n = wrapCount(text, size, o.font || 'sans', o.weight || 400, maxWpx, maxLines);
+      const centre = topY + (n - 1) * lh / 2;
+      push({ type: 'text', text: String(text), size, weight: o.weight || 400, font: o.font || 'sans', color: o.color || fg, align: 'center', opacity: o.opacity == null ? 1 : o.opacity, wrapf: maxWpx / W, lineh: lh / size, xf: 0.5, yf: (centre - size * 0.35) / H });
+      return topY + (n - 1) * lh;   // last-line baseline, for placing whatever follows
+    };
+
+    if (p.type === 'agent') {
+      bg = { type: 'gradient', c1: Visuals.shade(prim, 16), c2: Visuals.shade(prim, -34), angle: 90 };
+      const dia = story ? 320 : 280; let y = story ? 430 : 340;
+      if (b.headImg && b.headImg.width) push({ type: 'image', src: 'head', shape: 'circle', wf: dia / W, xf: 0.5, yf: y / H });
+      else push({ type: 'rect', shape: 'ellipse', noFill: true, stroke: 'accent', strokeWf: 4 / W, color: 'accent', wf: dia / W, hf: dia / H, xf: 0.5, yf: y / H });
+      y += dia / 2 + (story ? 110 : 96);
+      ctr('MEET YOUR AGENT', y - (story ? 64 : 56), story ? 30 : 27, { weight: 700, font: sf, color: 'accent', tracking: 5 });
+      ctr(b.agentName || 'Your Name Here', y, story ? 72 : 62, { weight: 700, font: sf });
+      y += story ? 56 : 50; ctr(p.tagline || ((b.brokerage ? b.brokerage + ' · ' : '') + 'Your local property specialist'), y, story ? 36 : 32, { color: fg, opacity: 0.85 });
+      if (p.bio) { y += story ? 80 : 70; wrapBlock(p.bio, y, story ? 34 : 30, story ? 50 : 44, W - 220, story ? 5 : 3, { color: fg, opacity: 0.9 }); }
+      const contact = [b.phone, b.email].filter(Boolean).join('   ·   ');
+      if (contact) ctr(contact, H - (story ? 96 : 70), story ? 30 : 27, { weight: 600, color: 'accent' });
+    } else if (p.type === 'prospect') {
+      bg = { type: 'gradient', c1: Visuals.shade(prim, 18), c2: Visuals.shade(prim, -34), angle: 135 };
+      push({ type: 'rect', shape: 'ellipse', noFill: true, stroke: 'accent', strokeWf: 3 / W, color: 'accent', wf: 400 / W, hf: 400 / H, xf: (W - 90) / W, yf: 120 / H, opacity: 0.3, locked: true });
+      let y = story ? 560 : 430;
+      ctr((p.suburb ? p.suburb.toUpperCase() : 'YOUR AREA') + ' PROPERTY', y - (story ? 92 : 78), story ? 34 : 30, { weight: 700, font: sf, color: 'accent', tracking: 6 });
+      ctr(p.headline || 'Thinking of selling?', y, story ? 96 : 84, { weight: 700, font: sf });
+      y += story ? 90 : 78;
+      y = wrapBlock(p.sub || 'Find out what your home could be worth in today’s market — no obligation.', y, story ? 40 : 36, story ? 54 : 48, W - 220, 3, { color: fg, opacity: 0.92 });
+      push({ type: 'badge', text: 'BOOK A FREE APPRAISAL', size: story ? 32 : 28, weight: 800, color: 'accent', font: 'sans', align: 'center', tracking: 3, xf: 0.5, yf: (y + (story ? 90 : 76) + (story ? 42 : 38)) / H });
+      const foot = [b.agentName, b.phone].filter(Boolean).join('   ·   ');
+      if (foot) ctr(foot, H - (story ? 96 : 70), story ? 30 : 27, { weight: 600, color: fg, opacity: 0.9 });
+    } else {   // testimonial
+      bg = { type: 'gradient', c1: Visuals.shade(prim, 14), c2: Visuals.shade(prim, -34), angle: 90 };
+      push({ type: 'rect', shape: 'rect', noFill: true, stroke: 'accent', strokeWf: 2 / W, color: 'accent', wf: (W - 84) / W, hf: (H - 84) / H, xf: 0.5, yf: 0.5, radius: 0, opacity: 0.5, locked: true });
+      push({ type: 'text', text: '“', size: story ? 230 : 196, weight: 800, font: 'serif', color: 'accent', align: 'center', opacity: 0.92, xf: 0.5, yf: ((story ? 380 : 312) - (story ? 230 : 196) * 0.7) / H });
+      const rt = Math.max(0.5, Math.min(5, p.rating || 5)), full = Math.floor(rt), half = rt - full >= 0.5;
+      ctr('★'.repeat(full) + (half ? '½' : ''), story ? 470 : 392, story ? 60 : 54, { color: 'accent' });
+      const qLh = story ? 76 : 66, qSize = story ? 56 : 50, qTop = story ? 600 : 480;
+      let y = wrapBlock(p.quote || 'Add a client review to create a testimonial post.', qTop, qSize, qLh, W - 200, story ? 7 : 5, { weight: 500, font: 'serif', color: fg });
+      if (p.author) { y += story ? 112 : 94; ctr('— ' + p.author, y, story ? 42 : 38, { weight: 700, font: sf, color: 'accent' }); }
+      if (p.role) { y += story ? 48 : 42; ctr(p.role, y, story ? 28 : 26, { color: fg, opacity: 0.82 }); }
+      const foot = [b.agentName, b.brokerage].filter(Boolean).join('   ·   ');
+      if (foot) ctr(foot, H - (story ? 96 : 72), story ? 30 : 27, { weight: 600, color: fg, opacity: 0.9 });
+    }
+    layers = out; selId = null; bgEdit = false; rebuiltFrom = null; renderBgPicker(); commit(); inRebuild = false;
+  };
+
   // ---- my templates (save layout, reuse on any listing) ---------------------
   const TPL_LS = 'lk_studio_templates';
   const loadTpls = () => { try { return JSON.parse(localStorage.getItem(TPL_LS) || '[]'); } catch (e) { return []; } };
@@ -1788,6 +1854,9 @@ const Studio = (() => {
     } else if (seed === 'openhome') {
       // faithfully reproduce the open-home post (photo + HOME OPEN + date/time + address)
       buildOpenHome({ photoIndex: startIdx });
+    } else if (seed === 'post') {
+      // faithfully reproduce a social post (testimonial / prospect / meet-the-agent)
+      buildPost({});
     } else {
       // cover slide / default: reproduce the brand's chosen graphic style as editable layers
       rebuildStyle(ctxData.brand.templateId || 'modern');

@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v75';
+  const APP_VERSION = 'v76';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -867,6 +867,12 @@
     });
     $('openStudio').addEventListener('click', openStudio);
     if ($('dlPack')) $('dlPack').addEventListener('click', downloadCampaignPack);
+    // click any main graphic → zoom + "Edit in Design Studio" (reproduces that size as editable layers)
+    [['cvSquare', 'square', 'instagram-post'], ['cvStory', 'story', 'story'], ['cvWide', 'wide', 'facebook']].forEach(([id, size, dl]) => {
+      const cv = $(id); if (!cv) return;
+      cv.classList.add('lb-zoom'); cv.title = 'Tap to zoom & edit in the Design Studio';
+      cv.addEventListener('click', () => openLightbox(cv, null, 1, 'cover', { dlName: dl, editFn: () => openStudio({ seed: 'cover', size, photoIndex: 0 }) }));
+    });
   };
 
   // ---------------- campaign pack (one click → every asset in one ZIP) ----------------
@@ -1000,6 +1006,7 @@
       startPhotoIndex: (typeof opt.photoIndex === 'number') ? opt.photoIndex : null,
       seed: opt.seed || null,
       openHome: opt.openHome || null,    // open-home reproduction data (header/date/time/address)
+      post: opt.post || null,            // social-post reproduction data (testimonial/prospect/agent)
       // carousel slide reproduction: the clicked slide's caption + position
       caption: opt.caption || null,
       idx: (typeof opt.idx === 'number') ? opt.idx : null,
@@ -1289,7 +1296,22 @@
     else if (type === 'agent') Visuals.agentPost(cv, tmFormat, { brand, tagline: $('agTagline').value.trim(), bio: $('agBio').value });
     else Visuals.testimonial(cv, tmFormat, { brand, quote: $('tmQuote').value, author: $('tmAuthor').value.trim(), role: $('tmRole').value.trim(), rating: parseFloat($('tmRating').value) || 5 });
   };
+  const postData = () => {
+    const type = $('postType') ? $('postType').value : 'testimonial';
+    if (type === 'prospect') return { type: 'prospect', headline: $('psHeadline').value, sub: $('psSub').value, suburb: $('psSuburb').value.trim() };
+    if (type === 'agent') return { type: 'agent', tagline: $('agTagline').value.trim(), bio: $('agBio').value };
+    return { type: 'testimonial', quote: $('tmQuote').value, author: $('tmAuthor').value.trim(), role: $('tmRole').value.trim(), rating: parseFloat($('tmRating').value) || 5 };
+  };
   const wireTestimonial = () => {
+    // click the post → zoom + "Edit in Design Studio" (reproduces it as editable layers)
+    const tmCanvas = $('cvTestimonial');
+    if (tmCanvas) {
+      tmCanvas.classList.add('lb-zoom'); tmCanvas.title = 'Tap to zoom & edit in the Design Studio';
+      tmCanvas.addEventListener('click', () => openLightbox(tmCanvas, null, 1, 'post', {
+        dlName: ($('postType') ? $('postType').value : 'post') + '-post',
+        editFn: () => openStudio({ seed: 'post', size: tmFormat, post: postData() }),
+      }));
+    }
     ['tmQuote', 'tmAuthor', 'tmRole', 'psHeadline', 'psSub', 'psSuburb', 'agTagline', 'agBio'].forEach((id) => { if ($(id)) $(id).addEventListener('input', () => { if (activeTab === 'testimonial') renderTestimonial(); }); });
     ['tmRating', 'postType'].forEach((id) => { if ($(id)) $(id).addEventListener('change', () => { if (activeTab === 'testimonial') renderTestimonial(); }); });
     document.querySelectorAll('#tmFmtRow .fmt-btn').forEach((b) => b.addEventListener('click', () => {
