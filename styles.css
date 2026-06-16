@@ -156,7 +156,7 @@ body {
 .tour-nav { display: flex; gap: 6px; }
 
 /* ---------- carousel lightbox ---------- */
-.lightbox { position: fixed; inset: 0; z-index: 150; background: rgba(10,14,17,.86); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; }
+.lightbox { position: fixed; inset: 0; z-index: 150; background: rgba(10,14,17,.86); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px; overflow-y: auto; overscroll-behavior: contain; }
 .lightbox[hidden] { display: none; }
 .lightbox img { max-width: min(92vw, 720px); max-height: 76vh; border-radius: 6px; box-shadow: 0 10px 50px rgba(0,0,0,.5); }
 .lb-actions { display: flex; gap: 10px; }
@@ -475,7 +475,7 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 .tab:hover { color: var(--ink); }
 .tab.active { color: var(--navy); border-bottom-color: var(--gold); background: var(--card); }
 .compliance-tab { margin-left: auto; display: flex; align-items: center; gap: 5px; }
-.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: inline-block; }
+.dot { width: 9px; height: 9px; border-radius: 50%; background: var(--line); display: inline-block; overflow: hidden; text-indent: -9999px; white-space: nowrap; vertical-align: middle; }
 .dot.clear { background: var(--green); }
 .dot.warn { background: var(--amber); }
 .dot.alert { background: var(--red); }
@@ -839,8 +839,10 @@ body.dark .st-slider input[type=range] { background: #3a4047; }
   /* one graphic per row + bigger photo cards so the per-photo controls are tappable */
   .gfx-grid { grid-template-columns: 1fr; gap: 12px; }
   .photo-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
-  /* stack the carousel-lightbox actions full-width */
-  .lightbox { padding: 16px; }
+  /* stack the carousel-lightbox actions full-width; top-anchor + shrink the image budget
+     so a tall Story/portrait asset never pushes the Download button off the bottom */
+  .lightbox { padding: 16px; justify-content: flex-start; }
+  .lightbox img { max-height: 62vh; }
   .lb-actions { flex-direction: column; width: 100%; max-width: 320px; }
   .lb-actions .mini-btn, .lb-actions button { width: 100%; }
   /* let the AI-polish input own a full row instead of fighting the Apply button */
@@ -862,6 +864,14 @@ body.dark .st-slider input[type=range] { background: #3a4047; }
 @media (max-width: 380px) {
   .studio-stage { height: 32vh; }
   .topbar h1 { font-size: 19px; }
+}
+/* TOUCH devices only: iOS Safari auto-zooms the page when a focused field computes < 16px.
+   Scope to (hover: none) so phones/tablets get 16px (no zoom-jump) while the Mac author's
+   dense desktop layout — incl. the height-capped Design Studio side panel — keeps its 13–14.5px. */
+@media (hover: none) {
+  input, select, textarea,
+  .ai-bar input, .importrow input, .import-box textarea,
+  .cs-select, .st-row input { font-size: 16px; }
 }
 .st-row input { flex: 1; font-size: 13px; padding: 7px 9px; }
 .st-add button:disabled { opacity: .4; cursor: default; }

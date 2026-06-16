@@ -26,7 +26,7 @@ const Tour = (() => {
       text: 'Privacy, the compliance disclaimer and the version live behind this “i”. Re-run this walkthrough any time from the “?”. Happy listing!' },
   ];
 
-  let steps = [], i = 0, wired = false;
+  let steps = [], i = 0, wired = false, launcher = null;
   const target = (s) => (s && document.querySelector(s.sel)) || null;
 
   const position = (step, t) => {
@@ -75,7 +75,7 @@ const Tour = (() => {
     window.addEventListener('resize', () => { if (!$('tourOverlay').hidden) { const t = target(steps[i]); if (t) position(steps[i], t); } });
   };
 
-  const start = () => { wire(); steps = STEPS.slice(); i = 0; $('tourOverlay').hidden = false; layout(); };
-  const stop = () => { $('tourOverlay').hidden = true; };
+  const start = () => { wire(); launcher = document.activeElement; steps = STEPS.slice(); i = 0; $('tourOverlay').hidden = false; layout(); try { $('tourNext').focus(); } catch (e) {} };
+  const stop = () => { $('tourOverlay').hidden = true; if (launcher && launcher.focus) { try { launcher.focus(); } catch (e) {} } launcher = null; };
   return { start, stop };
 })();

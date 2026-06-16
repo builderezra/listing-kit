@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v87';
+  const APP_VERSION = 'v88';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -469,12 +469,15 @@
       });
       const focus = p.focus || 'center';
       const edited = (filterCSS(p.filter) || hasAdv(p.filter) || hasCrop(p.crop)) ? ' edited' : '';
-      cell.innerHTML = `<img src="${photoThumbURL(p)}" alt="" style="filter:${filterCSS(p.filter)}">` +
+      cell.innerHTML = `<img src="${photoThumbURL(p)}" alt="" role="button" tabindex="0" aria-label="${i === heroIndex ? 'Hero photo' : 'Make this the hero photo'}" style="filter:${filterCSS(p.filter)}">` +
         (i === heroIndex ? '<span class="hero-tag">★ hero</span>' : '') +
         `<button type="button" class="photo-x" title="Remove">×</button>` +
         `<button type="button" class="photo-edit${edited}" title="Edit photo (filters &amp; crop)">✎</button>` +
         `<button type="button" class="photo-focus${focus !== 'center' ? ' on' : ''}" title="Crop focus: ${focus} (click to change)">${FOCUS_ICON[focus]}</button>`;
-      cell.querySelector('img').addEventListener('click', () => { heroIndex = i; renderPhotoGrid(); rerenderVisuals(); });
+      const makeHero = () => { heroIndex = i; renderPhotoGrid(); rerenderVisuals(); };
+      const heroImg = cell.querySelector('img');
+      heroImg.addEventListener('click', makeHero);
+      heroImg.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); makeHero(); } });
       cell.querySelector('.photo-edit').addEventListener('click', () => openPhotoEditor(i));
       cell.querySelector('.photo-focus').addEventListener('click', () => {
         p.focus = FOCUS_ORDER[(FOCUS_ORDER.indexOf(focus) + 1) % FOCUS_ORDER.length];
@@ -502,7 +505,7 @@
     warm: { b: 104, c: 102, s: 110, w: 38 },
     mono: { b: 102, c: 106, s: 0, w: 0 },
   };
-  let editIdx = -1, peCropMode = false, peCropFrac = { x: 0, y: 0, w: 1, h: 1 }, peCropDrag = null;
+  let editIdx = -1, peCropMode = false, peCropFrac = { x: 0, y: 0, w: 1, h: 1 }, peCropDrag = null, peReturnFocus = null;
   // small cached thumbnail that reflects crop + advanced (for the photo grid)
   const photoThumbURL = (p) => {
     if (!hasCrop(p.crop) && !hasAdv(p.filter)) return p.url;
@@ -606,12 +609,22 @@
     peCropMode = false;
     $('peCropLayer').hidden = true; $('peCropBar').hidden = true; $('peBody').hidden = false; $('peCropBtn').classList.remove('active');
     peSyncControls();
+    peReturnFocus = document.activeElement;               // restore focus to the ✎ button on close
     $('photoEditor').hidden = false;
     document.body.style.overflow = 'hidden';
+    setTimeout(() => { try { $('peClose').focus(); } catch (e) {} }, 30);   // move focus into the modal
     requestAnimationFrame(peRenderPreview);              // size canvas after the modal is laid out
   };
-  const closePhotoEditor = () => { if (peCropMode) peExitCrop(false); $('photoEditor').hidden = true; document.body.style.overflow = ''; renderPhotoGrid(); rerenderVisuals(); };
+  const closePhotoEditor = () => {
+    if (peCropMode) peExitCrop(false);
+    $('photoEditor').hidden = true; document.body.style.overflow = '';
+    if (peReturnFocus && peReturnFocus.focus) { try { peReturnFocus.focus(); } catch (e) {} }
+    peReturnFocus = null;
+    renderPhotoGrid(); rerenderVisuals();
+  };
   const wirePhotoEditor = () => {
+    // Escape closes the photo editor (crop mode cancels first) — universal modal-dismiss gesture
+    window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !$('photoEditor').hidden) { if (peCropMode) peExitCrop(false); else closePhotoEditor(); } });
     [['peB', 'b'], ['peC', 'c'], ['peS', 's'], ['peW', 'w'], ['peHi', 'highlights'], ['peSh', 'shadows'], ['peTint', 'tint'], ['peSharp', 'sharpness'], ['peVig', 'vignette']].forEach(([id, key]) => {
       $(id).addEventListener('input', () => { const p = photos[editIdx]; if (!p) return; p.filter[key] = Number($(id).value); peRenderPreview(); peSyncControls(); });
     });
@@ -832,12 +845,21 @@
 
   // ---- carousel slide lightbox (zoom + edit) ----
   let lbState = { photo: null, n: 1, cv: null, kind: 'photo', idx: 0, total: 1, editFn: null, dlName: null };
+  let lbReturnFocus = null;
   const openLightbox = (cv, photo, n, kind, meta) => {
     lbState = { photo, n, cv, kind: kind || 'photo', idx: (meta && meta.idx) || 0, total: (meta && meta.total) || 1, editFn: (meta && meta.editFn) || null, dlName: (meta && meta.dlName) || null };
+    lbReturnFocus = document.activeElement;   // remember the slide/canvas to restore focus on close
     $('lbImg').src = cv.toDataURL('image/png');
     $('lightbox').hidden = false;
+    document.body.style.overflow = 'hidden';   // lock the page behind the overlay (no scroll-behind on mobile)
+    setTimeout(() => { try { $('lbClose').focus(); } catch (e) {} }, 30);   // move focus into the dialog
   };
-  const closeLightbox = () => { $('lightbox').hidden = true; };
+  const closeLightbox = () => {
+    $('lightbox').hidden = true;
+    document.body.style.overflow = '';
+    if (lbReturnFocus && lbReturnFocus.focus) { try { lbReturnFocus.focus(); } catch (e) {} }
+    lbReturnFocus = null;
+  };
   const wireLightbox = () => {
     $('lbClose').addEventListener('click', closeLightbox);
     $('lightbox').addEventListener('click', (e) => { if (e.target === $('lightbox')) closeLightbox(); });
@@ -988,7 +1010,7 @@
       // 4) print-ready flyer — self-contained (photos baked in as data URLs so it works from the zip)
       try {
         const fo = flyerOpts();
-        const flyerPhotos = fo.photos.map((p) => ({ url: photoToDataURL(p) || '', fcss: p.fcss || '' })).filter((p) => p.url);
+        const flyerPhotos = fo.photos.filter((p) => p.url);   // already baked dataURLs (with fcss + focus) from flyerOpts
         files.push({ name: 'flyer-print.html', data: Flyer.buildHTML({ ...fo, photos: flyerPhotos, print: true }) });
       } catch (e) {}
 
@@ -1090,7 +1112,9 @@
     return {
       d: { ...d.raw, badgeText: d.badgeText, ohLine: d.ohLine, price: d.price, sqft: Generator.num(d.raw.sqft), cars: d.cars, areaUnit: d.areaUnit },
       brand,
-      photos: orderedPhotos(),
+      // bake crop + advanced adjustments into the flyer photos (the flyer uses hero + 3 strip);
+      // p.url is the untouched original, so without this the flyer ignored crops/advanced edits
+      photos: orderedPhotos().slice(0, 4).map((p) => ({ url: photoToDataURL(p) || p.url, fcss: p.fcss || '', focus: p.focus })),
       // the flyer has its own Highlights sidebar — drop the bullet block
       mls: outputs ? outputs.mls.split('\n\n').filter((p) => !p.startsWith('At a glance') && !p.startsWith('Features at a glance')).join('\n\n') : '',
       features: Generator.flyerFeatures(d.raw, 7),
@@ -1113,14 +1137,26 @@
     wrap.style.height = Math.ceil(h * scale + 24) + 'px';
   };
 
-  // re-render whatever visual surface is active (cheap; canvases only)
-  const rerenderVisuals = () => {
+  // re-render whatever visual surface is active (canvases only)
+  const _rerenderVisualsNow = () => {
     if (activeTab === 'testimonial') renderTestimonial();   // brand content works without a generated listing
     if (!outputs) return;
     if (activeTab === 'graphics') renderGraphics();
     if (activeTab === 'flyer') renderFlyer();
     if (activeTab === 'signboard') renderSignboard();
     if (activeTab === 'openhome') renderOpenHome();
+  };
+  // coalesce bursts of input events (esp. dragging an <input type=color> or fast typing)
+  // into at most one raster per animation frame — keeps the live preview from janking on a phone.
+  // State mutation + saveBrand/saveDraft still run synchronously in the callers; only the canvas
+  // raster is deferred and de-duped.
+  let _rvPending = false, _rvTimer = null;
+  const _rvFlush = () => { if (!_rvPending) return; _rvPending = false; clearTimeout(_rvTimer); _rerenderVisualsNow(); };
+  const rerenderVisuals = () => {
+    if (_rvPending) return;
+    _rvPending = true;
+    requestAnimationFrame(_rvFlush);      // ideal coalescing on a focused tab (one raster per frame)
+    _rvTimer = setTimeout(_rvFlush, 80);  // fallback so it still flushes if rAF is suspended (hidden / headless tab)
   };
 
   // ---- status stamp (SOLD / UNDER OFFER / PRICE REDUCED / LEASED) ----
@@ -1449,7 +1485,7 @@
 
   const renderTab = (tab) => {
     activeTab = tab;
-    document.querySelectorAll('.tab').forEach((t) => t.classList.toggle('active', t.dataset.tab === tab));
+    document.querySelectorAll('.tab').forEach((t) => { const sel = t.dataset.tab === tab; t.classList.toggle('active', sel); t.setAttribute('aria-selected', sel ? 'true' : 'false'); });
     // testimonials are brand content, not tied to a generated listing — show anytime
     if (tab === 'testimonial') {
       ['graphicsContent', 'flyerContent', 'content', 'complianceContent', 'signboardContent', 'openhomeContent', 'reelContent'].forEach((id) => { if ($(id)) $(id).hidden = true; });
@@ -1648,10 +1684,14 @@
   const updateComplianceDot = () => {
     const dot = $('complianceDot');
     dot.className = 'dot';
-    if (!report) return;
-    if (report.clear) dot.classList.add('clear');
-    else if (report.counts.high) dot.classList.add('alert');
-    else dot.classList.add('warn');
+    const tab = dot.closest('.tab');
+    if (!report) { dot.textContent = ''; if (tab) tab.setAttribute('aria-label', 'Compliance check'); return; }
+    let word;
+    if (report.clear) { dot.classList.add('clear'); word = 'all clear'; }
+    else if (report.counts.high) { dot.classList.add('alert'); word = 'high-risk items to review'; }
+    else { dot.classList.add('warn'); word = 'items to review'; }
+    dot.textContent = word;   // visually hidden (CSS), but read by assistive tech + reflected in the tab label
+    if (tab) tab.setAttribute('aria-label', 'Compliance check — ' + word);
   };
 
   // ---------------- copy button ----------------
@@ -1957,7 +1997,8 @@
     redoStack = { mls: [], instagram: [], facebook: [], email: [] };
     ['graphicsContent', 'flyerContent', 'content', 'complianceContent', 'signboardContent', 'openhomeContent', 'reelContent', 'testimonialContent'].forEach((id) => { const e = $(id); if (e) e.hidden = true; });
     $('emptyState').hidden = false;
-    $('complianceDot').className = 'dot';
+    $('complianceDot').className = 'dot'; $('complianceDot').textContent = '';
+    { const ct = document.querySelector('.compliance-tab'); if (ct) ct.setAttribute('aria-label', 'Compliance check'); }
     $('parseNote').textContent = '';
     try { localStorage.removeItem(DRAFT_KEY); } catch (e) {}
   };
@@ -2532,6 +2573,12 @@
   // colour-theme popover (discoverable 🎨 button in the topbar)
   $('paletteBtn').addEventListener('click', (e) => { e.stopPropagation(); $('infoPop').hidden = true; $('palettePop').hidden = !$('palettePop').hidden; });
   document.addEventListener('click', (e) => { if (!$('palettePop').hidden && !$('palettePop').contains(e.target) && e.target !== $('paletteBtn')) $('palettePop').hidden = true; });
+  // Escape closes whichever topbar popover is open (matches the lightbox/modal Escape behaviour)
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (!$('infoPop').hidden) { $('infoPop').hidden = true; $('infoBtn').focus(); }
+    if (!$('palettePop').hidden) { $('palettePop').hidden = true; $('paletteBtn').focus(); }
+  });
 
   loadBrand();
   restoreDraft();

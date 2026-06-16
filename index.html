@@ -8,7 +8,7 @@
   <link rel="icon" href="icon.svg" />
   <link rel="manifest" href="manifest.webmanifest" />
   <meta name="theme-color" content="#0f2e3d" />
-  <link rel="stylesheet" href="styles.css?v=87" />
+  <link rel="stylesheet" href="styles.css?v=88" />
 </head>
 <body>
   <div id="loadbar" class="loadbar" hidden></div>
@@ -469,24 +469,24 @@
     <!-- ============ OUTPUT ============ -->
     <section class="panel out-panel" aria-label="Generated marketing kit">
       <nav class="tabs" id="tabs" role="tablist">
-        <button class="tab active" data-tab="graphics" role="tab">🎨 Graphics</button>
-        <button class="tab" data-tab="flyer" role="tab">📄 Flyer</button>
-        <button class="tab" data-tab="mls" role="tab">📝 Listing</button>
-        <button class="tab" data-tab="instagram" role="tab"><svg class="tabico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5"/><circle cx="12" cy="12" r="4.4"/><circle cx="17.6" cy="6.4" r="1.3" fill="currentColor" stroke="none"/></svg> Instagram</button>
-        <button class="tab" data-tab="facebook" role="tab"><svg class="tabico" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M13.5 21v-7H16l.5-3h-3V9.2c0-.8.3-1.2 1.3-1.2H16.5V5.3C16.1 5.2 15 5 13.9 5 11.6 5 10 6.4 10 9v2H7.5v3H10v7z"/></svg> Facebook</button>
-        <button class="tab" data-tab="email" role="tab">✉️ Email</button>
-        <button class="tab" data-tab="signboard" role="tab">🪧 Sign board</button>
-        <button class="tab" data-tab="openhome" role="tab">🏠 Open home</button>
-        <button class="tab" data-tab="reel" role="tab">🎬 Reel</button>
-        <button class="tab" data-tab="testimonial" role="tab">📣 Posts</button>
-        <button class="tab compliance-tab" data-tab="compliance" role="tab">⚖️ <span class="dot" id="complianceDot"></span></button>
+        <button class="tab active" data-tab="graphics" role="tab" aria-selected="true">🎨 Graphics</button>
+        <button class="tab" data-tab="flyer" role="tab" aria-selected="false">📄 Flyer</button>
+        <button class="tab" data-tab="mls" role="tab" aria-selected="false">📝 Listing</button>
+        <button class="tab" data-tab="instagram" role="tab" aria-selected="false"><svg class="tabico" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="2.5" y="2.5" width="19" height="19" rx="5.5"/><circle cx="12" cy="12" r="4.4"/><circle cx="17.6" cy="6.4" r="1.3" fill="currentColor" stroke="none"/></svg> Instagram</button>
+        <button class="tab" data-tab="facebook" role="tab" aria-selected="false"><svg class="tabico" viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true"><path d="M13.5 21v-7H16l.5-3h-3V9.2c0-.8.3-1.2 1.3-1.2H16.5V5.3C16.1 5.2 15 5 13.9 5 11.6 5 10 6.4 10 9v2H7.5v3H10v7z"/></svg> Facebook</button>
+        <button class="tab" data-tab="email" role="tab" aria-selected="false">✉️ Email</button>
+        <button class="tab" data-tab="signboard" role="tab" aria-selected="false">🪧 Sign board</button>
+        <button class="tab" data-tab="openhome" role="tab" aria-selected="false">🏠 Open home</button>
+        <button class="tab" data-tab="reel" role="tab" aria-selected="false">🎬 Reel</button>
+        <button class="tab" data-tab="testimonial" role="tab" aria-selected="false">📣 Posts</button>
+        <button class="tab compliance-tab" data-tab="compliance" role="tab" aria-selected="false" aria-label="Compliance check"><span aria-hidden="true">⚖️</span> <span class="dot" id="complianceDot" role="status"></span></button>
         <button type="button" class="studio-launch" id="studioLaunch" title="Open the full-screen design editor">✏️ Design Studio ↗</button>
       </nav>
 
       <div class="output" id="output">
         <div class="empty" id="emptyState">
           <div class="empty-art">📸</div>
-          <p>Add the listing on the left and hit <strong>Generate</strong>.</p>
+          <p>Add the listing details and hit <strong>Generate</strong>.</p>
           <p class="muted">Fastest start: paste a reiwa.com.au link into <em>Quick import</em>.</p>
         </div>
 
@@ -987,7 +987,7 @@
     </div>
   </div>
 
-  <div class="modal-overlay" id="photoEditor" hidden>
+  <div class="modal-overlay" id="photoEditor" role="dialog" aria-modal="true" aria-label="Edit photo" hidden>
     <div class="modal photo-editor">
       <div class="pe-head">
         <span class="pe-title">Edit photo</span>
@@ -1058,7 +1058,7 @@
   <div id="tourOverlay" hidden>
     <div id="tourMask"></div>
     <div id="tourHole"></div>
-    <div id="tourCard">
+    <div id="tourCard" role="dialog" aria-modal="true" aria-labelledby="tourTitle">
       <h3 id="tourTitle"></h3>
       <p id="tourText"></p>
       <div class="tour-foot">
@@ -1073,7 +1073,7 @@
   </div>
 
   <!-- carousel slide lightbox / zoom -->
-  <div id="lightbox" class="lightbox" hidden>
+  <div id="lightbox" class="lightbox" role="dialog" aria-modal="true" aria-label="Preview" hidden>
     <button type="button" class="lb-close" id="lbClose" aria-label="Close">×</button>
     <img id="lbImg" alt="Carousel slide preview" />
     <div class="lb-actions">
@@ -1083,18 +1083,18 @@
     </div>
   </div>
 
-  <script src="generator.js?v=87"></script>
-  <script src="fairhousing.js?v=87"></script>
-  <script src="parser.js?v=87"></script>
-  <script src="importer.js?v=87"></script>
-  <script src="qr.js?v=87"></script>
-  <script src="visuals.js?v=87"></script>
-  <script src="flyer.js?v=87"></script>
-  <script src="ai.js?v=87"></script>
-  <script src="studio.js?v=87"></script>
-  <script src="tour.js?v=87"></script>
-  <script src="zip.js?v=87"></script>
-  <script src="reel.js?v=87"></script>
-  <script src="app.js?v=87"></script>
+  <script src="generator.js?v=88"></script>
+  <script src="fairhousing.js?v=88"></script>
+  <script src="parser.js?v=88"></script>
+  <script src="importer.js?v=88"></script>
+  <script src="qr.js?v=88"></script>
+  <script src="visuals.js?v=88"></script>
+  <script src="flyer.js?v=88"></script>
+  <script src="ai.js?v=88"></script>
+  <script src="studio.js?v=88"></script>
+  <script src="tour.js?v=88"></script>
+  <script src="zip.js?v=88"></script>
+  <script src="reel.js?v=88"></script>
+  <script src="app.js?v=88"></script>
 </body>
 </html>

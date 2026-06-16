@@ -10,6 +10,8 @@ const Flyer = (() => {
   'use strict';
 
   const esc = (s) => String(s || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  // honour the per-photo crop-focus (top/bottom) so the flyer frames a photo like every other format
+  const objPos = (f) => f === 'top' ? 'center top' : f === 'bottom' ? 'center bottom' : 'center';
 
   // page geometry: A4 everywhere except the US (Letter). px @ 96dpi for preview scaling.
   const pagePx = (brand) => (brand.region === 'us' ? { w: 816, h: 1056 } : { w: 794, h: 1123 });
@@ -31,7 +33,7 @@ const Flyer = (() => {
       d.beds && [d.beds, d.beds == 1 ? 'Bedroom' : 'Bedrooms'],
       d.baths && [d.baths, d.baths == 1 ? 'Bath' : 'Baths'],
       d.cars && [d.cars, d.cars == 1 ? 'Car' : 'Cars'],
-      d.sqft && [d.sqft, d.areaUnit === 'sqm' ? 'm²' : 'Sq Ft'],
+      d.sqft && [d.sqft, d.areaUnit === 'sqm' ? 'm²' : d.areaUnit === 'sqft' ? 'Sq Ft' : (d.areaUnit || 'Sq Ft')],
       d.available && [d.available, 'Available'],
       d.leaseTerm && [d.leaseTerm, 'Lease'],
       d.furnished === 'furnished' && ['Yes', 'Furnished'],
@@ -39,7 +41,7 @@ const Flyer = (() => {
       d.beds && [d.beds, d.beds == 1 ? 'Bedroom' : 'Bedrooms'],
       d.baths && [d.baths, d.baths == 1 ? 'Bath' : 'Baths'],
       d.cars && [d.cars, d.cars == 1 ? 'Car' : 'Cars'],
-      d.sqft && [d.sqft, d.areaUnit === 'sqm' ? 'm²' : 'Sq Ft'],
+      d.sqft && [d.sqft, d.areaUnit === 'sqm' ? 'm²' : d.areaUnit === 'sqft' ? 'Sq Ft' : (d.areaUnit || 'Sq Ft')],
       d.lot && [d.lot, 'Lot'],
       d.year && [d.year, 'Built'],
     ]).filter(Boolean);
@@ -110,7 +112,7 @@ ${print ? '<div class="printbar"><button onclick="window.print()">🖨️ Print 
     <span class="brok">${esc(brand.brokerage || '')}</span>
   </div>
   <div class="hero">
-    ${hero ? `<img src="${hero}" alt="" style="filter:${heroFilter}">` : '<div class="noimg">🏡</div>'}
+    ${hero ? `<img src="${hero}" alt="" style="filter:${heroFilter};object-position:${objPos(photos[0] && photos[0].focus)}">` : '<div class="noimg">🏡</div>'}
     ${d.price ? `<div class="pricetag">${esc(d.price)}</div>` : ''}
   </div>
   <div class="addr">
@@ -122,7 +124,7 @@ ${print ? '<div class="printbar"><button onclick="window.print()">🖨️ Print 
     <div class="desc">${mlsParas}</div>
     ${features.length ? `<div class="side"><h3>Highlights</h3><ul>${features.map((f) => `<li>${esc(f)}</li>`).join('')}</ul></div>` : ''}
   </div>
-  ${strip.length ? `<div class="strip">${strip.map((p) => `<img src="${p.url}" alt="" style="filter:${p.fcss || ''}">`).join('')}${strip.length < 3 ? '<div class="ph">🏡</div>'.repeat(3 - strip.length) : ''}</div>` : ''}
+  ${strip.length ? `<div class="strip">${strip.map((p) => `<img src="${p.url}" alt="" style="filter:${p.fcss || ''};object-position:${objPos(p.focus)}">`).join('')}${strip.length < 3 ? '<div class="ph">🏡</div>'.repeat(3 - strip.length) : ''}</div>` : ''}
   <div class="agent">
     ${brand.headshot ? `<img class="head" src="${brand.headshot}" alt="">` : ''}
     <div class="who">
@@ -138,10 +140,18 @@ ${print ? '<div class="printbar"><button onclick="window.print()">🖨️ Print 
   };
 
   const openPrint = (opts) => {
-    const w = window.open('', '_blank');
-    if (!w) return;
-    w.document.write(buildHTML({ ...opts, print: true }));
-    w.document.close();
+    const html = buildHTML({ ...opts, print: true });
+    const url = URL.createObjectURL(new Blob([html], { type: 'text/html' }));
+    const w = window.open(url, '_blank');
+    if (w) { setTimeout(() => URL.revokeObjectURL(url), 60000); return true; }
+    // popup blocked / null (common on iOS Safari) — print via a hidden same-document iframe
+    const ifr = document.createElement('iframe');
+    ifr.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+    ifr.src = url;
+    ifr.onload = () => { try { ifr.contentWindow.focus(); ifr.contentWindow.print(); } catch (e) {} };
+    document.body.appendChild(ifr);
+    setTimeout(() => { ifr.remove(); URL.revokeObjectURL(url); }, 60000);
+    return true;
   };
 
   return { buildHTML, openPrint, pagePx };

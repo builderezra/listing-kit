@@ -433,6 +433,12 @@ const Studio = (() => {
     return [[-hw, -hh], [hw, -hh], [hw, hh], [-hw, hh]].map(([x, y]) => ({ x: c.cx + x * cos - y * sin, y: c.cy + x * sin + y * cos }));
   };
   const handleR = () => W() * (COARSE ? 0.03 : 0.018);
+  // resize handle = the box's bottom-right corner, but clamped to stay on-canvas so a layer
+  // dragged into the bottom-right corner keeps a grabbable handle (its true corner can fall off-canvas)
+  const handlePt = (c) => {
+    const r = handleR(), br = boxCorners(c)[2];
+    return { x: Math.min(W() - r, Math.max(r, br.x)), y: Math.min(H() - r, Math.max(r, br.y)) };
+  };
 
   // freehand pen state
   let drawMode = false, drawing = false, curStroke = null, drawColor = 'accent', drawWidth = 0.012;
@@ -479,7 +485,8 @@ const Studio = (() => {
         ctx2d.beginPath(); pts.forEach((p, i) => i ? ctx2d.lineTo(p.x, p.y) : ctx2d.moveTo(p.x, p.y)); ctx2d.closePath(); ctx2d.stroke();
         ctx2d.setLineDash([]);
         if (!L.locked) {
-          ctx2d.fillStyle = '#2c7a7b'; ctx2d.beginPath(); ctx2d.arc(pts[2].x, pts[2].y, handleR(), 0, Math.PI * 2); ctx2d.fill();
+          const hp = handlePt(L._c);
+          ctx2d.fillStyle = '#2c7a7b'; ctx2d.beginPath(); ctx2d.arc(hp.x, hp.y, handleR(), 0, Math.PI * 2); ctx2d.fill();
           ctx2d.strokeStyle = '#fff'; ctx2d.lineWidth = Math.max(1.5, W() / 540); ctx2d.stroke();
         }
         ctx2d.restore();
@@ -577,7 +584,7 @@ const Studio = (() => {
     const p = pt(e);
     const cur = layers.find((x) => x.id === selId);
     if (cur && cur._c && !cur.locked) {
-      const br = boxCorners(cur._c)[2];
+      const br = handlePt(cur._c);   // clamped on-canvas handle position (matches what render() draws)
       if (Math.hypot(p.x - br.x, p.y - br.y) <= handleR() * 1.9) {
         bgEdit = false;   // resizing a layer leaves background-adjust mode
         // capture the starting dimensions so resize scales from them (no drift / clamp distortion)
