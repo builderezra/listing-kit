@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v78';
+  const APP_VERSION = 'v79';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -837,10 +837,26 @@
     if (canShareFiles()) { $('lbShare').hidden = false; $('lbShare').addEventListener('click', async () => { if (lbState.cv) { const ok = await shareCanvas(lbState.cv, lbDlName(), (outputs && outputs.instagram) || ''); if (!ok) $('lbDownload').click(); } }); }
     window.addEventListener('keydown', (e) => { if (!$('lightbox').hidden && e.key === 'Escape') closeLightbox(); });
   };
+  // render the QR to a standalone PNG data-URL so it can ride into the studio as a baked layer
+  const qrDataURL = (url) => {
+    if (!url || typeof QR === 'undefined') return '';
+    try { const qs = 196, c = document.createElement('canvas'); c.width = qs; c.height = qs; const cx = c.getContext('2d'); cx.fillStyle = '#fff'; cx.fillRect(0, 0, qs, qs); QR.draw(cx, url, 0, 0, qs, '#1c2b30'); return c.toDataURL('image/png'); } catch (e) { return ''; }
+  };
+  const openSignboardStudio = () => {
+    const d = vizData();
+    const status = d.stamp || (d.ohLine ? d.badgeText : (d.raw.mode === 'rent' ? 'FOR LEASE' : 'FOR SALE'));
+    openStudio({ seed: 'signboard', size: 'signboard', photoIndex: 0, signboard: { status, ohLine: d.ohLine || '', qrData: qrDataURL($('sbUrl').value.trim()) } });
+  };
   const wireSignboard = () => {
     $('sbUrl').addEventListener('input', () => { if (activeTab === 'signboard' && outputs) renderSignboard(); saveDraft(); });
     $('sbDownload').addEventListener('click', () => { Visuals.download($('cvSignboard'), `${slug()}-signboard.png`); markDone('signboard'); });
-    $('sbStudio').addEventListener('click', () => openStudio());
+    $('sbStudio').addEventListener('click', openSignboardStudio);
+    // click the signboard → zoom + edit in studio (faithful reproduction; QR rides along as a baked layer)
+    const sbCv = $('cvSignboard');
+    if (sbCv) {
+      sbCv.classList.add('lb-zoom'); sbCv.title = 'Tap to zoom & edit in the Design Studio';
+      sbCv.addEventListener('click', () => openLightbox(sbCv, null, 1, 'signboard', { dlName: 'signboard', editFn: openSignboardStudio }));
+    }
   };
   const wireShare = () => {
     if (!canShareFiles()) return;
@@ -1009,6 +1025,8 @@
       seed: opt.seed || null,
       openHome: opt.openHome || null,    // open-home reproduction data (header/date/time/address)
       post: opt.post || null,            // social-post reproduction data (testimonial/prospect/agent)
+      sign: opt.sign || null,            // open-home directional-sign reproduction data
+      signboard: opt.signboard || null,  // for-sale signboard reproduction data (status/ohLine/qrData)
       // carousel slide reproduction: the clicked slide's caption + position
       caption: opt.caption || null,
       idx: (typeof opt.idx === 'number') ? opt.idx : null,
@@ -1255,6 +1273,16 @@
       openLightbox(ohCanvas, null, 1, 'openhome', {
         dlName: 'open-home',
         editFn: () => openStudio({ seed: 'openhome', size: ohFormat, photoIndex: pIdx, openHome: { header: isRent ? 'OPEN FOR INSPECTION' : 'HOME OPEN', date: when.date, time: when.time, address: d.address } }),
+      });
+    });
+    // click the directional sign → zoom + edit in studio (reproduced as editable layers)
+    const signCv = $('cvOpenSign');
+    signCv.classList.add('lb-zoom'); signCv.title = 'Tap to zoom & edit in the Design Studio';
+    signCv.addEventListener('click', () => {
+      const d = vizData(), when = openHomeWhen(), isRent = d.raw && d.raw.mode === 'rent';
+      openLightbox(signCv, null, 1, 'arrowsign', {
+        dlName: 'open-home-sign',
+        editFn: () => openStudio({ seed: 'arrowsign', size: 'sign', sign: { dir: ohDir, header: isRent ? 'INSPECTION' : 'HOME OPEN', date: when.date, time: when.time, address: d.address } }),
       });
     });
   };

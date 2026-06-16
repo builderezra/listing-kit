@@ -27,6 +27,15 @@ const Studio = (() => {
   const $ = (id) => document.getElementById(id);
   const SIZES = {
     square: [1080, 1080], portrait: [1080, 1350], story: [1080, 1920], wide: [1200, 630],
+    sign: [1400, 1000], signboard: [1200, 900],   // open-home directional sign + for-sale signboard
+  };
+  // cache of arbitrary baked images (e.g. the signboard QR) referenced by data-URL on a
+  // layer — survives autosave/undo because the dataURL is a plain string on the layer.
+  const _dataImgs = {};
+  const getDataImg = (url) => {
+    if (_dataImgs[url]) return _dataImgs[url];
+    const im = new Image(); im.onload = () => { try { render(); } catch (e) {} }; im.src = url;
+    _dataImgs[url] = im; return im;
   };
   const SANS = `-apple-system, 'Helvetica Neue', 'Segoe UI', Arial, sans-serif`;
   const SERIF = `Georgia, 'Times New Roman', serif`;
@@ -288,7 +297,7 @@ const Studio = (() => {
         const proc = img ? processed(img, L.filter, L) : null;   // advanced ops baked (cached)
         draw = proc || img;
         if (!proc) useFilter = photoFilterCSS(L.filter);
-      } else { img = L.src === 'logo' ? ctxData.brand.logoImg : ctxData.brand.headImg; draw = img; }
+      } else { img = L.src === 'logo' ? ctxData.brand.logoImg : L.src === 'head' ? ctxData.brand.headImg : (L.imgData ? getDataImg(L.imgData) : null); draw = img; }
       if (!img || !img.width) { ctx2d.restore(); L._c = { cx, cy, w: 0, h: 0, rot: L.rot || 0, pad: 0 }; return; }
       if (useFilter) { try { ctx2d.filter = useFilter; } catch (e) {} }
       const dw = L.wf * w;
@@ -1013,7 +1022,7 @@ const Studio = (() => {
   const rebuildStyle = (tpl) => {
     inRebuild = true;
     const W = SIZES[sizeKey][0], H = SIZES[sizeKey][1];
-    const k = (sizeKey === 'portrait') ? 'square' : sizeKey;   // portrait borrows the square layout, with taller photo metrics
+    const k = (sizeKey === 'portrait') ? 'square' : (sizeKey === 'sign' || sizeKey === 'signboard') ? 'wide' : sizeKey;   // portrait borrows square; sign/board fall back to wide if a generated style is rebuilt
     const port = sizeKey === 'portrait';
     const pIdx = (bg.type === 'photo' && ctxData.photos[bg.photoIndex]) ? bg.photoIndex : 0;   // which photo to feature (carousel edit picks this)
     const b = ctxData.brand, f = ctxData.fields;
@@ -1376,6 +1385,79 @@ const Studio = (() => {
       if (p.role) { y += story ? 48 : 42; ctr(p.role, y, story ? 28 : 26, { color: fg, opacity: 0.82 }); }
       const foot = [b.agentName, b.brokerage].filter(Boolean).join('   ·   ');
       if (foot) ctr(foot, H - (story ? 96 : 72), story ? 30 : 27, { weight: 600, color: fg, opacity: 0.9 });
+    }
+    layers = out; selId = null; bgEdit = false; rebuiltFrom = null; renderBgPicker(); commit(); inRebuild = false;
+  };
+
+  // reproduce the open-home directional sign — mirrors visuals.arrowSign (visuals.js:675)
+  const buildArrowSign = () => {
+    inRebuild = true;
+    const W = SIZES.sign[0], H = SIZES.sign[1];
+    const b = ctxData.brand, sg = ctxData.sign || {};
+    const prim = b.primary, fg = Visuals.onColor(prim), serif = b.font === 'serif', sf = serif ? 'serif' : 'sans';
+    const out = [];
+    const push = (o) => { out.push({ id: uid++, opacity: 1, rot: 0, ...o }); return out[out.length - 1]; };
+    // shrink a size so the text fits maxW (mirrors visuals.fitFont)
+    const fit = (t, maxW, maxSize, wt, fam) => { ctx2d.font = `${wt} ${maxSize}px ${FAMILY(fam)}`; const w = ctx2d.measureText(String(t)).width; return w <= maxW ? maxSize : Math.max(20, Math.floor(maxSize * maxW / w)); };
+    const ctr = (t, cxf, baseY, size, o = {}) => push({ type: 'text', text: String(t), size, weight: o.weight || 400, font: o.font || 'sans', color: o.color || fg, align: 'center', tracking: o.tracking || 0, opacity: o.opacity == null ? 1 : o.opacity, xf: cxf, yf: (baseY - size * 0.35) / H });
+    bg = { type: 'gradient', c1: Visuals.shade(prim, 14), c2: Visuals.shade(prim, -28), angle: 90 };
+    push({ type: 'rect', shape: 'rect', noFill: true, stroke: 'accent', strokeWf: 16 / W, color: 'accent', wf: (W - 60) / W, hf: (H - 60) / H, xf: 0.5, yf: 0.5, radius: 0, opacity: 0.92, locked: true });
+    const dir = (sg.dir === 'left' || sg.dir === 'up') ? sg.dir : 'right';
+    let cxf, baseY, boxW;
+    if (dir === 'up') { push({ type: 'rect', shape: 'arrow', color: 'accent', wf: 320 / W, hf: 130 / H, xf: 0.5, yf: 0.30, rot: -90 }); cxf = 0.5; baseY = H * 0.70 - 30; boxW = W - 200; }
+    else if (dir === 'left') { push({ type: 'rect', shape: 'arrow', color: 'accent', wf: 380 / W, hf: 138 / H, xf: 0.24, yf: 0.5, rot: 180 }); cxf = 0.66; baseY = H / 2 - 130; boxW = W * 0.5; }
+    else { push({ type: 'rect', shape: 'arrow', color: 'accent', wf: 380 / W, hf: 138 / H, xf: 0.76, yf: 0.5, rot: 0 }); cxf = 0.34; baseY = H / 2 - 130; boxW = W * 0.5; }
+    let y = baseY;
+    const hdr = sg.header || 'HOME OPEN';
+    ctr(hdr, cxf, y, fit(hdr, boxW, 92, 800, sf), { weight: 800, font: sf, color: 'accent', tracking: 5 });
+    const dtl = [sg.date, sg.time].filter(Boolean).join('   ');
+    if (dtl) { y += 104; ctr(dtl, cxf, y, fit(dtl, boxW, 66, 700, sf), { weight: 700, font: sf, color: fg }); }
+    if (sg.address) { y += 82; ctr(sg.address, cxf, y, fit(sg.address, boxW, 50, 600, 'sans'), { weight: 600, color: fg, opacity: 0.9 }); }
+    if (b.brokerage) ctr(b.brokerage.toUpperCase(), 0.5, H - 74, 30, { weight: 700, color: 'accent', tracking: 3 });
+    layers = out; selId = null; bgEdit = false; rebuiltFrom = null; renderBgPicker(); commit(); inRebuild = false;
+  };
+
+  // reproduce the for-sale signboard — mirrors visuals.signboard (visuals.js:915)
+  const buildSignboard = () => {
+    inRebuild = true;
+    const W = SIZES.signboard[0], H = SIZES.signboard[1];   // 1200×900
+    const b = ctxData.brand, sb = ctxData.signboard || {}, f = ctxData.fields;
+    const prim = b.primary, fg = Visuals.onColor(prim), serif = b.font === 'serif', priceF = serif ? 'serif' : 'sans';
+    const out = [];
+    const push = (o) => { out.push({ id: uid++, opacity: 1, rot: 0, ...o }); return out[out.length - 1]; };
+    const mW = (t, wt, size, fam) => { ctx2d.font = `${wt} ${size}px ${FAMILY(fam)}`; return ctx2d.measureText(String(t)).width; };
+    const leftText = (t, mpx, baseY, size, o = {}) => { const fam = o.font || 'sans', wt = o.weight || 400, wdt = mW(t, wt, size, fam); return push({ type: 'text', text: String(t), size, weight: wt, font: fam, color: o.color || fg, align: 'left', tracking: o.tracking || 0, opacity: o.opacity == null ? 1 : o.opacity, xf: (mpx + wdt / 2) / W, yf: (baseY - size * 0.35) / H }); };
+    const rightText = (t, rpx, baseY, size, o = {}) => { const fam = o.font || 'sans', wt = o.weight || 400, wdt = mW(t, wt, size, fam); return push({ type: 'text', text: String(t), size, weight: wt, font: fam, color: o.color || fg, align: 'right', opacity: o.opacity == null ? 1 : o.opacity, xf: (rpx - wdt / 2) / W, yf: (baseY - size * 0.35) / H }); };
+    bg = { type: 'color', color: '#ffffff' };
+    const barH = 132;
+    push({ type: 'rect', shape: 'rect', color: 'primary', wf: 1, hf: barH / H, xf: 0.5, yf: (barH / 2) / H, radius: 0, locked: true });
+    leftText(sb.status || 'FOR SALE', 48, barH / 2 + 56 * 0.35 + 3, 56, { weight: 800, color: fg, tracking: 3 });
+    if (b.brokerage) rightText(b.brokerage, W - 48, barH / 2 + 30 * 0.35 + 2, 30, { weight: 600, color: fg, opacity: 0.92 });
+    const photoY = barH, photoH = 356;
+    if (ctxData.photos.length) push({ type: 'photo', photoIndex: 0, shape: 'rect', wf: 1, hf: photoH / H, xf: 0.5, yf: (photoY + photoH / 2) / H, radius: 0, filter: { b: 100, c: 100, s: 100, h: 0, sep: 0, blur: 0 }, crop: { zoom: 1, ox: 0, oy: 0 } });
+    push({ type: 'rect', shape: 'rect', color: 'accent', wf: 1, hf: 8 / H, xf: 0.5, yf: (photoY + photoH + 4) / H, radius: 0, locked: true });
+    let y = photoY + photoH + 82;
+    if (sb.ohLine) {
+      const bw = mW(sb.ohLine, 800, 27, 'sans') + 27 * 1.4;
+      push({ type: 'badge', text: sb.ohLine, size: 27, weight: 800, color: 'accent', font: 'sans', align: 'center', tracking: 1.5, xf: (48 + bw / 2) / W, yf: (photoY + photoH + 18 + 25) / H });
+      y += 60;
+    }
+    if (f.price) leftText(f.price, 48, y, 78, { weight: 800, font: priceF, color: 'primary' });
+    if (f.address) { y += 58; leftText(f.address, 48, y, 36, { color: '#23333b' }); }
+    if (f.stats) { y += 50; leftText(f.stats, 48, y, 30, { weight: 600, tracking: 3, color: '#23333b' }); }
+    // agent row pinned bottom-left
+    const ay = H - 70; let ax = 48;
+    if (b.headImg && b.headImg.width) { const dd = 96; push({ type: 'image', src: 'head', shape: 'circle', wf: dd / W, xf: (48 + dd / 2) / W, yf: ay / H }); ax = 48 + dd + 20; }
+    else if (b.logoImg && b.logoImg.width) { const s = Math.min(78 / b.logoImg.height, 300 / b.logoImg.width), lw = b.logoImg.width * s; push({ type: 'image', src: 'logo', shape: 'rect', wf: lw / W, xf: (48 + lw / 2) / W, yf: ay / H }); ax = 48 + lw + 18; }
+    leftText(b.agentName || 'Your Name Here', ax, (ay - 16) + 36 * 0.35, 36, { weight: 700, color: '#1c2b30' });
+    const contact = [b.phone, b.email].filter(Boolean).join('   ·   ');
+    if (contact) leftText(contact, ax, (ay + 20) + 28 * 0.35, 28, { color: '#5d6e75' });
+    // QR (right) — baked image layer so it stays scannable; everything else editable
+    if (sb.qrData) {
+      const qs = 196, qx = W - qs - 56, qy = photoY + photoH + 44;
+      push({ type: 'rect', shape: 'rect', color: '#ffffff', stroke: prim, strokeWf: 2 / W, wf: (qs + 28) / W, hf: (qs + 28) / H, xf: (qx + qs / 2) / W, yf: (qy + qs / 2) / H, radius: 14, opacity: 1, locked: true });
+      push({ type: 'image', src: 'image', imgData: sb.qrData, shape: 'rect', wf: qs / W, xf: (qx + qs / 2) / W, yf: (qy + qs / 2) / H, locked: true });
+      push({ type: 'text', text: 'Scan for details', size: 24, weight: 700, font: 'sans', color: '#5d6e75', align: 'center', xf: (qx + qs / 2) / W, yf: ((qy + qs + 34) - 24 * 0.35) / H });
     }
     layers = out; selId = null; bgEdit = false; rebuiltFrom = null; renderBgPicker(); commit(); inRebuild = false;
   };
@@ -1857,6 +1939,10 @@ const Studio = (() => {
     } else if (seed === 'post') {
       // faithfully reproduce a social post (testimonial / prospect / meet-the-agent)
       buildPost({});
+    } else if (seed === 'arrowsign') {
+      buildArrowSign();
+    } else if (seed === 'signboard') {
+      buildSignboard();
     } else {
       // cover slide / default: reproduce the brand's chosen graphic style as editable layers
       rebuildStyle(ctxData.brand.templateId || 'modern');
