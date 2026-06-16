@@ -135,17 +135,22 @@ const Visuals = (() => {
     return w;
   };
 
-  // optional small logo watermark, top-right of a social graphic (with a soft shadow)
+  // logo watermark, top-right of a social graphic. A soft dark halo (drawn in two
+  // passes) keeps it legible on any photo — light logos on a bright sky, dark on dark.
   const watermarkLogo = (ctx, W, H, brand) => {
     const img = brand.logoImg;
     if (!img || !img.width) return;
-    const s = Math.min(W, H), pad = s * 0.05;
-    const sc = Math.min((s * 0.085) / img.height, (s * 0.32) / img.width);
-    const w = img.width * sc, h = img.height * sc;
+    const s = Math.min(W, H), pad = s * 0.055;
+    const sc = Math.min((s * 0.095) / img.height, (s * 0.34) / img.width);
+    const w = img.width * sc, h = img.height * sc, x = W - pad - w, y = pad;
     ctx.save();
-    ctx.globalAlpha = 0.92;
-    ctx.shadowColor = 'rgba(0,0,0,0.35)'; ctx.shadowBlur = s * 0.02; ctx.shadowOffsetY = s * 0.004;
-    ctx.drawImage(img, W - pad - w, pad, w, h);
+    // halo pass: the logo's silhouette blurred dark, so it lifts off bright backgrounds
+    ctx.shadowColor = 'rgba(0,0,0,0.55)'; ctx.shadowBlur = s * 0.03; ctx.shadowOffsetY = s * 0.005;
+    ctx.drawImage(img, x, y, w, h);
+    ctx.shadowBlur = s * 0.015;
+    ctx.drawImage(img, x, y, w, h);
+    ctx.shadowColor = 'transparent';
+    ctx.drawImage(img, x, y, w, h);   // crisp logo on top
     ctx.restore();
   };
 
@@ -267,6 +272,7 @@ const Visuals = (() => {
       ctx.fillText(b.agentName || 'Your Name Here', centerX, H - 124);
       const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
       if (sub) { ctx.font = font(400, 19); ctx.fillStyle = mut; ctx.fillText(sub, centerX, H - 88); }
+      if (b.headImg && b.headImg.width) circleImg(ctx, b.headImg, 44 + 60, H - 44 - 60, 112, b.accent);   // over the photo's bottom-left
       ctx.textAlign = 'left';
       return;
     }
@@ -403,7 +409,7 @@ const Visuals = (() => {
     if (sub) { ctx.font = font(400, story ? 20 : 17); ctx.fillStyle = mut; ctx.fillText(sub, lx, ay + (story ? 30 : 26)); }
     // big agent headshot filling the card's empty right side (vertically centred); else the logo
     if (b.headImg && b.headImg.width) {
-      const hd = Math.min(story ? 196 : wide ? 150 : 168, cardH - pad * 1.2);
+      const hd = Math.min(story ? 196 : wide ? 112 : 168, cardH - pad * 1.2);
       circleImg(ctx, b.headImg, cardX + cardW - pad - hd / 2, cardY + cardH / 2, hd, b.accent);
     } else if (b.logoImg && b.logoImg.width && !b.watermark) {
       logoImg(ctx, b.logoImg, cardX + cardW - pad, ay - 6, story ? 56 : 46);
@@ -429,13 +435,13 @@ const Visuals = (() => {
       ctx.strokeStyle = alpha(b.accent, 0.85); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx - 42, y - 8); ctx.lineTo(cx + 42, y - 8); ctx.stroke(); y += 44;
       if (d.address) { ctx.font = font(400, 26); ctx.fillStyle = mut; ctx.fillText(d.address, cx, y); y += 52; }
       const stats = statText(d); if (stats) { ctx.font = font(500, 20); spacing(ctx, 3); ctx.fillStyle = ink; ctx.fillText(stats, cx, y); spacing(ctx, 0); }
-      if (b.headImg && b.headImg.width) circleImg(ctx, b.headImg, cx, H - 104 - 102, 134, b.accent);
+      if (b.headImg && b.headImg.width) circleImg(ctx, b.headImg, 44 + 62, H - 44 - 62, 116, b.accent);   // over the photo's bottom-left (the right panel is too tight)
       ctx.font = font(500, 24, SERIF); ctx.fillStyle = ink; ctx.fillText(b.agentName || 'Your Name Here', cx, H - 104);
       const sub = [b.brokerage, b.phone].filter(Boolean).join('   ·   '); if (sub) { ctx.font = font(400, 18); ctx.fillStyle = mut; ctx.fillText(sub, cx, H - 74); }
       ctx.textAlign = 'left'; return;
     }
     const mm = 56, photoTop = mm + (story ? 36 : 26);
-    const photoH = (b.headImg && b.headImg.width) ? (story ? 902 : 500) : (story ? 1060 : 624);   // shrink to make room for a centred headshot
+    const photoH = (b.headImg && b.headImg.width && !story) ? 500 : (story ? 1060 : 624);   // square shrinks the photo to make room for a centred headshot
     cover(ctx, d.hero, mm, photoTop, W - mm * 2, photoH, 0, b, d.heroFocus, d.heroFilter);
     ctx.textAlign = 'center';
     let y = photoTop + photoH + (story ? 134 : 108);
@@ -446,7 +452,7 @@ const Visuals = (() => {
     if (d.address) { ctx.font = font(400, story ? 34 : 30); ctx.fillStyle = mut; ctx.fillText(d.address, W / 2, y); y += story ? 52 : 46; }
     const stats = statText(d); if (stats) { ctx.font = font(500, story ? 26 : 23); spacing(ctx, 3); ctx.fillStyle = ink; ctx.fillText(stats, W / 2, y); spacing(ctx, 0); }
     const baseY = H - (story ? 104 : 84);
-    if (b.headImg && b.headImg.width) { const hd = story ? 168 : 132; circleImg(ctx, b.headImg, W / 2, baseY - (story ? 150 : 116), hd, b.accent); }
+    if (b.headImg && b.headImg.width) { const hd = story ? 168 : 104; circleImg(ctx, b.headImg, W / 2, baseY - (story ? 150 : 92), hd, b.accent); }
     ctx.font = font(500, story ? 30 : 26, SERIF); ctx.fillStyle = ink; ctx.fillText(b.agentName || 'Your Name Here', W / 2, baseY);
     const sub = [b.brokerage, b.phone].filter(Boolean).join('   ·   '); if (sub) { ctx.font = font(400, story ? 22 : 19); ctx.fillStyle = mut; ctx.fillText(sub, W / 2, baseY + (story ? 34 : 30)); }
     ctx.textAlign = 'left';

@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v82';
+  const APP_VERSION = 'v83';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -34,7 +34,7 @@
     logo: '', headshot: '',      // dataURLs (persisted)
     templateId: 'modern',
     font: 'auto',                // headline font: auto | serif | sans
-    watermark: false,            // overlay the logo on social graphics
+    watermark: true,             // overlay the logo on social graphics (on by default — gives the logo its own spot)
     prefs: { noEmojis: false, noHashtags: false, noExclaim: false, short: false, greeting: '', signoff: '', banned: '' },
     region: 'au',                // au | us | uk | other — drives defaults + compliance framing
   };
