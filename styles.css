@@ -242,6 +242,8 @@ input[type="color"] { padding: 3px; height: 38px; cursor: pointer; }
 
 .link-btn { background: none; border: none; color: var(--accent-ink); font-size: 13px; font-weight: 600; cursor: pointer; padding: 0; }
 .link-btn:hover { text-decoration: underline; }
+/* row of AI quick-actions under a field (e.g. Location highlights: Research / Polish) */
+.field-ai-row { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 7px; }
 
 /* image pickers (logo / headshot) */
 .imgpick { display: flex; align-items: center; gap: 9px; }

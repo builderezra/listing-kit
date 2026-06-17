@@ -148,6 +148,23 @@ const AI = (() => {
     });
   };
 
+  // ---- polish the agent's OWN location-highlights notes (no web search, no invention) ----
+  const POLISH_LOC_SYSTEM = [
+    'You refine a real-estate "location highlights" line. Rewrite the agent\'s own notes into ONE concise, natural, appealing phrase a buyer reads after "you\'re ___" — e.g. "moments from Cottesloe Beach, the Napoleon Street cafés, and Grant Street station".',
+    'Use ONLY the places, amenities and details the agent gives you. Do NOT invent, add, guess or research anything new, and do not exaggerate. Just fix grammar and flow, trim filler, and make it read well.',
+    'NEVER mention schools or school catchments, crime, safety, or the demographic makeup of an area (anti-discrimination / fair-housing risk) — silently drop any such mention.',
+    'Output ONLY the finished phrase wrapped between [HL] and [/HL] and nothing else inside the markers — no lead-in like "here\'s" or "sure".',
+  ].join('\n');
+  const polishLocation = ({ text, region }) => call(
+    POLISH_LOC_SYSTEM,
+    `Polish this location-highlights line${REGION_NAME[region] ? ' (market: ' + REGION_NAME[region] + ')' : ''} and return it wrapped in [HL]…[/HL]:\n${text}`,
+    400,
+  ).then((t) => {
+    const m = t.match(/\[HL\]([\s\S]*?)\[\/HL\]/i);
+    return (m ? m[1] : t).replace(/^(here(?:'s| is)[^:]*:\s*|sure[,!]?\s*|location highlights:\s*)/i, '')
+      .replace(/^["'“]+|["'”]+$/g, '').trim();
+  });
+
   // ---- AI auto-layout: compose a full Design Studio graphic (structured JSON) -
   // The model only emits LAYOUT/COLOUR/TYPOGRAPHY decisions + references to real
   // facts — it never writes property copy or touches pixels. The studio binds
@@ -299,5 +316,5 @@ Now produce the JSON.`;
     return e && e.message ? e.message : 'Something went wrong.';
   };
 
-  return { MODELS, available, getKey, setKey, getModel, setModel, modelLabel, polish, instruct, buyerMatch, reelCaptions, research, designStyle, designLayout, editLayout, compliance, test, explain };
+  return { MODELS, available, getKey, setKey, getModel, setModel, modelLabel, polish, instruct, buyerMatch, reelCaptions, research, polishLocation, designStyle, designLayout, editLayout, compliance, test, explain };
 })();

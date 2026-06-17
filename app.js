@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v90';
+  const APP_VERSION = 'v91';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -2322,6 +2322,31 @@
       $('researchBtn').disabled = false;
     }
   };
+  // polish the agent's OWN location notes (rephrase, don't invent — distinct from Research)
+  const polishLocationField = async () => {
+    const note = (msg, kind) => { $('researchStatus').textContent = msg; $('researchStatus').className = 'parse-note' + (kind ? ' ' + kind : ''); };
+    if (!AI.available()) { $('brandSection').open = true; setTimeout(() => $('aiKey').focus(), 50); note('Add your API key in “Your brand” to enable AI.', 'err'); return; }
+    const cur = $('neighborhood').value.trim();
+    if (!cur) { note('Write a few location notes first, then polish them.', 'err'); $('neighborhood').focus(); return; }
+    if ($('polishLocBtn').disabled) return;
+    $('polishLocBtn').disabled = true;
+    const busy = startBusy($('researchStatus'), 'parse-note', 'Polishing your notes', '3–10s');
+    try {
+      const phrase = (await AI.polishLocation({ text: cur, region: brand.region }) || '').trim();
+      if ($('neighborhood').value.trim() !== cur) { busy.finish('Field changed — polish discarded.', 'err'); return; }   // don't overwrite a newer edit
+      if (phrase) {
+        $('neighborhood').value = phrase;
+        $('neighborhood').classList.remove('missing');
+        saveDraft();
+        busy.finish('✓ Polished — check it reads right, then Generate (or Reword).', 'ok');
+        if (outputs) generate(true, true);
+      } else busy.finish('No change returned — try again.', 'err');
+    } catch (e) {
+      busy.finish(AI.explain(e), 'err');
+    } finally {
+      $('polishLocBtn').disabled = false;
+    }
+  };
 
   // ---------------- events ----------------
   form.addEventListener('submit', (e) => { e.preventDefault(); generate(); });
@@ -2353,6 +2378,7 @@
     aiBusy(false, '↪ Redid the change', 'ok');
   });
   $('researchBtn').addEventListener('click', researchLocation);
+  $('polishLocBtn').addEventListener('click', polishLocationField);
   $('clearBtn').addEventListener('click', clearListing);
 
   // import + paste UX
