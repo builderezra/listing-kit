@@ -311,9 +311,12 @@ const Visuals = (() => {
 
     ctx.textAlign = 'center';
     const compact = kind === 'square' && thumbs;
-    y += compact ? 64 : 84;
-    if (d.ohLine) { ctx.font = font(600, compact ? 22 : 26); ctx.fillStyle = mut; ctx.fillText(d.ohLine, W / 2, y - (compact ? 36 : 46)); }
-    if (d.price) { ctx.font = font(700, compact ? 60 : kind === 'story' ? 88 : 72, priceFam(b, SERIF)); ctx.fillStyle = b.primary; ctx.fillText(d.price, W / 2, y); y += compact ? 46 : 58; }
+    const priceSize = compact ? 60 : kind === 'story' ? 88 : 72;
+    y += (compact ? 64 : 84) + (d.ohLine ? 12 : 0);   // extra room only when the open-home kicker is present
+    // open-home kicker sits a clear gap above the price (the serif price ascends ~0.72×its size,
+    // so a fixed 36/46px offset put the date inside the price glyphs)
+    if (d.ohLine) { ctx.font = font(600, compact ? 22 : 26); ctx.fillStyle = mut; ctx.fillText(d.ohLine, W / 2, y - Math.round(priceSize * 0.72) - 12); }
+    if (d.price) { ctx.font = font(700, priceSize, priceFam(b, SERIF)); ctx.fillStyle = b.primary; ctx.fillText(d.price, W / 2, y); y += compact ? 46 : 58; }
     if (d.address) { ctx.font = font(400, compact ? 27 : kind === 'story' ? 36 : 31); ctx.fillStyle = ink; ctx.fillText(d.address, W / 2, y); y += compact ? 40 : 52; }
     if (!compact) { ctx.fillStyle = b.accent; ctx.fillRect(W / 2 - 45, y - 14, 90, 3); y += 38; }
     const stats = statText(d);
@@ -374,9 +377,10 @@ const Visuals = (() => {
     badge(ctx, 0, 0, d.badgeText, b.accent, onColor(b.accent), kind === 'story' ? 30 : 26, 10);
     ctx.restore();
 
-    y = m + photoH + (kind === 'story' ? 150 : 110);
-    if (d.ohLine) { ctx.font = font(600, kind === 'story' ? 28 : 24); ctx.fillStyle = alpha('#ffffff', 0.92); ctx.fillText(d.ohLine, m + 16, y - (kind === 'story' ? 88 : 64)); }
-    if (d.price) { ctx.font = font(800, kind === 'story' ? 104 : 88, priceFam(b, SANS)); ctx.fillStyle = fg; ctx.fillText(d.price, m + 16, y); y += kind === 'story' ? 66 : 56; }
+    const bPriceSize = kind === 'story' ? 104 : 88;
+    y = m + photoH + (kind === 'story' ? 150 : (d.ohLine ? 130 : 110));   // extra room for the open-home kicker so it clears the badge above + the price below
+    if (d.ohLine) { ctx.font = font(600, kind === 'story' ? 28 : 24); ctx.fillStyle = alpha('#ffffff', 0.92); ctx.fillText(d.ohLine, m + 16, y - Math.round(bPriceSize * 0.72) - 14); }
+    if (d.price) { ctx.font = font(800, bPriceSize, priceFam(b, SANS)); ctx.fillStyle = fg; ctx.fillText(d.price, m + 16, y); y += kind === 'story' ? 66 : 56; }
     if (d.address) { ctx.font = font(400, kind === 'story' ? 38 : 33); ctx.fillStyle = alpha(fg === '#ffffff' ? '#ffffff' : '#1c2b30', 0.85); ctx.fillText(d.address, m + 16, y); y += kind === 'story' ? 84 : 66; }
     let cx = m + 16;
     [bdN(d) && `${bdN(d)} BD`, d.baths && `${d.baths} BA`, d.cars && `${d.cars} CAR`, d.sqft && `${d.sqft} ${areaLabel(d)}`].filter(Boolean).forEach((t) => {
@@ -404,8 +408,8 @@ const Visuals = (() => {
     g.addColorStop(0, 'rgba(0,0,0,0.32)'); g.addColorStop(1, 'rgba(0,0,0,0)');
     ctx.fillStyle = g; ctx.fillRect(0, 0, W, 220);
     const m = wide ? 34 : 44;
-    badge(ctx, m, m, d.badgeText, '#ffffff', '#1c2b30', wide ? 20 : 26);
-    if (d.ohLine) { ctx.font = font(600, wide ? 18 : 22); ctx.fillStyle = '#fff'; ctx.fillText(d.ohLine, m + 4, m + (wide ? 52 : 64)); }
+    const mbd = badge(ctx, m, m, d.badgeText, '#ffffff', '#1c2b30', wide ? 20 : 26);
+    if (d.ohLine) { ctx.font = font(600, wide ? 18 : 22); ctx.fillStyle = '#fff'; ctx.fillText(d.ohLine, m + 4, m + mbd.h + (wide ? 24 : 30)); }   // sit a clear gap below the badge (was a hardcoded offset that touched it)
     const pad = wide ? 30 : 40;
     const cardW = wide ? Math.min(560, Math.round(W * 0.5)) : W - m * 2;
     const cardH = story ? 384 : wide ? 250 : 300;
@@ -491,6 +495,7 @@ const Visuals = (() => {
       ctx.fillStyle = b.accent; ctx.fillRect(W - panelW, 0, 6, H);
       badge(ctx, 36, 36, d.badgeText, b.accent, onColor(b.accent), 22);
       const px = W - panelW + 44; let y = 220;
+      if (d.ohLine) { ctx.fillStyle = b.accent; fitFont(ctx, d.ohLine.toUpperCase(), W - px - 44, 18, 700, SANS); ctx.fillText(d.ohLine.toUpperCase(), px, y - 58); }   // open-home date (was missing from the banner)
       if (d.price) { ctx.font = font(800, 58, priceFam(b, SANS)); ctx.fillStyle = fg; ctx.fillText(d.price, px, y); y += 54; }
       if (d.address) { ctx.font = font(400, 25); ctx.fillStyle = alpha(fg, 0.9); ctx.fillText(d.address, px, y); y += 40; }
       ctx.fillStyle = b.accent; ctx.fillRect(px, y - 8, 52, 4); y += 36;
@@ -507,8 +512,10 @@ const Visuals = (() => {
     ctx.fillStyle = b.accent; ctx.fillRect(0, H - bandH, W, 6);
     const m = 56;
     badge(ctx, m - 8, 40, d.badgeText, b.accent, onColor(b.accent), story ? 30 : 26);
-    let y = H - bandH + (story ? 118 : 92);
-    if (d.price) { ctx.font = font(800, story ? 104 : 80, priceFam(b, SANS)); ctx.fillStyle = fg; ctx.fillText(d.price, m, y); y += story ? 60 : 50; }
+    const bnPrice = story ? 104 : 80;
+    let y = H - bandH + (story ? 118 : 92) + (d.ohLine ? (story ? 30 : 24) : 0);   // make room for the open-home date kicker
+    if (d.ohLine) { ctx.fillStyle = b.accent; fitFont(ctx, d.ohLine.toUpperCase(), W - m * 2, story ? 24 : 19, 700, SANS); ctx.fillText(d.ohLine.toUpperCase(), m, y - Math.round(bnPrice * 0.72) - 14); }   // open-home date (was missing)
+    if (d.price) { ctx.font = font(800, bnPrice, priceFam(b, SANS)); ctx.fillStyle = fg; ctx.fillText(d.price, m, y); y += story ? 60 : 50; }
     if (d.address) { ctx.font = font(400, story ? 36 : 30); ctx.fillStyle = alpha(fg, 0.92); ctx.fillText(d.address, m, y); y += story ? 50 : 42; }
     ctx.fillStyle = b.accent; ctx.fillRect(m, y - 14, 56, 4); y += 26;
     const stats = statText(d); if (stats) { ctx.font = font(600, story ? 27 : 23); spacing(ctx, 3); ctx.fillStyle = fg; ctx.fillText(stats, m, y); spacing(ctx, 0); }
