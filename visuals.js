@@ -192,12 +192,17 @@ const Visuals = (() => {
     return h;
   };
 
+  // a studio is "0" beds — suppress it (don't render "0 BD"); custom area units pass through
+  const bdN = (d) => (Number(d.beds) > 0 ? d.beds : null);
+  const areaLabel = (d, compact) => d.areaUnit === 'sqm' ? 'M²'
+    : d.areaUnit === 'sqft' ? (compact ? 'SF' : 'SQ FT')
+    : (d.areaUnit ? String(d.areaUnit).toUpperCase() : (compact ? 'SF' : 'SQ FT'));
   const statText = (d) => {
     const p = [];
-    if (d.beds) p.push(`${d.beds} BD`);
+    if (bdN(d)) p.push(`${bdN(d)} BD`);
     if (d.baths) p.push(`${d.baths} BA`);
     if (d.cars) p.push(`${d.cars} CAR`);
-    if (d.sqft) p.push(`${d.sqft} ${d.areaUnit === 'sqm' ? 'M²' : 'SQ FT'}`);
+    if (d.sqft) p.push(`${d.sqft} ${areaLabel(d)}`);
     return p.join('   ·   ');
   };
 
@@ -347,7 +352,7 @@ const Visuals = (() => {
       if (d.price) { ctx.font = font(800, 64, priceFam(b, SANS)); ctx.fillStyle = fg; ctx.fillText(d.price, contentX, y); y += 52; }
       if (d.address) { ctx.font = font(400, 26); ctx.fillStyle = alpha(fg === '#ffffff' ? '#ffffff' : '#1c2b30', 0.85); ctx.fillText(d.address, contentX, y); y += 64; }
       let cx = contentX;
-      [d.beds && `${d.beds} BD`, d.baths && `${d.baths} BA`, d.cars && `${d.cars} CAR`, d.sqft && `${d.sqft} ${d.areaUnit === 'sqm' ? 'M²' : 'SF'}`].filter(Boolean).forEach((t) => {
+      [bdN(d) && `${bdN(d)} BD`, d.baths && `${d.baths} BA`, d.cars && `${d.cars} CAR`, d.sqft && `${d.sqft} ${areaLabel(d, true)}`].filter(Boolean).forEach((t) => {
         cx += chip(ctx, cx, y, t, b.accent, fg, 20).w + 12;
       });
       ctx.font = font(700, 24); ctx.fillStyle = fg;
@@ -374,7 +379,7 @@ const Visuals = (() => {
     if (d.price) { ctx.font = font(800, kind === 'story' ? 104 : 88, priceFam(b, SANS)); ctx.fillStyle = fg; ctx.fillText(d.price, m + 16, y); y += kind === 'story' ? 66 : 56; }
     if (d.address) { ctx.font = font(400, kind === 'story' ? 38 : 33); ctx.fillStyle = alpha(fg === '#ffffff' ? '#ffffff' : '#1c2b30', 0.85); ctx.fillText(d.address, m + 16, y); y += kind === 'story' ? 84 : 66; }
     let cx = m + 16;
-    [d.beds && `${d.beds} BD`, d.baths && `${d.baths} BA`, d.cars && `${d.cars} CAR`, d.sqft && `${d.sqft} ${d.areaUnit === 'sqm' ? 'M²' : 'SQ FT'}`].filter(Boolean).forEach((t) => {
+    [bdN(d) && `${bdN(d)} BD`, d.baths && `${d.baths} BA`, d.cars && `${d.cars} CAR`, d.sqft && `${d.sqft} ${areaLabel(d)}`].filter(Boolean).forEach((t) => {
       cx += chip(ctx, cx, y, t, b.accent, fg, kind === 'story' ? 26 : 23).w + 14;
     });
 

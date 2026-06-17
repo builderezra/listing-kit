@@ -7,7 +7,7 @@
   const $ = (id) => document.getElementById(id);
   const form = $('listingForm');
   const BRAND_KEY = 'lk_brand_v2';
-  const APP_VERSION = 'v88';
+  const APP_VERSION = 'v89';
 
   // ---------------- state ----------------
   let photos = [];        // [{url, img, name}] — hero is photos[heroIndex]
@@ -1048,7 +1048,8 @@
   // the listing facts the studio binds its price/address/stats/badge layers to
   const studioFields = () => {
     const d = vizData();
-    const stats = [d.beds && d.beds + ' BD', d.baths && d.baths + ' BA', d.cars && d.cars + ' CAR', d.sqft && d.sqft + ' ' + (d.areaUnit === 'sqm' ? 'M²' : 'SQ FT')].filter(Boolean).join('  ·  ');
+    const aLbl = d.areaUnit === 'sqm' ? 'M²' : d.areaUnit === 'sqft' ? 'SQ FT' : (d.areaUnit ? String(d.areaUnit).toUpperCase() : 'SQ FT');
+    const stats = [(Number(d.beds) > 0) && d.beds + ' BD', d.baths && d.baths + ' BA', d.cars && d.cars + ' CAR', d.sqft && d.sqft + ' ' + aLbl].filter(Boolean).join('  ·  ');
     return { photos: d.photos, fields: { price: d.price, address: d.address, stats, badge: d.badgeText } };
   };
   // open the design studio from anywhere (works before a kit is generated too)
@@ -1189,7 +1190,7 @@
     const addr = d.address || 'the property';
     const whenStr = [when.date, when.time].filter(Boolean).join(', ');
     const sign = [brand.agentName, brand.brokerage].filter(Boolean).join(', ');
-    const beds = [d.beds && `${d.beds} bed`, d.baths && `${d.baths} bath`, d.cars && `${d.cars} car`].filter(Boolean).join(', ');
+    const beds = [(Number(d.beds) > 0) && `${d.beds} bed`, d.baths && `${d.baths} bath`, d.cars && `${d.cars} car`].filter(Boolean).join(', ');
     let text;
     if (tone === 'email') {
       const greeting = (p.greeting ? p.greeting.trim().replace(/[,!.]*$/, '') : 'Hi there') + ',';
@@ -2155,7 +2156,7 @@
     if (d.address) L.push(`Address: ${d.address}${d.city ? ', ' + d.city : ''}`);
     if (Generator.money(d.price)) L.push(d.mode === 'rent' ? `Rent: ${Generator.priceLong(d)}` : `Price: ${Generator.money(d.price, d.currency)}`);
     L.push(`Property type: ${d.type === 'customtype' && d.typeCustom ? d.typeCustom : (TYPE_WORD[d.type] || 'home')}`);
-    const bb = [d.beds && `${d.beds} bed`, d.baths && `${d.baths} bath`, d.cars && `${d.cars} car`].filter(Boolean);
+    const bb = [(Number(d.beds) > 0) && `${d.beds} bed`, d.baths && `${d.baths} bath`, d.cars && `${d.cars} car`].filter(Boolean);
     if (bb.length) L.push(`Configuration: ${bb.join(', ')}`);
     if (Generator.num(d.sqft)) L.push(`Internal size: ${Generator.num(d.sqft)} ${d.areaUnit === 'sqm' ? 'm²' : d.areaUnit === 'sqft' ? 'sq ft' : d.areaUnit}`);
     if (d.lot) L.push(`Land / block: ${d.lot}`);
