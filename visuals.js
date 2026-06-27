@@ -170,14 +170,18 @@ const Visuals = (() => {
     ctx.fillStyle = bg;
     ctx.fillRect(0, H - h, W, h);
     const pad = h * 0.36, cy = H - h / 2;
+    // reserve the right side for the headshot + logo so a long name/agency fits to its left
+    const hasHead = brand.headImg && brand.headImg.width;
+    const hasLogo = brand.watermark && brand.logoImg && brand.logoImg.width;
+    const textMaxW = W - pad * 2 - (hasHead ? h * 0.88 : 0) - (hasLogo ? h * 0.7 : 0);
     ctx.fillStyle = fg;
-    ctx.font = font(700, h * 0.3);
     const name = brand.agentName || 'Your Name Here';
+    fitFont(ctx, name, textMaxW, h * 0.3, 700, SANS);
     ctx.fillText(name, pad, cy - (brand.brokerage || brand.phone ? h * 0.06 : -h * 0.1));
     const sub = [brand.brokerage, brand.phone].filter(Boolean).join('  ·  ');
     if (sub) {
       ctx.globalAlpha = 0.82;
-      ctx.font = font(400, h * 0.22);
+      fitFont(ctx, sub, textMaxW, h * 0.22, 400, SANS);
       ctx.fillText(sub, pad, cy + h * 0.27);
       ctx.globalAlpha = 1;
     }
@@ -247,7 +251,7 @@ const Visuals = (() => {
       y -= statSize * 1.7;
     }
     if (d.address) {
-      ctx.font = font(400, addrSize);
+      fitFont(ctx, d.address, W - m * 2, addrSize, 400, SANS);   // shrink a long address to fit instead of running off the card
       ctx.fillStyle = 'rgba(255,255,255,0.94)';
       ctx.fillText(d.address, m, y);
       y -= addrSize * 1.45;
@@ -317,7 +321,7 @@ const Visuals = (() => {
     // so a fixed 36/46px offset put the date inside the price glyphs)
     if (d.ohLine) { ctx.font = font(600, compact ? 22 : 26); ctx.fillStyle = mut; ctx.fillText(d.ohLine, W / 2, y - Math.round(priceSize * 0.72) - 12); }
     if (d.price) { ctx.font = font(700, priceSize, priceFam(b, SERIF)); ctx.fillStyle = b.primary; ctx.fillText(d.price, W / 2, y); y += compact ? 46 : 58; }
-    if (d.address) { ctx.font = font(400, compact ? 27 : kind === 'story' ? 36 : 31); ctx.fillStyle = ink; ctx.fillText(d.address, W / 2, y); y += compact ? 40 : 52; }
+    if (d.address) { fitFont(ctx, d.address, W - 128, compact ? 27 : kind === 'story' ? 36 : 31, 400, SANS); ctx.fillStyle = ink; ctx.fillText(d.address, W / 2, y); y += compact ? 40 : 52; }
     if (!compact) { ctx.fillStyle = b.accent; ctx.fillRect(W / 2 - 45, y - 14, 90, 3); y += 38; }
     const stats = statText(d);
     if (stats) { ctx.font = font(600, compact ? 22 : kind === 'story' ? 28 : 24); spacing(ctx, 5); ctx.fillStyle = ink; ctx.fillText(stats, W / 2, y); spacing(ctx, 0); }
@@ -328,7 +332,7 @@ const Visuals = (() => {
     ctx.font = font(700, kind === 'story' ? 30 : 26); ctx.fillStyle = ink;
     ctx.fillText(b.agentName || 'Your Name Here', W / 2, baseY);
     const sub = [b.brokerage, b.phone].filter(Boolean).join('  ·  ');
-    if (sub) { ctx.font = font(400, kind === 'story' ? 24 : 20); ctx.fillStyle = mut; ctx.fillText(sub, W / 2, baseY + (kind === 'story' ? 38 : 32)); }
+    if (sub) { fitFont(ctx, sub, W - 128, kind === 'story' ? 24 : 20, 400, SANS); ctx.fillStyle = mut; ctx.fillText(sub, W / 2, baseY + (kind === 'story' ? 38 : 32)); }
     ctx.textAlign = 'left';
   };
 
@@ -381,7 +385,7 @@ const Visuals = (() => {
     y = m + photoH + (kind === 'story' ? 150 : (d.ohLine ? 130 : 110));   // extra room for the open-home kicker so it clears the badge above + the price below
     if (d.ohLine) { ctx.font = font(600, kind === 'story' ? 28 : 24); ctx.fillStyle = alpha('#ffffff', 0.92); ctx.fillText(d.ohLine, m + 16, y - Math.round(bPriceSize * 0.72) - 14); }
     if (d.price) { ctx.font = font(800, bPriceSize, priceFam(b, SANS)); ctx.fillStyle = fg; ctx.fillText(d.price, m + 16, y); y += kind === 'story' ? 66 : 56; }
-    if (d.address) { ctx.font = font(400, kind === 'story' ? 38 : 33); ctx.fillStyle = alpha(fg === '#ffffff' ? '#ffffff' : '#1c2b30', 0.85); ctx.fillText(d.address, m + 16, y); y += kind === 'story' ? 84 : 66; }
+    if (d.address) { fitFont(ctx, d.address, W - (m + 16) * 2, kind === 'story' ? 38 : 33, 400, SANS); ctx.fillStyle = alpha(fg === '#ffffff' ? '#ffffff' : '#1c2b30', 0.85); ctx.fillText(d.address, m + 16, y); y += kind === 'story' ? 84 : 66; }
     let cx = m + 16;
     [bdN(d) && `${bdN(d)} BD`, d.baths && `${d.baths} BA`, d.cars && `${d.cars} CAR`, d.sqft && `${d.sqft} ${areaLabel(d)}`].filter(Boolean).forEach((t) => {
       cx += chip(ctx, cx, y, t, b.accent, fg, kind === 'story' ? 26 : 23).w + 14;
@@ -458,11 +462,12 @@ const Visuals = (() => {
       ctx.font = font(600, 18); spacing(ctx, 6); ctx.fillStyle = b.accent; ctx.fillText(kicker, cx, y); spacing(ctx, 0); y += 78;
       if (d.price) { ctx.font = font(500, 62, SERIF); ctx.fillStyle = ink; ctx.fillText(d.price, cx, y); y += 56; }
       ctx.strokeStyle = alpha(b.accent, 0.85); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(cx - 42, y - 8); ctx.lineTo(cx + 42, y - 8); ctx.stroke(); y += 44;
-      if (d.address) { ctx.font = font(400, 26); ctx.fillStyle = mut; ctx.fillText(d.address, cx, y); y += 52; }
+      const lxPanelW = W - Math.round(W * 0.5) - 88;   // right-panel content width (fit long values to it)
+      if (d.address) { fitFont(ctx, d.address, lxPanelW, 26, 400, SANS); ctx.fillStyle = mut; ctx.fillText(d.address, cx, y); y += 52; }
       const stats = statText(d); if (stats) { ctx.font = font(500, 20); spacing(ctx, 3); ctx.fillStyle = ink; ctx.fillText(stats, cx, y); spacing(ctx, 0); }
       if (b.headImg && b.headImg.width) circleImg(ctx, b.headImg, 44 + 62, H - 44 - 62, 116, b.accent);   // over the photo's bottom-left (the right panel is too tight)
-      ctx.font = font(500, 24, SERIF); ctx.fillStyle = ink; ctx.fillText(b.agentName || 'Your Name Here', cx, H - 104);
-      const sub = [b.brokerage, b.phone].filter(Boolean).join('   ·   '); if (sub) { ctx.font = font(400, 18); ctx.fillStyle = mut; ctx.fillText(sub, cx, H - 74); }
+      fitFont(ctx, b.agentName || 'Your Name Here', lxPanelW, 24, 500, SERIF); ctx.fillStyle = ink; ctx.fillText(b.agentName || 'Your Name Here', cx, H - 104);
+      const sub = [b.brokerage, b.phone].filter(Boolean).join('   ·   '); if (sub) { fitFont(ctx, sub, lxPanelW, 18, 400, SANS); ctx.fillStyle = mut; ctx.fillText(sub, cx, H - 74); }
       ctx.textAlign = 'left'; return;
     }
     const mm = 56, photoTop = mm + (story ? 36 : 26);
@@ -475,7 +480,7 @@ const Visuals = (() => {
     ctx.fillText(kicker, W / 2, y - (story ? 92 : 76)); spacing(ctx, 0);
     if (d.price) { ctx.font = font(500, story ? 92 : 76, SERIF); ctx.fillStyle = ink; ctx.fillText(d.price, W / 2, y); y += story ? 60 : 52; }
     ctx.strokeStyle = alpha(b.accent, 0.85); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(W / 2 - 44, y - 10); ctx.lineTo(W / 2 + 44, y - 10); ctx.stroke(); y += 40;
-    if (d.address) { ctx.font = font(400, story ? 34 : 30); ctx.fillStyle = mut; ctx.fillText(d.address, W / 2, y); y += story ? 52 : 46; }
+    if (d.address) { fitFont(ctx, d.address, W - 112, story ? 34 : 30, 400, SANS); ctx.fillStyle = mut; ctx.fillText(d.address, W / 2, y); y += story ? 52 : 46; }
     const stats = statText(d); if (stats) { ctx.font = font(500, story ? 26 : 23); spacing(ctx, 3); ctx.fillStyle = ink; ctx.fillText(stats, W / 2, y); spacing(ctx, 0); }
     const baseY = H - (story ? 104 : 84);
     if (b.headImg && b.headImg.width) { const hd = story ? 168 : 104; circleImg(ctx, b.headImg, W / 2, baseY - (story ? 150 : 92), hd, b.accent); }
@@ -497,7 +502,7 @@ const Visuals = (() => {
       const px = W - panelW + 44; let y = 220;
       if (d.ohLine) { ctx.fillStyle = b.accent; fitFont(ctx, d.ohLine.toUpperCase(), W - px - 44, 18, 700, SANS); ctx.fillText(d.ohLine.toUpperCase(), px, y - 58); }   // open-home date (was missing from the banner)
       if (d.price) { ctx.font = font(800, 58, priceFam(b, SANS)); ctx.fillStyle = fg; ctx.fillText(d.price, px, y); y += 54; }
-      if (d.address) { ctx.font = font(400, 25); ctx.fillStyle = alpha(fg, 0.9); ctx.fillText(d.address, px, y); y += 40; }
+      if (d.address) { fitFont(ctx, d.address, W - px - 44, 25, 400, SANS); ctx.fillStyle = alpha(fg, 0.9); ctx.fillText(d.address, px, y); y += 40; }
       ctx.fillStyle = b.accent; ctx.fillRect(px, y - 8, 52, 4); y += 36;
       const stats = statText(d); if (stats) { ctx.font = font(600, 20); spacing(ctx, 3); ctx.fillStyle = fg; ctx.fillText(stats, px, y); spacing(ctx, 0); }
       ctx.font = font(700, 24); ctx.fillStyle = fg; ctx.fillText(b.agentName || 'Your Name Here', px, H - 108);
@@ -516,7 +521,7 @@ const Visuals = (() => {
     let y = H - bandH + (story ? 118 : 92) + (d.ohLine ? (story ? 30 : 24) : 0);   // make room for the open-home date kicker
     if (d.ohLine) { ctx.fillStyle = b.accent; fitFont(ctx, d.ohLine.toUpperCase(), W - m * 2, story ? 24 : 19, 700, SANS); ctx.fillText(d.ohLine.toUpperCase(), m, y - Math.round(bnPrice * 0.72) - 14); }   // open-home date (was missing)
     if (d.price) { ctx.font = font(800, bnPrice, priceFam(b, SANS)); ctx.fillStyle = fg; ctx.fillText(d.price, m, y); y += story ? 60 : 50; }
-    if (d.address) { ctx.font = font(400, story ? 36 : 30); ctx.fillStyle = alpha(fg, 0.92); ctx.fillText(d.address, m, y); y += story ? 50 : 42; }
+    if (d.address) { fitFont(ctx, d.address, W - m * 2, story ? 36 : 30, 400, SANS); ctx.fillStyle = alpha(fg, 0.92); ctx.fillText(d.address, m, y); y += story ? 50 : 42; }
     ctx.fillStyle = b.accent; ctx.fillRect(m, y - 14, 56, 4); y += 26;
     const stats = statText(d); if (stats) { ctx.font = font(600, story ? 27 : 23); spacing(ctx, 3); ctx.fillStyle = fg; ctx.fillText(stats, m, y); spacing(ctx, 0); }
     const ry = H - (story ? 70 : 54);
